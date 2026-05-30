@@ -24,6 +24,7 @@ from behavioral_md.visualization import (
     plot_atom_series,
     plot_energy,
     plot_food_biomass,
+    plot_force_decomposition,
     plot_learning_curve,
     plot_occupancy_landscape,
     plot_weight_acquisition,
@@ -80,6 +81,10 @@ def main() -> None:
     weights_df = pd.DataFrame([r for res in results for r in res["weights"]])
 
     rep_log, best = representative_log()
+    # A mature, long-lived life for the force decomposition (learning accumulated).
+    rep_steps = rep_log.groupby("episode")["timestep"].max()
+    mature = rep_steps[rep_steps.index >= N_EPISODES // 2]
+    mature_ep = int(mature.idxmax()) if len(mature) else best
 
     drive_atoms = ["approach_food", "avoid_danger", "approach_light", "orient_to_cue"]
     action_atoms = ["move_up", "move_down", "move_left", "move_right", "consume", "pause"]
@@ -94,6 +99,8 @@ def main() -> None:
                          FIG_DIR / "activation.png", ylabel="Activation"),
         plot_atom_series(rep_log, best, "atom_force", drive_atoms,
                          FIG_DIR / "drive_force.png", ylabel="Force"),
+        plot_force_decomposition(rep_log, mature_ep, "approach_food",
+                                 FIG_DIR / "force_decomposition.png"),
     ]
     print(f"Population: {N_AGENTS} agents (95% CI). Representative agent seed {REP_SEED}.")
     print("Wrote figures:")
