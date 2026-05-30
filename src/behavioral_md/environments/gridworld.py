@@ -91,6 +91,7 @@ class BehavioralFieldEnv(gym.Env):
                 "danger_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "light_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "cue_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                "food_contact": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "last_consequence": spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32),
             }
         )
@@ -159,36 +160,43 @@ class BehavioralFieldEnv(gym.Env):
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         action = int(action)
-        consequence = 0.0
-        consumed = False
 
         if action in _MOVES:
             self._attempt_move(_MOVES[action])
-        elif action == 5:  # consume
-            if self._distance(self.position, self.food_pos) <= self.consume_radius:
-                if self.food_reinforces:
-                    consequence += self.FOOD_REWARD
-                    consumed = True
-        # action 0 (no-op) and 6 (pause) do not move the organism.
+        # action 0 (no-op), 5 (consume), 6 (pause) do not move the organism.
 
-        # Passive danger contact: standing on danger always has a consequence.
-        if self._distance(self.position, self.danger_pos) <= self.consume_radius:
-            consequence += self.DANGER_REWARD
+        # Foraging world: ingestion happens on CONTACT with food (time-at-patch
+        # feeding), not via a consume action. Food persists -- eating does NOT
+        # end the world. (The instrumental consume/press operant lives in the
+        # operant-chamber environment instead.)
+        at_food = (
+            self.food_reinforces
+            and self._distance(self.position, self.food_pos) <= self.consume_radius
+        )
 
-        self.last_consequence = consequence
+        # Danger contact: binary for now (Phase 5 will gate detection by light).
+        danger_contact = (
+            1.0 if self._distance(self.position, self.danger_pos) <= self.consume_radius else 0.0
+        )
+
+        self.last_consequence = float(at_food) - danger_contact
         self.t += 1
 
-        terminated = consumed  # episode ends when food is successfully consumed
+        # No environmental terminal state: the world is endless. Death (energy
+        # depletion) is the organism's terminal condition, handled by the loop.
+        terminated = False
         truncated = self.t >= self.config.max_steps
 
         obs = self._build_observation()
         info = self._build_info()
-        info["consumed"] = consumed
+        info["at_food"] = at_food
+        info["food_consumed"] = at_food  # in-contact step (used for latency/intake)
+        info["danger_contact"] = danger_contact
         info["action_name"] = ACTIONS[action]
 
         if self.render_mode == "human":
             self.render()
-        return obs, float(consequence), terminated, truncated, info
+        return obs, self.last_consequence, terminated, truncated, info
 
     def render(self) -> np.ndarray | None:
         if self.render_mode in (None, "none"):
@@ -246,6 +254,12 @@ class BehavioralFieldEnv(gym.Env):
                 [self._intensity(self.light_pos)], dtype=np.float32
             ),
             "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
+            # Sharp binary contact signal: 1.0 only within consume_radius of food.
+            "food_contact": np.array(
+                [1.0 if self._distance(self.position, self.food_pos) <= self.consume_radius
+                 else 0.0],
+                dtype=np.float32,
+            ),
             "last_consequence": np.array([self.last_consequence], dtype=np.float32),
         }
 

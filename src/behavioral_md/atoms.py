@@ -76,6 +76,10 @@ class BehavioralAtom:
     # sensing (approach/locomotion). A large value makes the atom respond only
     # near maximal intensity, i.e. on contact -- used for consummatory responses.
     contact_exponent: float = 1.0
+    # Consummatory atoms (e.g. consume) are driven by a sharp binary food-contact
+    # signal rather than the broad navigation field, so they fire ONLY at food.
+    # This keeps the organism stationary at food (consummatory > locomotion there).
+    consummatory: bool = False
 
     @property
     def activation(self) -> float:
@@ -113,6 +117,7 @@ def _atom(
     history: dict[str, float] | None = None,
     direction: tuple[float, float] | None = None,
     contact_exponent: float = 1.0,
+    consummatory: bool = False,
 ) -> BehavioralAtom:
     """Construct an atom initialized at its baseline activation (zero velocity)."""
     state = np.array([baseline], dtype=np.float64)
@@ -127,6 +132,7 @@ def _atom(
         history_weights=dict.fromkeys(STIMULI, 0.0) | (history or {}),
         direction=None if direction is None else np.array(direction, dtype=np.float64),
         contact_exponent=contact_exponent,
+        consummatory=consummatory,
     )
 
 
@@ -144,9 +150,12 @@ def default_atom_set() -> list[BehavioralAtom]:
         _atom("avoid_danger", sensitivity={"danger": 1.0}),
         _atom("approach_light", sensitivity={"light": 0.3}),
         _atom("orient_to_cue", sensitivity={"cue": 0.0}),  # neutral until trained
-        # consume is contact-gated (responds only at near-maximal food intensity).
-        _atom("consume", sensitivity={"food": 1.0}, contact_exponent=6.0),
-        _atom("pause", mass=1.5, sensitivity={"danger": 0.5}),
+        # consume is consummatory: driven by a sharp binary food-contact signal,
+        # so it fires only AT food and holds the organism there to feed.
+        _atom("consume", sensitivity={"food": 1.0}, consummatory=True),
+        # Freezing is evoked by *proximal* threat, so danger is contact-gated
+        # (otherwise distant danger drives constant freezing under a broad field).
+        _atom("pause", mass=1.5, sensitivity={"danger": 0.5}, contact_exponent=4.0),
         _atom("explore", baseline=0.2, sensitivity={}),
         # --- Directional movement atoms ------------------------------------
         # Weak innate food approach (+) and innate danger avoidance (-) enter

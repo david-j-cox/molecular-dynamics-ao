@@ -13,12 +13,16 @@ import numpy as np
 
 from behavioral_md.atoms import ACTION_ATOMS, STIMULI, BehavioralAtom, default_atom_set
 from behavioral_md.config import SimulationConfig
+from behavioral_md.consequence import ConsequenceEvent, make_consequence_model
 from behavioral_md.forces import (
     ForceCalculator,
     ForceComponents,
     sensory_from_observation,
 )
 from behavioral_md.learning import EligibilityTrace, update_history
+
+# Movement actions (cost more energy than resting/consuming).
+_MOVE_ACTIONS = frozenset({1, 2, 3, 4})
 
 
 class Organism:
@@ -38,8 +42,12 @@ class Organism:
         self.force_calc = ForceCalculator(self.atoms, coupling_matrix, self.config)
         self.eligibility = EligibilityTrace(len(self.atoms), self.config.eligibility_decay)
         self.rng = rng or np.random.default_rng(self.config.seed)
+        self.consequence_model = make_consequence_model(self.config)
 
-        self.hunger = self.config.hunger_init
+        # Objective physical state.
+        self.energy = self.config.energy_init
+        self.alive = True
+        self.cause_of_death: str | None = None
         # Most-recent step bookkeeping, exposed for logging.
         self.last_force = np.zeros(len(self.atoms))
         self.last_components: ForceComponents | None = None
@@ -50,11 +58,13 @@ class Organism:
     # Lifecycle
     # ------------------------------------------------------------------ #
     def reset(self, observation: dict[str, np.ndarray]) -> None:
-        """Reset atom states, eligibility, and motivation for a new episode."""
+        """Reset atom states, eligibility, and energy for a new life."""
         for atom in self.atoms:
             atom.reset()
         self.eligibility.reset()
-        self.hunger = self.config.hunger_init
+        self.energy = self.config.energy_init
+        self.alive = True
+        self.cause_of_death = None
         self.last_force = np.zeros(len(self.atoms))
         self.last_components = None
         self.last_intensities = self._intensities(observation)
@@ -65,7 +75,7 @@ class Organism:
         sensory = sensory_from_observation(observation)
         self.last_intensities = {s: sensory[s].intensity for s in STIMULI}
 
-        force, components = self.force_calc.compute(sensory, self.hunger)
+        force, components = self.force_calc.compute(sensory, self.energy)
         self.last_force = force
         self.last_components = components
 
@@ -115,19 +125,36 @@ class Organism:
         self,
         observation: dict[str, np.ndarray],
         action: int,
-        consequence: float,
         info: dict,
     ) -> None:
-        """Update motivation and learning history from the delivered consequence."""
-        # Motivating operation: hunger grows over time, drops on consumption.
-        cfg = self.config
-        self.hunger = min(cfg.hunger_max, self.hunger + cfg.hunger_growth)
-        if info.get("consumed", False):
-            self.hunger = max(0.0, self.hunger - cfg.hunger_drop_on_food)
+        """Run energy bookkeeping and the learning-history update for one step.
 
+        Energy flows: ``E <- E - basal - move/rest cost + contingent energy
+        (food intake - danger loss)``. Depletion to zero is death. The learning
+        consequence is the consequence model's signal (delta-E by default).
+        """
+        cfg = self.config
+
+        # 1. Contingent events -> energy + learning signal (via the model).
+        event = ConsequenceEvent(
+            food_intake=cfg.food_intake_rate if info.get("at_food", False) else 0.0,
+            danger_contact=float(info.get("danger_contact", 0.0)),
+        )
+        intake = self.consequence_model.energy_delta(event)
+        consequence = self.consequence_model.learning_signal(event)
+
+        # 2. Objective energy bookkeeping (intake minus metabolic expenditure).
+        expenditure = cfg.basal_metabolism + (
+            cfg.move_cost if action in _MOVE_ACTIONS else cfg.rest_cost
+        )
+        self.energy = float(np.clip(self.energy + intake - expenditure, 0.0, cfg.energy_capacity))
+        if self.energy <= 0.0 and self.alive:
+            self.alive = False
+            self.cause_of_death = "danger" if event.danger_contact > 0.0 else "starvation"
+
+        # 3. Learning-history update (recency-weighted credit across present cues).
         intensities = self._intensities(observation)
-        # A neutral cue can be paired with the consequence by the demos.
-        source = info.get("credit_source")
+        source = info.get("credit_source")  # demos may pair a neutral cue
         update_history(
             self.atoms,
             self.eligibility,

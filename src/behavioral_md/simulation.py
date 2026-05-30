@@ -57,7 +57,8 @@ class DataLogger:
             "danger_intensity": intensities["danger"],
             "light_intensity": intensities["light"],
             "cue_intensity": intensities["cue"],
-            "hunger": organism.hunger,
+            "energy": organism.energy,
+            "alive": organism.alive,
         }
         for i, atom in enumerate(organism.atoms):
             row = dict(base)
@@ -116,20 +117,27 @@ def run_episode(
     reset_options: dict[str, Any] | None = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
-    """Run one episode; return a summary dict (steps, consumed, latency, ...)."""
+    """Run one life; return a summary dict.
+
+    The world is continuous: the episode ends only on **death** (energy
+    depletion) or truncation at ``max_steps``. ``latency`` is the step of first
+    food consumption (censored at ``max_steps`` if it never eats).
+    """
     obs, info = env.reset(seed=seed, options=reset_options)
     organism.reset(obs)
 
-    latency = config.max_steps  # censored value if food never consumed
-    consumed = False
-    total_consequence = 0.0
+    latency = config.max_steps  # censored if food never consumed
+    first_consumed = False
+    n_consumed = 0
     steps = 0
 
     for t in range(config.max_steps):
         organism.step(obs)
         action = organism.emit_action()
         next_obs, reward, terminated, truncated, info = env.step(action)
-        organism.update_history(next_obs, action, reward, info)
+        organism.update_history(next_obs, action, info)
+        # Death is the organism's terminal condition (env has no terminal state).
+        terminated = terminated or (not organism.alive)
 
         if logger is not None:
             logger.log_step(
@@ -144,11 +152,12 @@ def run_episode(
                 intensities=organism.last_intensities,
             )
 
-        total_consequence += reward
         steps = t + 1
-        if info.get("consumed", False) and not consumed:
-            consumed = True
-            latency = steps
+        if info.get("food_consumed", False):
+            n_consumed += 1
+            if not first_consumed:
+                first_consumed = True
+                latency = steps
         obs = next_obs
         if terminated or truncated:
             break
@@ -156,9 +165,12 @@ def run_episode(
     return {
         "episode": episode,
         "steps": steps,
-        "consumed": consumed,
+        "consumed": first_consumed,
         "latency": latency,
-        "total_consequence": total_consequence,
+        "n_consumed": n_consumed,
+        "final_energy": organism.energy,
+        "alive": organism.alive,
+        "cause_of_death": organism.cause_of_death,
     }
 
 

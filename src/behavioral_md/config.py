@@ -99,13 +99,42 @@ class SimulationConfig(BaseModel):
     history_weight_min: float = Field(-5.0, description="Lower clip for history weights.")
     history_weight_max: float = Field(5.0, description="Upper clip for history weights.")
 
-    # --- Motivation --------------------------------------------------------
-    hunger_init: float = Field(0.5, ge=0.0, description="Initial hunger level.")
-    hunger_growth: float = Field(0.01, ge=0.0, description="Hunger gained per step.")
-    hunger_drop_on_food: float = Field(
-        0.5, ge=0.0, description="Hunger removed on food consumption."
+    # --- Energy budget (objective; replaces the hunger/MO construct) -------
+    # Energy is a conserved physical reserve in [0, energy_capacity]. Behavior
+    # shifts with depletion only because energy is real and runs out -- nothing
+    # is "valued" or "established". See lab notebook (behavioral-ecology framing).
+    energy_capacity: float = Field(1.0, gt=0.0, description="Max energy reserve.")
+    energy_init: float = Field(0.5, ge=0.0, description="Starting energy reserve.")
+    basal_metabolism: float = Field(
+        0.005, ge=0.0, description="Energy spent per step just to keep living."
     )
-    hunger_max: float = Field(1.0, gt=0.0, description="Hunger saturation ceiling.")
+    move_cost: float = Field(
+        0.005, ge=0.0, description="Extra energy per step for a movement action."
+    )
+    rest_cost: float = Field(
+        0.001, ge=0.0, description="Extra energy per step for no-op/pause/consume."
+    )
+    food_intake_rate: float = Field(
+        0.05,
+        ge=0.0,
+        description="Energy gained per step in contact with food (time-at-patch feeding).",
+    )
+    danger_energy_loss: float = Field(
+        0.15, ge=0.0, description="Energy lost per unit danger contact (punisher magnitude)."
+    )
+    # Convex marginal value of energy: food-directed drive scales with the
+    # deficit raised to this exponent (1 = linear, 2 = quadratic/steep near
+    # starvation -> risk-sensitive foraging).
+    deficit_exponent: float = Field(
+        2.0, ge=1.0, description="Exponent on the energy deficit for the food drive."
+    )
+    motivational_strength: float = Field(
+        2.0, ge=0.0, description="Gain on the energy-deficit-driven food drive."
+    )
+    consequence_model: Literal["delta_energy"] = Field(
+        "delta_energy",
+        description="Pluggable consequence model (only delta_energy implemented).",
+    )
 
     # --- Environment geometry ----------------------------------------------
     grid_size: int = Field(10, ge=3, description="Side length of the square grid.")

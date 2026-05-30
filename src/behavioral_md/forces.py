@@ -14,7 +14,7 @@ non-directional atom the geometric factor is ``1``.
 Grounding (no mentalism):
   - sensory_drive    : stimulus control via psychophysical intensity x sensitivity
   - history_drive    : operant strength from learning history (sign = approach/avoid)
-  - motivational_drive: a motivating operation (deprivation/hunger scales reinforcer pull)
+  - motivational_drive: energy deficit drives food-seeking (state-dependent foraging)
   - coupling_drive   : competition/induction among members of a response class
   - fatigue          : within-bout response decrement (subtracted)
   - readiness        : momentary gain on the stimulus-evoked drives
@@ -36,6 +36,7 @@ class SensoryField:
 
     direction: np.ndarray  # unit vector toward the source, shape (2,)
     intensity: float       # in [0, 1], distance falloff
+    contact: float = 0.0   # sharp binary contact signal (food only), in {0, 1}
 
 
 def sensory_from_observation(obs: dict[str, np.ndarray]) -> dict[str, SensoryField]:
@@ -46,6 +47,8 @@ def sensory_from_observation(obs: dict[str, np.ndarray]) -> dict[str, SensoryFie
             direction=np.asarray(obs[f"{s}_vector"], dtype=np.float64),
             intensity=float(np.asarray(obs[f"{s}_intensity"]).ravel()[0]),
         )
+    # Food carries a sharp contact signal for consummatory atoms.
+    fields["food"].contact = float(np.asarray(obs.get("food_contact", 0.0)).ravel()[0])
     return fields
 
 
@@ -91,33 +94,50 @@ class ForceCalculator:
         return float(np.dot(field.direction, atom.direction))
 
     def compute(
-        self, sensory: dict[str, SensoryField], hunger: float
+        self, sensory: dict[str, SensoryField], energy: float
     ) -> tuple[np.ndarray, ForceComponents]:
-        """Return ``(net_force, components)`` as arrays aligned with ``self.atoms``."""
+        """Return ``(net_force, components)`` as arrays aligned with ``self.atoms``.
+
+        ``energy`` is the organism's current reserve; its *deficit* drives the
+        motivational term via the convex marginal-value-of-energy coupling.
+        """
         sensory_drive = np.zeros(self.n)
         history_drive = np.zeros(self.n)
         motivational_drive = np.zeros(self.n)
         fatigue = np.zeros(self.n)
+
+        # Convex marginal value of energy: low reserve -> strong food drive.
+        cap = self.config.energy_capacity
+        deficit = max(0.0, 1.0 - energy / cap)
+        deficit_gain = self.config.motivational_strength * (
+            deficit**self.config.deficit_exponent
+        )
 
         for i, atom in enumerate(self.atoms):
             s_drive = 0.0
             h_drive = 0.0
             for s in STIMULI:
                 field = sensory[s]
-                geom = self._geometry(atom, field)
-                eff_intensity = field.intensity**atom.contact_exponent
+                if s == "food" and atom.consummatory:
+                    # Consummatory atoms use the sharp binary contact signal and
+                    # are non-directional (geom=1): they fire only AT food.
+                    eff_intensity = field.contact
+                    geom = 1.0
+                else:
+                    geom = self._geometry(atom, field)
+                    eff_intensity = field.intensity**atom.contact_exponent
                 s_drive += atom.sensitivity.get(s, 0.0) * eff_intensity * geom
                 h_drive += atom.history_weights.get(s, 0.0) * eff_intensity * geom
 
-            # Motivating operation: hunger scales the (learned) pull of food.
+            # Energy deficit drives food-directed behavior (objective: energy is
+            # worth more nearer the death boundary -> state-dependent foraging).
             food = sensory["food"]
-            geom_food = self._geometry(atom, food)
-            m_drive = (
-                hunger
-                * food.intensity**atom.contact_exponent
-                * atom.history_weights.get("food", 0.0)
-                * geom_food
-            )
+            if atom.consummatory:
+                # Hunger amplifies consummatory behavior only when at food.
+                m_drive = deficit_gain * food.contact
+            else:
+                geom_food = self._geometry(atom, food)
+                m_drive = deficit_gain * food.intensity**atom.contact_exponent * geom_food
 
             # readiness is a momentary gain on stimulus-evoked drive.
             sensory_drive[i] = atom.readiness * s_drive

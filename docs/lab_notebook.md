@@ -326,3 +326,54 @@ final dynamics tuning happens once the foraging world (4b–4d) is in place.
 sweeps (1000s of lives across parameter grids) planned for later phases.
 
 Next: **4b** energy budget + pluggable `ConsequenceModel` (ΔE default).
+
+---
+
+## 2026-05-30 — Phase 4b built; Exp 003 reveals a learning architecture problem
+
+**Built (4b + persistent episodes):** objective energy budget (reserve, basal
+metabolism, movement/rest costs, contact-based food intake, danger energy loss),
+convex marginal-value coupling (`(1-E/Ecap)**deficit_exponent`), death at E<=0
+with cause attribution, pluggable `ConsequenceModel` (`DeltaEnergy` default,
+consequence = ΔE), eating no longer ends the episode (death/truncation do),
+contact-gated consummatory `consume` (sharp binary `food_contact` signal),
+proximal-gated `pause`. Energy bookkeeping verified to conserve exactly; convex
+coupling verified (starving food drive 1.54 -> 3.16); death/starvation works.
+
+**Exp 003 (`experiments/exp003_learning_curve.py`): learning does NOT tighten
+approach -- it is incoherent.** 72 persistent organisms x 60 lives, sweeping
+eligibility_decay {0.9,0.95,0.99}. `hw_food` (movement atoms' learned food
+weight) stays **negative** (-0.5 to -0.9) across all lives; contact rate flat or
+declining. Follow-ups (all with data in this session):
+- eligibility_decay (temporal weighting): barely matters (0.99 slightly less
+  negative, still wrong).
+- sensor_range {2,3,5,10}: `hw_food` negative at every width -> not a broad-field
+  miscredit problem alone.
+- reinforcement_asymptote (lambda) {1,5,20,50}: does not fix sign; lambda=1 even
+  showed mild contact/survival gains with `hw_food` still negative.
+
+**Root cause (controlled no-danger trace): you cannot coherently learn on signed
+directional units.** A directional movement atom (e.g. `move_right`) is positive
+when food is in its direction and negative when food is opposite, so its
+*eligibility* swings sign (observed +0.05 -> -3.2 -> +1.7 within one life).
+Crediting a consequence times a sign-flipping eligibility gives self-cancelling
+credit. With food in varying locations, no movement atom is consistently "toward
+food", so none develops a stable food weight (they average ~0; danger bleed
+makes them slightly negative). Secondary: per-step food intake (0.05) is a tiny
+RW target, so positive credit is weak even when correctly signed.
+
+The non-directional `approach_food` atom *could* learn cleanly (reliably positive
+when food present) -- but in the chosen **single-tier directional-projection**
+design it does not drive locomotion.
+
+**OPEN DECISION (architecture):** single-tier directional projection cannot
+support coherent learning. Options:
+1. **Two-tier** (originally offered, then declined): non-directional drive atoms
+   (approach_food, ...) learn cleanly; their activation is projected onto the
+   movement atoms via the live stimulus geometry each step. Learning lives on
+   sign-stable response-class units.
+2. **Sign-corrected single-tier**: learn the food *sensitivity gain* of movement
+   atoms using an unsigned engagement signal (e.g. credit |activation| or
+   rectified eligibility), not a signed history weight.
+Energy/survival mechanics committed as WIP; learning effectiveness pending this
+decision.

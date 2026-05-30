@@ -85,7 +85,7 @@ def run_episode(
 
     for t in range(steps):
         sensory = sensory_from_observation(obs)
-        force, comp = org.force_calc.compute(sensory, org.hunger)
+        force, comp = org.force_calc.compute(sensory, org.energy)
 
         # Verlet step, optionally with velocity damping (-c * v).
         for i, atom in enumerate(org.atoms):
