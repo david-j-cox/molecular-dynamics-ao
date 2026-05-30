@@ -1,0 +1,12 @@
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+matplotlib>=3.8
+gymnasium>=0.29
+pydantic>=2.5
+pytest>=7.4
+ruff>=0.1
+
+# Optional: live pygame render. May require building from source on newer
+# Python versions (needs SDL). Install with: pip install pygame
+# pygame>=2.5

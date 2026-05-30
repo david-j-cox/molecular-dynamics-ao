@@ -1,0 +1,320 @@
+"""BehavioralFieldEnv: a 2D grid arena that presents sensory force-fields.
+
+The arena holds an organism plus food, danger, light, and a neutral cue. The
+observation exposes only *sensory* information (direction + intensity to each
+source, plus the last consequence) rather than omniscient state. Rewards are
+returned for Gymnasium compatibility but are intended to be consumed as
+*consequence events* that update learning history, not as an RL training signal.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import gymnasium as gym
+import numpy as np
+from gymnasium import spaces
+
+from behavioral_md.config import SimulationConfig
+
+# Discrete action set (see CLAUDE.md spec).
+ACTIONS: dict[int, str] = {
+    0: "no-op",
+    1: "move_up",
+    2: "move_down",
+    3: "move_left",
+    4: "move_right",
+    5: "consume",
+    6: "pause",
+}
+
+# Movement deltas in (row, col) grid coordinates for the directional actions.
+_MOVES: dict[int, np.ndarray] = {
+    1: np.array([0.0, 1.0]),   # up   -> +y
+    2: np.array([0.0, -1.0]),  # down -> -y
+    3: np.array([-1.0, 0.0]),  # left -> -x
+    4: np.array([1.0, 0.0]),   # right-> +x
+}
+
+
+class BehavioralFieldEnv(gym.Env):
+    """Grid arena presenting food/danger/light/cue stimulus fields.
+
+    Parameters
+    ----------
+    config:
+        Simulation configuration controlling grid size, sensor falloff, etc.
+    food_reinforces:
+        If False, consuming food yields no positive consequence (used by the
+        extinction demo). Food remains visible.
+    cue_value:
+        Scalar position of the neutral cue in an abstract stimulus space. Used
+        by the generalization demo to vary cue similarity across runs.
+    """
+
+    metadata = {"render_modes": ["human", "rgb_array", "none"], "render_fps": 8}
+
+    # Consequence magnitudes.
+    FOOD_REWARD = 1.0
+    DANGER_REWARD = -1.0
+
+    def __init__(
+        self,
+        config: SimulationConfig | None = None,
+        *,
+        food_reinforces: bool = True,
+        cue_value: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self.config = config or SimulationConfig()
+        self.food_reinforces = food_reinforces
+        self.cue_value = cue_value
+
+        self.grid_size = self.config.grid_size
+        self.sensor_range = self.config.sensor_range
+        self.consume_radius = self.config.consume_radius
+
+        self.render_mode = (
+            None if self.config.render_mode == "none" else self.config.render_mode
+        )
+
+        self.action_space = spaces.Discrete(len(ACTIONS))
+        g = float(self.grid_size)
+        self.observation_space = spaces.Dict(
+            {
+                "position": spaces.Box(0.0, g, shape=(2,), dtype=np.float32),
+                "food_vector": spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32),
+                "danger_vector": spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32),
+                "light_vector": spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32),
+                "cue_vector": spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32),
+                "food_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                "danger_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                "light_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                "cue_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                "last_consequence": spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32),
+            }
+        )
+
+        # State populated in reset().
+        self.position = np.zeros(2, dtype=np.float64)
+        self.food_pos = np.zeros(2, dtype=np.float64)
+        self.danger_pos = np.zeros(2, dtype=np.float64)
+        self.light_pos = np.zeros(2, dtype=np.float64)
+        self.cue_pos = np.zeros(2, dtype=np.float64)
+        self.barriers: set[tuple[int, int]] = set()
+        self.t = 0
+        self.last_consequence = 0.0
+        self._window = None  # pygame surface, lazily created
+
+    # ------------------------------------------------------------------ #
+    # Gymnasium API
+    # ------------------------------------------------------------------ #
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+        super().reset(seed=seed)
+        options = options or {}
+
+        # Allow per-episode overrides used by the demos.
+        if "food_reinforces" in options:
+            self.food_reinforces = bool(options["food_reinforces"])
+        if "cue_value" in options:
+            self.cue_value = float(options["cue_value"])
+
+        rng = self.np_random
+        g = self.grid_size
+
+        def rand_cell() -> np.ndarray:
+            return rng.integers(0, g, size=2).astype(np.float64)
+
+        # Place sources and organism on distinct cells.
+        taken: set[tuple[int, int]] = set()
+
+        def place() -> np.ndarray:
+            while True:
+                c = rand_cell()
+                key = (int(c[0]), int(c[1]))
+                if key not in taken:
+                    taken.add(key)
+                    return c
+
+        explicit = options.get("layout", {})
+        self.position = np.asarray(explicit.get("position", place()), dtype=np.float64)
+        self.food_pos = np.asarray(explicit.get("food", place()), dtype=np.float64)
+        self.danger_pos = np.asarray(explicit.get("danger", place()), dtype=np.float64)
+        self.light_pos = np.asarray(explicit.get("light", place()), dtype=np.float64)
+        self.cue_pos = np.asarray(explicit.get("cue", place()), dtype=np.float64)
+        self.barriers = set(explicit.get("barriers", set()))
+
+        self.t = 0
+        self.last_consequence = 0.0
+
+        obs = self._build_observation()
+        info = self._build_info()
+        if self.render_mode == "human":
+            self.render()
+        return obs, info
+
+    def step(
+        self, action: int
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+        action = int(action)
+        consequence = 0.0
+        consumed = False
+
+        if action in _MOVES:
+            self._attempt_move(_MOVES[action])
+        elif action == 5:  # consume
+            if self._distance(self.position, self.food_pos) <= self.consume_radius:
+                if self.food_reinforces:
+                    consequence += self.FOOD_REWARD
+                    consumed = True
+        # action 0 (no-op) and 6 (pause) do not move the organism.
+
+        # Passive danger contact: standing on danger always has a consequence.
+        if self._distance(self.position, self.danger_pos) <= self.consume_radius:
+            consequence += self.DANGER_REWARD
+
+        self.last_consequence = consequence
+        self.t += 1
+
+        terminated = consumed  # episode ends when food is successfully consumed
+        truncated = self.t >= self.config.max_steps
+
+        obs = self._build_observation()
+        info = self._build_info()
+        info["consumed"] = consumed
+        info["action_name"] = ACTIONS[action]
+
+        if self.render_mode == "human":
+            self.render()
+        return obs, float(consequence), terminated, truncated, info
+
+    def render(self) -> np.ndarray | None:
+        if self.render_mode in (None, "none"):
+            return None
+        return self._render_pygame()
+
+    def close(self) -> None:
+        if self._window is not None:
+            import pygame
+
+            pygame.display.quit()
+            pygame.quit()
+            self._window = None
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _attempt_move(self, delta: np.ndarray) -> None:
+        target = self.position + delta
+        # Clamp to grid bounds.
+        target = np.clip(target, 0, self.grid_size - 1)
+        if (int(target[0]), int(target[1])) in self.barriers:
+            return  # blocked
+        self.position = target
+
+    @staticmethod
+    def _distance(a: np.ndarray, b: np.ndarray) -> float:
+        return float(np.linalg.norm(a - b))
+
+    def _unit_vector(self, target: np.ndarray) -> np.ndarray:
+        """Unit direction from organism toward target (zero if coincident)."""
+        diff = target - self.position
+        dist = np.linalg.norm(diff)
+        if dist < 1e-9:
+            return np.zeros(2, dtype=np.float32)
+        return (diff / dist).astype(np.float32)
+
+    def _intensity(self, target: np.ndarray) -> float:
+        """Exponential distance falloff in [0, 1]; 1.0 when coincident."""
+        dist = self._distance(self.position, target)
+        return float(np.exp(-dist / self.sensor_range))
+
+    def _build_observation(self) -> dict[str, np.ndarray]:
+        return {
+            "position": self.position.astype(np.float32),
+            "food_vector": self._unit_vector(self.food_pos),
+            "danger_vector": self._unit_vector(self.danger_pos),
+            "light_vector": self._unit_vector(self.light_pos),
+            "cue_vector": self._unit_vector(self.cue_pos),
+            "food_intensity": np.array([self._intensity(self.food_pos)], dtype=np.float32),
+            "danger_intensity": np.array(
+                [self._intensity(self.danger_pos)], dtype=np.float32
+            ),
+            "light_intensity": np.array(
+                [self._intensity(self.light_pos)], dtype=np.float32
+            ),
+            "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
+            "last_consequence": np.array([self.last_consequence], dtype=np.float32),
+        }
+
+    def _build_info(self) -> dict[str, Any]:
+        return {
+            "timestep": self.t,
+            "position": self.position.copy(),
+            "food_pos": self.food_pos.copy(),
+            "danger_pos": self.danger_pos.copy(),
+            "light_pos": self.light_pos.copy(),
+            "cue_pos": self.cue_pos.copy(),
+            "cue_value": self.cue_value,
+            "distance_to_food": self._distance(self.position, self.food_pos),
+            "food_reinforces": self.food_reinforces,
+        }
+
+    def _render_pygame(self) -> np.ndarray | None:
+        import pygame
+
+        cell = 48
+        size = self.grid_size * cell
+        if self._window is None:
+            pygame.init()
+            if self.render_mode == "human":
+                self._window = pygame.display.set_mode((size, size))
+                pygame.display.set_caption("BehavioralFieldEnv")
+            else:
+                self._window = pygame.Surface((size, size))
+
+        surf = pygame.Surface((size, size))
+        surf.fill((20, 20, 24))
+
+        # Grid lines.
+        for i in range(self.grid_size + 1):
+            pygame.draw.line(surf, (40, 40, 48), (0, i * cell), (size, i * cell))
+            pygame.draw.line(surf, (40, 40, 48), (i * cell, 0), (i * cell, size))
+
+        def to_px(pos: np.ndarray) -> tuple[int, int]:
+            # Flip y so +y renders upward.
+            x = int(pos[0] * cell + cell / 2)
+            y = int(size - (pos[1] * cell + cell / 2))
+            return x, y
+
+        for cell_xy in self.barriers:
+            pygame.draw.rect(
+                surf,
+                (90, 90, 100),
+                pygame.Rect(cell_xy[0] * cell, size - (cell_xy[1] + 1) * cell, cell, cell),
+            )
+
+        markers = [
+            (self.food_pos, (60, 200, 90)),    # food: green
+            (self.danger_pos, (220, 60, 60)),  # danger: red
+            (self.light_pos, (240, 220, 80)),  # light: yellow
+            (self.cue_pos, (90, 140, 230)),    # cue: blue
+        ]
+        for pos, color in markers:
+            pygame.draw.circle(surf, color, to_px(pos), cell // 4)
+
+        # Organism: white circle.
+        pygame.draw.circle(surf, (240, 240, 240), to_px(self.position), cell // 3)
+
+        if self.render_mode == "human":
+            self._window.blit(surf, (0, 0))
+            pygame.event.pump()
+            pygame.display.flip()
+            return None
+
+        # rgb_array
+        return np.transpose(
+            np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
+        )
