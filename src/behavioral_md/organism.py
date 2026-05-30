@@ -14,6 +14,7 @@ import numpy as np
 from behavioral_md.atoms import ACTION_ATOMS, STIMULI, BehavioralAtom, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.consequence import ConsequenceEvent, make_consequence_model
+from behavioral_md.generalization import CueReceptorField
 from behavioral_md.forces import (
     ForceCalculator,
     ForceComponents,
@@ -44,12 +45,22 @@ class Organism:
         self.rng = rng or np.random.default_rng(self.config.seed)
         self.consequence_model = make_consequence_model(self.config)
         self.learning_rule = make_learning_rule(self.config)
+        # Cue generalization: a population of value-tuned receptors whose learned
+        # weights drive approach_food (a food-predictive cue evokes approach).
+        self.cue_field = CueReceptorField(
+            self.config.n_cue_receptors,
+            self.config.cue_generalization_beta,
+            self.config.history_weight_min,
+            self.config.history_weight_max,
+        )
+        self._af_index = self.index["approach_food"]
 
         # Objective physical state.
         self.energy = self.config.energy_init
         self.alive = True
         self.cause_of_death: str | None = None
         # Most-recent step bookkeeping, exposed for logging.
+        self.last_cue_drive = 0.0
         self.last_force = np.zeros(len(self.atoms))
         self.last_components: ForceComponents | None = None
         self.last_intensities: dict[str, float] = dict.fromkeys(STIMULI, 0.0)
@@ -66,6 +77,8 @@ class Organism:
         self.energy = self.config.energy_init
         self.alive = True
         self.cause_of_death = None
+        self.cue_field.reset_state()  # learned receptor weights persist across lives
+        self.last_cue_drive = 0.0
         self.last_force = np.zeros(len(self.atoms))
         self.last_components = None
         self.last_intensities = self._intensities(observation)
@@ -77,6 +90,15 @@ class Organism:
         self.last_intensities = {s: sensory[s].intensity for s in STIMULI}
 
         force, components = self.force_calc.compute(sensory, self.energy)
+
+        # Cue generalization: a food-predictive cue (value v, presence = cue
+        # intensity) evokes a conditioned approach via the receptor population,
+        # added to approach_food. Caches receptor activations for learning.
+        cue_value = float(np.asarray(observation["cue_value"]).ravel()[0])
+        cue_intensity = sensory["cue"].intensity
+        self.last_cue_drive = self.cue_field.drive(cue_value, cue_intensity)
+        force[self._af_index] += self.last_cue_drive
+
         self.last_force = force
         self.last_components = components
 
@@ -171,6 +193,15 @@ class Organism:
             aversive_exposure=on_danger,
             source=source,
         )
+
+        # Cue generalization: at food contact, the receptors active for the
+        # present cue value move toward the reinforcement asymptote (strengthen
+        # if fed, extinguish if omitted), using approach_food's eligibility.
+        if at_food:
+            e_af = max(0.0, float(self.eligibility.trace[self._af_index]))
+            self.cue_field.learn(
+                e_af, appetitive, cfg.cue_learning_rate, cfg.reinforcement_asymptote
+            )
 
     # ------------------------------------------------------------------ #
     # Helpers

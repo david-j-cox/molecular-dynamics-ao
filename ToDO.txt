@@ -94,7 +94,8 @@ VISUALIZATION (visualization.py)
 [x] Acquisition latency curve (run_demo) with 95% CI.
 [x] Force-decomposition grid (per-atom, normalized); extinction (train->ext).
 [ ] Day/night shading on time-series (after Phase 5).
-[ ] Generalization gradient; matching plots (relative response vs relative reinf).
+[x] Generalization gradient (response vs cue value, 95% CI).
+[ ] Matching plots (relative response vs relative reinforcement) -- needs patches.
 [ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
 
 DEMOS (scripts/)
@@ -106,8 +107,10 @@ DEMOS (scripts/)
 [x] run_extinction_demo.py extinction: train then food_reinforces=False ->
                            approach_food.hw_food decays 1.0 -> ~0; behavioral
                            steps-at-food fall. 100 agents, 95% CI.
-[ ] run_generalization_demo.py  cue generalization gradient (train one cue value,
-                           test similar/dissimilar; relies on cue conditioning)
+[x] run_generalization_demo.py  cue generalization gradient: population of
+                           value-tuned receptors (Shepard tuning); train at v0,
+                           probe across values -> emergent gradient peaked at v0
+                           (~38% drop at extremes), 100 agents, 95% CI.
 
 METRICS (metrics.py)
 --------------------

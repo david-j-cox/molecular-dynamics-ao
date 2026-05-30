@@ -148,6 +148,25 @@ class SimulationConfig(BaseModel):
     motivational_strength: float = Field(
         2.0, ge=0.0, description="Gain on the energy-deficit-driven food drive."
     )
+
+    # --- Cue generalization (population of value-tuned receptors) ----------
+    n_cue_receptors: int = Field(
+        11, ge=1, description="Receptors tiling the scalar cue dimension v in [0,1]."
+    )
+    cue_generalization_beta: float = Field(
+        6.0,
+        ge=0.0,
+        description="Shepard tuning width: receptor_k = exp(-beta*|v - c_k|).",
+    )
+    cue_learning_rate: float = Field(
+        0.0005,
+        ge=0.0,
+        description=(
+            "Cue-receptor association rate. Kept small so weights stay "
+            "sub-asymptotic and track receptor activation -> a graded, peaked "
+            "generalization gradient (large rates saturate and flatten it)."
+        ),
+    )
     consequence_model: Literal["delta_energy"] = Field(
         "delta_energy",
         description="Pluggable consequence model (only delta_energy implemented).",

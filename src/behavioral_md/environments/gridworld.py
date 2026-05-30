@@ -91,6 +91,8 @@ class BehavioralFieldEnv(gym.Env):
                 "danger_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "light_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "cue_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                # Abstract scalar cue dimension (for stimulus generalization).
+                "cue_value": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "food_contact": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "last_consequence": spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32),
             }
@@ -275,6 +277,7 @@ class BehavioralFieldEnv(gym.Env):
                 [self._intensity(self.light_pos)], dtype=np.float32
             ),
             "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
+            "cue_value": np.array([self.cue_value], dtype=np.float32),
             # Contact signal within consume_radius, scaled by remaining biomass.
             "food_contact": np.array(
                 [biomass_frac if in_range else 0.0], dtype=np.float32

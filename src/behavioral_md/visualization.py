@@ -381,6 +381,27 @@ def plot_extinction(summaries: pd.DataFrame, transition: int, path: str | Path) 
     return _save(fig, path)
 
 
+def plot_generalization_gradient(
+    values: np.ndarray,
+    responses: np.ndarray,
+    trained_value: float,
+    path: str | Path,
+) -> Path:
+    """Generalization gradient: conditioned response vs cue value (mean +/- 95% CI).
+
+    ``responses`` is an (agents, values) array of probed conditioned responses;
+    a dotted line marks the trained value.
+    """
+    mean, ci = _mean_ci(responses, axis=0)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    _band(ax, values, mean, ci, "response", "-", "o")
+    ax.axvline(trained_value, color="black", ls=":", lw=1.2)
+    ax.set_xlabel("Test cue value")
+    ax.set_ylabel("Conditioned response")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,
