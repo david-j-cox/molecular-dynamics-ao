@@ -30,7 +30,10 @@ TUNING / QUALITY (current foraging model)
 
 PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------
-[~] Done so far: acquisition, extinction, generalization, peak shift.
+[~] Done so far (NumPy demos): acquisition, extinction, generalization, peak shift.
+[x] JAX multi-life wrapper (run_lives/reset_for_life): learning carries over,
+    body resets per life. First zoo entry on JAX: acquisition curve (2000
+    organisms x 40 lives in ~5s; latency 175 -> 66, matches NumPy run_demo).
 [ ] Matching / undermatching; resistance-to-change (momentum); PREE; behavioral
     contrast; blocking; overshadowing; discounting & demand curves; FR/VR/FI/VI.
 [ ] Run the battery across parameter ranges as standing model-validity evidence.

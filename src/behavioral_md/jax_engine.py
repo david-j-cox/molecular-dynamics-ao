@@ -361,13 +361,50 @@ def make_simulate(spec, cfg, sources, food_reinforces, cue_value, cue_centers):
             eligibility=jnp.where(a2, elig, state.eligibility),
             cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
         )
-        return new, new.energy
+        return new, (new.energy, (intake > 0).astype(jnp.float32))
 
     def scanned(state: SimState, keys):
-        """Run len(keys) timesteps; return (final_state, per-step energy [T, O])."""
+        """Run len(keys) timesteps; return (final_state, (energy[T,O], fed[T,O]))."""
         return jax.lax.scan(step, state, keys)
 
     return jax.jit(scanned)
+
+
+def reset_for_life(state: SimState, spec, cfg, position) -> SimState:
+    """Start a new life: reset body/energy/position, KEEP learned history + cue weights."""
+    n_org = state.energy.shape[0]
+    a = spec.sensitivity.shape[0]
+    act0 = jnp.broadcast_to(spec.baseline, (n_org, a))
+    pos0 = jnp.broadcast_to(jnp.asarray(position, float), (n_org, 2))
+    return state._replace(
+        positions=pos0, biomass=jnp.full(n_org, cfg.food_carrying_capacity),
+        energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
+        activation=act0, previous=act0, eligibility=jnp.zeros((n_org, a)),
+    )
+
+
+def run_lives(sim, spec, cfg, state0, position, n_lives, n_steps, key):
+    """Run ``n_lives`` lives (learning carries over); return per-life metrics.
+
+    ``sim`` is a jitted ``scanned`` from :func:`make_simulate`. Returns a dict of
+    [n_lives, n_org] arrays: latency to first food, contact count, steps survived.
+    """
+    latency, contact, survived = [], [], []
+    state = state0
+    for life in range(n_lives):
+        state = reset_for_life(state, spec, cfg, position)
+        keys = jax.random.split(jax.random.fold_in(key, life), n_steps)
+        state, (energy, fed) = sim(state, keys)
+        any_fed = fed.sum(axis=0) > 0
+        latency.append(jnp.where(any_fed, jnp.argmax(fed, axis=0), n_steps))
+        contact.append(fed.sum(axis=0))
+        survived.append(jnp.minimum(jnp.argmax(energy <= 0.0, axis=0)
+                                    + (energy[-1] > 0.0) * n_steps, n_steps))
+    return {
+        "latency": np.asarray(jnp.stack(latency)),     # [n_lives, n_org]
+        "contact": np.asarray(jnp.stack(contact)),
+        "survived": np.asarray(jnp.stack(survived)),
+    }
 
 
 def validate_against_numpy(n_org: int = 4, seed: int = 0) -> float:
