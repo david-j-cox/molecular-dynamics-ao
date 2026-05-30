@@ -24,7 +24,7 @@ from behavioral_md.visualization import (
     plot_atom_series,
     plot_energy,
     plot_food_biomass,
-    plot_force_decomposition,
+    plot_force_decomposition_grid,
     plot_learning_curve,
     plot_occupancy_landscape,
     plot_weight_acquisition,
@@ -99,8 +99,11 @@ def main() -> None:
                          FIG_DIR / "activation.png", ylabel="Activation"),
         plot_atom_series(rep_log, best, "atom_force", drive_atoms,
                          FIG_DIR / "drive_force.png", ylabel="Force"),
-        plot_force_decomposition(rep_log, mature_ep, "approach_food",
-                                 FIG_DIR / "force_decomposition.png"),
+        plot_force_decomposition_grid(
+            rep_log, mature_ep,
+            drive_atoms + ["consume", "pause", "explore"] + action_atoms[:4],
+            FIG_DIR / "force_decomposition_grid.png",
+        ),
     ]
     print(f"Population: {N_AGENTS} agents (95% CI). Representative agent seed {REP_SEED}.")
     print("Wrote figures:")

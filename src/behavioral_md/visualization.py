@@ -226,6 +226,61 @@ def plot_force_decomposition(
     return _save(fig, path)
 
 
+_FORCE_COMPONENTS = [
+    ("force_sensory", "Sensory (innate)"),
+    ("force_history", "History (learned)"),
+    ("force_motivational", "Motivational (energy)"),
+    ("force_coupling", "Coupling"),
+    ("atom_force", "Net"),
+]
+
+
+def plot_force_decomposition_grid(
+    log: pd.DataFrame,
+    episode: int,
+    atom_names: list[str],
+    path: str | Path,
+    ncols: int = 3,
+) -> Path:
+    """One force-decomposition panel per atom, in a shared grid with one legend."""
+    ep = _episode_slice(log, episode)
+    n = len(atom_names)
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.2 * ncols, 2.6 * nrows),
+                             sharex=True, constrained_layout=True)
+    axes = np.atleast_1d(axes).ravel()
+    handles_labels = None
+
+    for ax, name in zip(axes, atom_names, strict=False):
+        a = ep[ep["atom_name"] == name].sort_values("timestep")
+        t = a["timestep"]
+        for (col, label), (ls, marker) in zip(_FORCE_COMPONENTS, _BW_CYCLE, strict=False):
+            if col in a:
+                ax.plot(t, a[col], color="black", ls=ls, lw=0.9, marker=marker, ms=4,
+                        markevery=max(1, len(a) // 12), label=label)
+        ax.axhline(0, color="0.6", lw=0.4)
+        ax.spines.top.set_visible(False)
+        ax.spines.right.set_visible(False)
+        # In-panel atom label (upper right), prettified to readable text.
+        ax.text(0.97, 0.95, name.replace("_", " ").capitalize(), transform=ax.transAxes,
+                va="top", ha="right", fontsize=12, fontweight="bold")
+        if handles_labels is None:
+            handles_labels = ax.get_legend_handles_labels()
+
+    for ax in axes[n:]:  # hide unused cells
+        ax.set_visible(False)
+    for i, ax in enumerate(axes[:n]):
+        if i % ncols == 0:  # left column
+            ax.set_ylabel("Force")
+        if i + ncols >= n:  # no visible panel below -> bottom edge
+            ax.set_xlabel("Time (steps)")
+
+    if handles_labels:
+        fig.legend(*handles_labels, loc="center left", bbox_to_anchor=(1.0, 0.5),
+                   frameon=False, fontsize=14)
+    return _save(fig, path)
+
+
 def plot_food_biomass(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
     """Food-patch biomass over one life (shows the deplete/regrow VI dynamic)."""
     steps = _episode_slice(log, episode).drop_duplicates("timestep").sort_values("timestep")
