@@ -15,11 +15,13 @@ DONE (for reference)
 
 TUNING / QUALITY (current foraging model)
 -----------------------------------------
-[!] Population learning curve is FLAT (200 agents, tight CI): random per-life
-    food layout swamps the learning signal and camping makes survival trivial.
-    Need a CONTROLLED acquisition protocol (fixed food location across lives)
-    to demonstrate learning -- ties to run_demo.py below.
-[ ] Amplify the acquisition effect size once on a controlled layout.
+[x] Random per-life layout gives a FLAT population learning curve (200 agents);
+    the CONTROLLED protocol in run_demo.py (fixed food cell, weak innate
+    approach_food sensitivity) recovers a clean acquisition curve (latency to
+    food 152 -> 106 over 40 lives). So learning works; random layout just
+    swamps the signal.
+[ ] Amplify the acquisition effect size on the controlled layout (sweep
+    learning_rate, reinforcement_asymptote, energy costs, food_intake_rate).
 [ ] Reduce bimodal reach-failure (some agents never lock onto food and die):
     reach reliability, initial search, possibly state-dependent exploration.
 [ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
