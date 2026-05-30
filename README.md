@@ -133,7 +133,8 @@ flowchart LR
 | Law (sketch) | In the engine | Status |
 |---|---|---|
 | Generalized matching law | softmax emission (Luce rule); concurrent matching needs multiple patches | partial |
-| Rescorla-Wagner | `learning.RescorlaWagner` (with omission decay / extinction) | implemented |
+| Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
+| Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
 | Behavioral momentum | atom `mass`; momentum-modulated extinction | planned |
 | Delay/probability discounting | — | planned |
@@ -226,6 +227,19 @@ w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
 `rw_independent` (per-channel error; enables cue conditioning/generalization),
 `rw_competitive` (shared error → blocking/overshadowing), `source_only`.
 
+**Stimulus generalization (population of cue receptors).** The cue varies along
+an abstract scalar dimension `v ∈ [0,1]`, represented by `K` receptors tuned to
+centers `c_k` with a Shepard kernel; each has a learned weight `w_k` updated by a
+summed (elemental) prediction error:
+```
+receptor_k(v) = exp(-β |v - c_k|)
+response(v)   = Σ_k w_k · receptor_k(v)
+Δw_k          = lr_cue · e · receptor_k · (λ·mag - Σ_j w_j receptor_j)
+```
+The generalization gradient (and, after S+/S− discrimination, the **peak shift**)
+emerge from the overlap of the tuning curves; the summed error lets a
+non-reinforced cue drive overlapping receptors negative (inhibition).
+
 ---
 
 ## Mapping to established biobehavioral principles
@@ -258,7 +272,39 @@ w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
   pluggable `ConsequenceModel` variants (currently only `DeltaEnergy`).
 - **Reproducible**: all randomness is seeded via `SimulationConfig.seed`.
 - See `ToDO.txt` for what is not yet implemented (day/night, operant schedules,
-  multiple food patches, visualization, demos, tests, asymmetry models).
+  multiple food patches, the punishment-asymmetry models, tests).
+
+---
+
+## Demonstrations
+
+Three classic behavior-analytic phenomena are reproduced; each is a script that
+runs a population of agents (use `--agents N`, default a few hundred) and writes a
+figure to `outputs/figures/` with a 95% CI band:
+
+| Demonstration | Script | Result |
+|---|---|---|
+| Acquisition | `scripts/run_demo.py` | latency to food falls (~185 → ~78 steps) across lives |
+| Extinction | `scripts/run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 once food stops reinforcing |
+| Generalization | `scripts/run_generalization_demo.py` | response gradient peaked at the trained cue value |
+| Peak shift | `scripts/run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
+
+`scripts/make_figures.py` regenerates the standard figure set (occupancy
+landscape, energy/biomass traces, learning curves, force-decomposition grid).
+
+## Performance (JAX engine)
+
+`jax_engine.py` is a JAX-vectorized twin of the NumPy engine: the whole
+population is held as arrays and one timestep is a pure, `jit`-compiled, batched
+operation run over time with `lax.scan`. It is validated component-by-component
+against the NumPy reference (force, learning, emission, environment all match to
+≤1e−7) and runs **~84× faster** on CPU (XLA), with autodiff available for
+parameter fitting. The NumPy engine remains the readable, canonical reference.
+
+```bash
+python -m behavioral_md.jax_engine        # run the equivalence checks
+python -m experiments.exp004_jax_benchmark  # JAX vs NumPy speed
+```
 
 ---
 
@@ -270,14 +316,21 @@ src/behavioral_md/
   atoms.py               # BehavioralAtom, verlet_update, default_atom_set (two-tier)
   forces.py              # ForceCalculator (drives + movement expression), coupling
   consequence.py         # ConsequenceModel (DeltaEnergy default; asymmetry stubs)
-  learning.py            # EligibilityTrace + valence-split RW history update
+  learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner / linear)
+  generalization.py      # CueReceptorField (tuned receptors; generalization & peak shift)
   organism.py            # Organism: sense -> force -> damped Verlet -> emit -> learn; energy/death
   simulation.py          # run_episode / run_simulation + long-format DataLogger
+  parallel.py            # run_sweep: multiprocessing across organisms / parameter cells
+  jax_engine.py          # JAX-vectorized fast twin (jit + scan); validated vs NumPy
+  visualization.py       # matplotlib figures (house style: B&W, despined, 95% CI)
   environments/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
-experiments/             # reproducible parameter sweeps (exp001-003) + parallel helper
+scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
+                         #   run_peak_shift_demo, make_figures  (each takes --agents N)
+experiments/             # reproducible sweeps/benchmarks (exp001-004) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
-outputs/                 # logs/ and figures/ (generated)
+docs/architecture/       # the original design sketch
+outputs/                 # logs/ and figures/ (generated; gitignored)
 ```
 
 ## Installation
@@ -287,7 +340,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
-python -m experiments.exp003_learning_curve   # learning curve across lives
+pip install -e ".[jax]"                        # optional: JAX-vectorized engine
+python scripts/run_demo.py                     # acquisition demo (writes a figure)
 ```
 (pygame is optional — `pip install pygame` — for the live render; it has no
 prebuilt wheel on some new Python versions.)
@@ -298,7 +352,10 @@ prebuilt wheel on some new Python versions.)
 - [x] **Phase 2** — `BehavioralAtom`, force model, Verlet integrator
 - [x] **Phase 3** — `Organism`, learning, simulation loop, logging
 - [x] **Phase 4** — damped Verlet + softmax; objective energy budget; persistent
-  lives; two-tier valence-split learning; consummatory competition. First
-  positive acquisition curve (foraging & survival improve across lives).
-- [ ] **Phase 5+** — day/night light cycle, operant schedules + matching,
-  multiple food patches, visualization, demos, tests (see `ToDO.txt`).
+  lives; two-tier valence-split learning; consummatory competition.
+- [x] **Learning phenomena** — acquisition, extinction (pluggable
+  `LearningRule`), generalization, and peak shift (cue receptor population).
+- [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster (autodiff-ready).
+- [ ] **Next** — phenomena zoo on the JAX engine, then evolution, model
+  comparison, real-data fitting; plus day/night, operant schedules + matching,
+  multiple food patches, tests (see `ToDO.txt`).
