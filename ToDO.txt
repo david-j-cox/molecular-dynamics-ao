@@ -1,0 +1,98 @@
+BEHAVIORAL MOLECULAR DYNAMICS ENGINE -- OUTSTANDING WORK
+=========================================================
+Status legend:  [ ] todo   [~] partial/in-progress   [x] done
+Newest planning context: docs/lab_notebook.md (running record).
+
+DONE (for reference)
+--------------------
+[x] Phase 1  package scaffold, SimulationConfig, BehavioralFieldEnv (Gymnasium)
+[x] Phase 2  BehavioralAtom, force model, Verlet integrator
+[x] Phase 3  Organism, learning, simulation loop, long-format logging
+[x] Phase 4a damped Verlet + softmax emission (overdamped + matching-law defaults)
+[x] Phase 4b objective energy budget, persistent lives, death + cause, ConsequenceModel
+[x] Phase 4  two-tier (drive -> movement expression) + valence-split RW learning;
+             consummatory-inhibits-locomotion; first positive acquisition curve
+
+TUNING / QUALITY (current foraging model)
+-----------------------------------------
+[ ] Amplify the acquisition effect size (currently ~25% over 60 lives):
+    parallel-sweep learning_rate, reinforcement_asymptote, costs, intake.
+[ ] Reduce bimodal reach-failure (some organisms never lock onto food and die):
+    reach reliability, initial search, possibly state-dependent exploration.
+[ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
+[ ] Revisit whether learning signal should be graded by energy (vs normalized
+    per-event) while keeping objectivism.
+
+PHASE 5 -- DAY/NIGHT (global ambient sun)
+-----------------------------------------
+[ ] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod 96)/96)); 96 steps/day.
+[ ] Danger detectability graded with light (low floor): danger_sensed =
+    danger_true*(floor + (1-floor)*L).
+[ ] Food growth and visibility scale with L (food easier to see / grows in day).
+[ ] Verify risk-sensitive foraging emerges (starving organism accepts night risk).
+[ ] Log light level; add day/night activity + mortality metrics.
+
+PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
+-------------------------------------------
+[ ] Multiple renewable food patches (2-3), logistic regrowth (rate prop. to L),
+    drawn down on consumption -> patch foraging + concurrent-schedule matching.
+[ ] Operant chamber environment (feeder + press response, no navigation) sharing
+    the Organism/atom engine, for clean schedule demos.
+[ ] Schedules: FR, VR, FI, VI; concurrent VI-VI for the matching law (headline).
+[ ] Add a `press` atom for the chamber (vs reusing consume).
+[ ] Reproduce classic signatures: VR high steady rate, FI scallop, conc VI-VI matching.
+
+CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
+-------------------------------------------------------
+[ ] Subtractive (de Villiers) direct-suppression model.
+[ ] CompetitiveSuppression (Deluty): punishment strengthens competing responses.
+[ ] ConcatenatedAsymmetric (Klapes): separate reinforcement/punishment sensitivities.
+[ ] InjuryHealing: danger -> delayed healing energy cost + temporary repertoire
+    impairment (disable/weaken specific atoms while healing), not an instant debit.
+[ ] Compare models on choice/allocation data (model selection).
+
+DISCRIMINATIVE STIMULI (separate from ambient sun)
+--------------------------------------------------
+[ ] S+ / S-delta / neutral discriminative stimuli (the localized light/cue slots);
+    stimulus control over reinforcement availability. Design TBD.
+
+VISUALIZATION (visualization.py)
+--------------------------------
+[ ] Trajectory plot; activation-over-time; force-over-time; history-weight-over-time.
+[ ] Latency-to-food / contact-rate / survival across lives (learning curves).
+[ ] Energy trajectory + death markers; day/night shading.
+[ ] Generalization gradient; matching plots (relative response vs relative reinf).
+[ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
+[ ] Save figures to outputs/figures/.
+
+DEMOS (scripts/)
+----------------
+[ ] run_demo.py            acquisition (approach/survival improves over lives)
+[ ] run_extinction_demo.py extinction (food no longer reinforces -> approach weakens;
+                           needs omission/decay handling in learning)
+[ ] run_generalization_demo.py  cue generalization gradient (train one cue value,
+                           test similar/dissimilar; relies on cue conditioning)
+
+METRICS (metrics.py)
+--------------------
+[ ] Latency, contact rate, survival curves, time-to-death distributions,
+    death-cause breakdown, patch allocation vs intake (matching), schedule rates.
+
+TESTS (tests/)
+--------------
+[ ] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
+[ ] valence-split learning changes weights in expected direction.
+[ ] env reset returns valid observation; step returns Gymnasium 5-tuple.
+[ ] energy bookkeeping conserves; death triggers; organism emits valid action.
+[ ] ConsequenceModel delta-E energy/learning signals.
+
+COMPUTE / INFRA
+---------------
+[~] Parallel parameter sweeps (experiments/_parallel.run_sweep) -- in use.
+[ ] JAX vectorization for many organisms in parallel (after NumPy version solid).
+[ ] CI / pre-commit (ruff + pytest).
+
+REPO HYGIENE
+------------
+[ ] Open PR from dev -> main once Phase 5/6 land (currently working on dev).
+[ ] Tag a v0.1 once tests + demos pass.
