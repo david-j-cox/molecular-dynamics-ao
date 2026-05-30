@@ -152,9 +152,9 @@ def default_atom_set() -> list[BehavioralAtom]:
         # Weak innate food approach (+) and innate danger avoidance (-) enter
         # via sensitivity; the sign of the *history* weight is what learning
         # tunes (approach vs. avoid) per the directional-projection model.
-        _atom("move_up", sensitivity={"food": 0.5, "danger": -0.4}, direction=(0.0, 1.0)),
-        _atom("move_down", sensitivity={"food": 0.5, "danger": -0.4}, direction=(0.0, -1.0)),
-        _atom("move_left", sensitivity={"food": 0.5, "danger": -0.4}, direction=(-1.0, 0.0)),
-        _atom("move_right", sensitivity={"food": 0.5, "danger": -0.4}, direction=(1.0, 0.0)),
+        _atom("move_up", sensitivity={"food": 1.5, "danger": -0.4}, direction=(0.0, 1.0)),
+        _atom("move_down", sensitivity={"food": 1.5, "danger": -0.4}, direction=(0.0, -1.0)),
+        _atom("move_left", sensitivity={"food": 1.5, "danger": -0.4}, direction=(-1.0, 0.0)),
+        _atom("move_right", sensitivity={"food": 1.5, "danger": -0.4}, direction=(1.0, 0.0)),
     ]
     return atoms

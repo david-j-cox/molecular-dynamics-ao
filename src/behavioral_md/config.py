@@ -64,7 +64,28 @@ class SimulationConfig(BaseModel):
         0.9, ge=0.0, le=1.0, description="Per-step recovery (decay) of fatigue."
     )
 
+    # --- Dynamics: damping -------------------------------------------------
+    # Velocity damping turns each atom into a damped (here, overdamped) harmonic
+    # oscillator so activation tracks current drive (leaky-accumulator regime)
+    # instead of acting as an inertial double-integrator. 0.0 = literal pure
+    # Verlet (no dissipation), as in the original spec. Standard in MD (Langevin
+    # friction -gamma*v). See lab notebook Exp 001.
+    damping_coef: float = Field(
+        10.0, ge=0.0, description="Velocity-damping coefficient c in force -= c*velocity."
+    )
+
     # --- Action emission ---------------------------------------------------
+    emission: Literal["softmax", "argmax"] = Field(
+        "softmax",
+        description=(
+            "Action-emission rule over action-atom activations. 'softmax' = Luce "
+            "choice rule / matching law (temperature ~ matching sensitivity); "
+            "'argmax' = winner-take-all (literal spec)."
+        ),
+    )
+    softmax_temperature: float = Field(
+        0.3, gt=0.0, description="Temperature for softmax emission (lower = sharper)."
+    )
     emission_threshold: float = Field(
         -1e9,
         description="Min action-atom activation to emit a directed action; below it emits no-op.",
@@ -92,7 +113,7 @@ class SimulationConfig(BaseModel):
         10.0, gt=0.0, description="Distance scale for stimulus intensity falloff."
     )
     consume_radius: float = Field(
-        0.0, ge=0.0, description="Max distance to food at which 'consume' succeeds."
+        1.0, ge=0.0, description="Max distance to food at which 'consume' succeeds."
     )
 
     # --- Rendering ---------------------------------------------------------

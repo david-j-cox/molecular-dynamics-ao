@@ -293,3 +293,36 @@ the alternatives.
 - https://pubmed.ncbi.nlm.nih.gov/29509286/ (Klapes & Riley, 2018)
 - https://pmc.ncbi.nlm.nih.gov/articles/PMC2251321/ (Rasmussen & Newland, 2008)
 - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1284944/ (Critchfield et al., 2003)
+
+---
+
+## 2026-05-30 — Phase 4a DONE + Exp 002 (core controller, parallel sweep)
+
+Implemented in **core**: velocity damping (`config.damping_coef`) in
+`Organism.step` and softmax emission (`config.emission`/`softmax_temperature`) in
+`Organism.emit_action`. Literal pure-Verlet (`damping_coef=0`) and `argmax` remain
+selectable.
+
+**Exp 002** (`experiments/exp002_core_controller_sweep.py`, parallel via
+`experiments/_parallel.py`): 1,152 lives = damping{2,10,20,40} x temp{0.2,0.3,0.5}
+x food_sens{0.5,1,1.5} x sensor_range{5,10} x 16 seeds, run across 18 cores in
+**2.2 s wall** (~15 cores busy). Raw: `outputs/logs/exp002_results.json`.
+
+Findings:
+- Best cells reach **15/16** (was 0/12 under literal spec in Exp 001).
+- `food_sens=1.5` dominates the top -> promoted to the movement-atom default
+  (was 0.5).
+- damping 10–20 and temperature 0.2–0.3 are the sweet spot; **damping=40 is
+  over-damped (0/16)**.
+- Chosen defaults: `damping_coef=10`, `emission=softmax`, `softmax_temperature=0.3`,
+  movement `food` sensitivity `1.5`, `consume_radius=1.0`. Pure-default reach on the
+  fixed test layout: **12/16, median latency 48** (T=0.5 gives 14/16 if more
+  exploration is wanted).
+
+Caveat logged: reach rate on this fixed "go to the food" layout is a weak proxy;
+final dynamics tuning happens once the foraging world (4b–4d) is in place.
+
+**Parallel infra** (`experiments/_parallel.run_sweep`) is reusable for the larger
+sweeps (1000s of lives across parameter grids) planned for later phases.
+
+Next: **4b** energy budget + pluggable `ConsequenceModel` (ΔE default).

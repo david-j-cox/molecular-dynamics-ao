@@ -71,7 +71,11 @@ class Organism:
 
         cfg = self.config
         for i, atom in enumerate(self.atoms):
-            atom.integrate(force[i], cfg.dt, cfg.activation_min, cfg.activation_max)
+            # Velocity damping (-c * v); v is the Verlet velocity (x - x_prev)/dt.
+            # c=0 recovers literal pure Verlet.
+            velocity = (atom.state[0] - atom.previous_state[0]) / cfg.dt
+            net_force = force[i] - cfg.damping_coef * velocity
+            atom.integrate(net_force, cfg.dt, cfg.activation_min, cfg.activation_max)
 
         self._update_fatigue()
         # Eligibility reflects the activations that just produced behavior.
@@ -79,9 +83,25 @@ class Organism:
         return np.array([a.activation for a in self.atoms])
 
     def emit_action(self) -> int:
-        """Emit the action of the most active action-atom (argmax; random ties)."""
+        """Emit an action from the action-atom activations.
+
+        ``emission='softmax'`` samples via the Luce choice rule / matching law
+        (P(a) proportional to exp(activation/temperature)); ``'argmax'`` is
+        winner-take-all with random tie-breaking (literal spec).
+        """
         ids = list(ACTION_ATOMS.keys())
         acts = np.array([self.atoms[self.index[ACTION_ATOMS[a]]].activation for a in ids])
+
+        if self.config.emission == "softmax":
+            z = acts / self.config.softmax_temperature
+            z -= z.max()
+            p = np.exp(z)
+            p /= p.sum()
+            action = int(self.rng.choice(ids, p=p))
+            self.last_action = action
+            return action
+
+        # argmax
         best = float(acts.max())
         if best < self.config.emission_threshold:
             self.last_action = 0
