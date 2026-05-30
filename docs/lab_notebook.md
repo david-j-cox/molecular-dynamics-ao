@@ -453,3 +453,38 @@ Amplifying the effect (learning rate, reach reliability) and the bimodal
 reach-failure are open tuning items; the qualitative acquisition result needed
 for the demos is in hand. Phase 4 (energy foraging + learning) is functionally
 complete; next is Phase 5 (day/night) or amplifying/again-parallel tuning.
+
+---
+
+## 2026-05-30 — Extinction, generalization, peak shift, and the JAX direction
+
+Since the entries above (committed incrementally on `dev`):
+- **Extinction**: pluggable `LearningRule` (RescorlaWagner with omission decay,
+  asymmetric acq/ext rates, gated to contact exposure) -> trained `hw_food` 1.0
+  extinguishes to ~0; `run_extinction_demo`.
+- **Generalization**: `CueReceptorField` (population of value-tuned receptors,
+  Shepard tuning, summed/elemental error) -> gradient peaked at the trained
+  value; `run_generalization_demo`.
+- **Peak shift**: balanced S+/S- discrimination on the receptor field shifts the
+  peak past S+ away from S- (Hanson 1959); `run_peak_shift_demo`. (Foraging
+  cannot balance S+/S- exposure -- reinforced organisms camp at S+ -- so the demo
+  uses a controlled discrimination procedure.)
+- All demos parallelized; `--agents` flag added; running at 10,000 agents.
+
+### Next major phase: JAX-vectorized engine
+Per-step Python overhead is the bottleneck. Plan (see [[memory]] jax direction):
+collapse per-organism loops into batched array ops; pure `jit`/`vmap`/`scan`;
+keep the NumPy OO engine as the canonical reference; validate equivalence.
+Research roadmap order: **phenomena zoo -> evolution -> model comparison ->
+real-data fitting** (autodiff is the enabler).
+
+**Foundation built + validated (`jax_engine.py`):** `build_spec` packs the atom
+set into static arrays; `compute_force` is the batched two-tier force;
+`integrate` the damped Verlet step. `validate_against_numpy` confirms the JAX
+force matches `ForceCalculator.compute` to ~1e-7 over random state. JAX 0.10.1
+installs on the Py3.14/arm64 venv (CPU backend; autodiff available).
+
+Remaining for a full vectorized engine: stochastic softmax emission (RNG via
+`jax.random`), the valence-split learning update + eligibility, the cue field,
+and a vectorized environment (grid/patches/cue) -- then `scan` over time and
+`vmap`/batch over organisms, plus the phenomena zoo on top.

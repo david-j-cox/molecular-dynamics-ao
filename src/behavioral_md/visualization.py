@@ -417,7 +417,7 @@ def plot_generalization_gradient(
         mark(float(values[int(np.argmax(mean))]), "-", "peak")
         mark(s_minus, "--", "S-")
     ax.set_xlabel("Test cue value")
-    ax.set_ylabel("Conditioned response")
+    ax.set_ylabel("Conditioned Response")
     ax.set_ylim(bottom=0)
     return _save(fig, path)
 

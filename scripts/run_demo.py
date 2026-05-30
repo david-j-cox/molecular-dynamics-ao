@@ -17,7 +17,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from behavioral_md.atoms import default_atom_set
@@ -49,7 +48,8 @@ def _weak_innate_atoms():
 
 def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     seed = cell["seed"]
-    cfg = SimulationConfig(n_episodes=N_LIVES, max_steps=STEPS, seed=seed, sensor_range=SENSOR_RANGE)
+    cfg = SimulationConfig(n_episodes=N_LIVES, max_steps=STEPS, seed=seed,
+                           sensor_range=SENSOR_RANGE)
     env = BehavioralFieldEnv(cfg)
     org = Organism(cfg, atoms=_weak_innate_atoms())
     rows = []
@@ -60,9 +60,9 @@ def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     return {"summaries": rows}
 
 
-def main() -> None:
-    print(f"Acquisition demo: {N_AGENTS} agents x {N_LIVES} lives (fixed layout)...")
-    results = run_sweep(agent_worker, [{"seed": s} for s in range(N_AGENTS)],
+def main(n_agents: int = N_AGENTS) -> None:
+    print(f"Acquisition demo: {n_agents} agents x {N_LIVES} lives (fixed layout)...")
+    results = run_sweep(agent_worker, [{"seed": s} for s in range(n_agents)],
                         progress_every=25)
     summaries = pd.DataFrame([r for res in results for r in res["summaries"]])
 
@@ -73,10 +73,15 @@ def main() -> None:
     early = by_life.iloc[:5].mean()
     late = by_life.iloc[-5:].mean()
     reached = (summaries["latency"] < STEPS).groupby(summaries["episode"]).mean()
-    print(f"Mean latency  early (lives 0-4): {early:.1f}  ->  late (lives {N_LIVES-5}-{N_LIVES-1}): {late:.1f}")
-    print(f"Fraction reaching food  early: {reached.iloc[:5].mean():.2f}  late: {reached.iloc[-5:].mean():.2f}")
+    print(f"Mean latency  early: {early:.1f}  ->  late: {late:.1f}")
+    print(f"Fraction reaching food  early: {reached.iloc[:5].mean():.2f}  "
+          f"late: {reached.iloc[-5:].mean():.2f}")
     print(f"Wrote {FIG_DIR/'acquisition_latency.png'} and {FIG_DIR/'acquisition_curve.png'}")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--agents", type=int, default=N_AGENTS)
+    main(_ap.parse_args().agents)

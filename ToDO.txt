@@ -28,6 +28,13 @@ TUNING / QUALITY (current foraging model)
 [ ] Revisit whether learning signal should be graded by energy (vs normalized
     per-event) while keeping objectivism.
 
+PHENOMENA ZOO (validation battery; runs on the JAX engine)
+----------------------------------------------------------
+[~] Done so far: acquisition, extinction, generalization, peak shift.
+[ ] Matching / undermatching; resistance-to-change (momentum); PREE; behavioral
+    contrast; blocking; overshadowing; discounting & demand curves; FR/VR/FI/VI.
+[ ] Run the battery across parameter ranges as standing model-validity evidence.
+
 PHASE 5 -- DAY/NIGHT (global ambient sun)
 -----------------------------------------
 [ ] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod 96)/96)); 96 steps/day.
@@ -132,7 +139,11 @@ TESTS (tests/)
 COMPUTE / INFRA
 ---------------
 [~] Parallel parameter sweeps (experiments/_parallel.run_sweep) -- in use.
-[ ] JAX vectorization for many organisms in parallel (after NumPy version solid).
+[~] JAX vectorization (next major phase; autodiff for fitting). Foundation
+    built + validated: jax_engine.py build_spec/compute_force/integrate match
+    the NumPy engine to ~1e-7. TODO: softmax emission (jax.random), valence-split
+    learning + eligibility, cue field, vectorized env, scan-over-time + batch.
+    Roadmap order: phenomena zoo -> evolution -> model comparison -> real data.
 [ ] CI / pre-commit (ruff + pytest).
 
 REPO HYGIENE

@@ -18,7 +18,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from behavioral_md.config import SimulationConfig
@@ -66,9 +65,9 @@ def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     return {"rows": rows}
 
 
-def main() -> None:
-    print(f"Extinction demo: {N_AGENTS} agents x ({N_TRAIN} train + {N_EXT} extinction) lives...")
-    results = run_sweep(agent_worker, [{"seed": s} for s in range(N_AGENTS)], progress_every=25)
+def main(n_agents: int = N_AGENTS) -> None:
+    print(f"Extinction demo: {n_agents} agents x ({N_TRAIN} train + {N_EXT} extinction) lives...")
+    results = run_sweep(agent_worker, [{"seed": s} for s in range(n_agents)], progress_every=25)
     df = pd.DataFrame([r for res in results for r in res["rows"]])
 
     plot_extinction(df, transition=N_TRAIN, path=FIG_DIR / "extinction.png")
@@ -84,4 +83,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--agents", type=int, default=N_AGENTS)
+    main(_ap.parse_args().agents)

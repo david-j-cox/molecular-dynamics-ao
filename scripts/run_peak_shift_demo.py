@@ -60,10 +60,10 @@ def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     return {"seed": seed, "gradient": [field.response(float(v)) for v in PROBE_VALUES]}
 
 
-def main() -> None:
-    print(f"Peak-shift demo: {N_AGENTS} agents, discrimination S+={V_PLUS} / S-={V_MINUS}, "
+def main(n_agents: int = N_AGENTS) -> None:
+    print(f"Peak-shift demo: {n_agents} agents, discrimination S+={V_PLUS} / S-={V_MINUS}, "
           f"{N_BLOCKS} balanced blocks...")
-    results = run_sweep(agent_worker, [{"seed": s} for s in range(N_AGENTS)], progress_every=50)
+    results = run_sweep(agent_worker, [{"seed": s} for s in range(n_agents)], progress_every=50)
     responses = np.array([r["gradient"] for r in results])
 
     plot_generalization_gradient(
@@ -78,4 +78,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--agents", type=int, default=N_AGENTS)
+    main(_ap.parse_args().agents)

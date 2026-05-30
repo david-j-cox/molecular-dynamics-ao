@@ -14,12 +14,12 @@ import numpy as np
 from behavioral_md.atoms import ACTION_ATOMS, STIMULI, BehavioralAtom, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.consequence import ConsequenceEvent, make_consequence_model
-from behavioral_md.generalization import CueReceptorField
 from behavioral_md.forces import (
     ForceCalculator,
     ForceComponents,
     sensory_from_observation,
 )
+from behavioral_md.generalization import CueReceptorField
 from behavioral_md.learning import EligibilityTrace, make_learning_rule
 
 # Movement actions (cost more energy than resting/consuming).

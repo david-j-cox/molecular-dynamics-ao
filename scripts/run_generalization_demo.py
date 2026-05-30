@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
@@ -50,9 +49,9 @@ def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     return {"seed": seed, "gradient": gradient}
 
 
-def main() -> None:
-    print(f"Generalization demo: {N_AGENTS} agents x {N_TRAIN} training lives (cue v0={V0})...")
-    results = run_sweep(agent_worker, [{"seed": s} for s in range(N_AGENTS)], progress_every=25)
+def main(n_agents: int = N_AGENTS) -> None:
+    print(f"Generalization demo: {n_agents} agents x {N_TRAIN} training lives (cue v0={V0})...")
+    results = run_sweep(agent_worker, [{"seed": s} for s in range(n_agents)], progress_every=25)
     responses = np.array([r["gradient"] for r in results])  # (agents, values)
 
     plot_generalization_gradient(PROBE_VALUES, responses, V0, FIG_DIR / "generalization.png")
@@ -67,4 +66,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--agents", type=int, default=N_AGENTS)
+    main(_ap.parse_args().agents)

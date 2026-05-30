@@ -73,9 +73,9 @@ def representative_log() -> tuple[pd.DataFrame, int]:
     return logger.to_dataframe(), best
 
 
-def main() -> None:
-    print(f"Running {N_AGENTS} agents x {N_EPISODES} lives across cores...")
-    results = run_sweep(agent_worker, [{"seed": s} for s in range(N_AGENTS)],
+def main(n_agents: int = N_AGENTS) -> None:
+    print(f"Running {n_agents} agents x {N_EPISODES} lives across cores...")
+    results = run_sweep(agent_worker, [{"seed": s} for s in range(n_agents)],
                         progress_every=50)
     summaries_df = pd.DataFrame([r for res in results for r in res["summaries"]])
     weights_df = pd.DataFrame([r for res in results for r in res["weights"]])
@@ -105,11 +105,15 @@ def main() -> None:
             FIG_DIR / "force_decomposition_grid.png",
         ),
     ]
-    print(f"Population: {N_AGENTS} agents (95% CI). Representative agent seed {REP_SEED}.")
+    print(f"Population: {n_agents} agents (95% CI). Representative agent seed {REP_SEED}.")
     print("Wrote figures:")
     for f in figs:
         print(f"  {f}")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--agents", type=int, default=N_AGENTS)
+    main(_ap.parse_args().agents)
