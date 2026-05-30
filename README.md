@@ -48,6 +48,101 @@ environment makes available. (`consume` is a consummatory response; `pause` and
 
 ---
 
+## Architecture
+
+This engine grew from a hand sketch tying together the governing behavioral
+equations, a "multiple-context" hierarchy of response units, and a dynamic
+energy budget:
+
+![Original design sketch](docs/architecture/original_sketch.jpg)
+
+The diagrams below capture the **current implementation** in that spirit.
+
+### Per-timestep loop
+
+```mermaid
+flowchart LR
+  ENV["Environment<br/>stimulus fields, renewable food patch, danger"]
+  SENSE["Sense<br/>intensity = exp(-d / range), direction, food_contact"]
+  FORCE["Force calculator<br/>F = sensory + history + motivational + coupling - fatigue"]
+  INT["Damped Verlet integration<br/>activation update with c * velocity damping"]
+  EMIT["Emission (softmax / matching)<br/>P(action) proportional to exp(activation / T)"]
+  ENERGY["Energy budget<br/>E += intake - metabolism - movement cost; death if E <= 0"]
+  LEARN["Learning rule (Rescorla-Wagner)<br/>dw = lr * elig * intensity * (lambda*mag - w)"]
+  ENV -->|observation| SENSE
+  SENSE --> FORCE
+  FORCE --> INT
+  INT --> EMIT
+  EMIT -->|action| ENV
+  ENV -->|consequence: energy| ENERGY
+  ENV -->|appetitive / aversive| LEARN
+  ENERGY --> FORCE
+  LEARN --> FORCE
+```
+
+### Two-tier atom architecture (the "multiple-context" hierarchy)
+
+Stimuli drive sign-stable **drive atoms** that carry the learning history; those
+are *expressed* through topographic **movement atoms** via the live stimulus
+geometry. Learning lives on the drive atoms, not the movements.
+
+```mermaid
+flowchart TB
+  subgraph STIM["Stimuli (sensed)"]
+    F["food"]
+    DG["danger"]
+    LT["light"]
+    CU["cue"]
+  end
+  subgraph DRIVE["Drive atoms (functional classes; learned weight w lives here)"]
+    AF["approach_food (+)"]
+    AD["avoid_danger (-)"]
+    AL["approach_light (+)"]
+    OC["orient_to_cue (+)"]
+  end
+  subgraph MOTOR["Movement atoms (topographies; no learning)"]
+    MU["move_up"]
+    MD["move_down"]
+    ML["move_left"]
+    MR["move_right"]
+  end
+  CON["consume<br/>contact-gated consummatory"]
+  MOD["pause / explore<br/>modulate via coupling"]
+  ACT(["Emitted action (softmax)"])
+  STIM --> DRIVE
+  DRIVE -->|"express: valence * activation * (stim_dir . move_dir)"| MOTOR
+  F -->|contact| CON
+  MOD --> MOTOR
+  MOTOR --> ACT
+  CON --> ACT
+```
+
+### Dynamic energy budget
+
+```mermaid
+flowchart LR
+  INTAKE["food intake (+)"] --> E(["Energy reserve E in 0..1"])
+  BAS["basal metabolism (-)"] --> E
+  MOV["movement / rest cost (-)"] --> E
+  E -->|"deficit = (1 - E/E_cap)^p (convex)"| MOT["motivational force<br/>on approach_food and consume"]
+  E -->|"E <= 0"| DEATH(["death: starvation or danger"])
+```
+
+### Quantitative laws from the sketch — implementation status
+
+| Law (sketch) | In the engine | Status |
+|---|---|---|
+| Generalized matching law | softmax emission (Luce rule); concurrent matching needs multiple patches | partial |
+| Rescorla-Wagner | `learning.RescorlaWagner` (with omission decay / extinction) | implemented |
+| Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
+| Behavioral momentum | atom `mass`; momentum-modulated extinction | planned |
+| Delay/probability discounting | — | planned |
+| Demand (exponential) | — | planned |
+| Unit price | — | planned |
+| Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
+
+---
+
 ## Governing equations
 
 Notation: atom `i` has scalar activation `x_i` (state), mass `m_i`, timestep
