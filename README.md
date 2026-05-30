@@ -15,7 +15,7 @@ behavioral ecology.
 
 ---
 
-## 1. Conceptual overview
+## Conceptual overview
 
 In molecular dynamics, particles move through space under forces. Here,
 behavioral atoms move through *activation space* under history-dependent
@@ -48,7 +48,7 @@ environment makes available. (`consume` is a consummatory response; `pause` and
 
 ---
 
-## 2. Governing equations
+## Governing equations
 
 Notation: atom `i` has scalar activation `x_i` (state), mass `m_i`, timestep
 `dt`. Stimulus channels `s ∈ {food, danger, light, cue}` each have intensity
@@ -133,7 +133,7 @@ w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
 
 ---
 
-## 3. Mapping to established biobehavioral principles
+## Mapping to established biobehavioral principles
 
 | Mechanism | Grounding |
 |---|---|
@@ -148,7 +148,7 @@ w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
 
 ---
 
-## 4. Key assumptions (current version)
+## Key assumptions (current version)
 
 - **Continuous world, no goal episodes.** Eating does not end the episode; the
   episode ends only at **death** (energy depletion) or truncation. Lives are long
@@ -167,7 +167,7 @@ w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
 
 ---
 
-## 5. Repository layout
+## Repository layout
 
 ```
 src/behavioral_md/
@@ -185,7 +185,7 @@ docs/lab_notebook.md     # running record of every experiment and decision
 outputs/                 # logs/ and figures/ (generated)
 ```
 
-## 6. Installation
+## Installation
 
 ```bash
 python -m venv .venv
@@ -197,7 +197,7 @@ python -m experiments.exp003_learning_curve   # learning curve across lives
 (pygame is optional — `pip install pygame` — for the live render; it has no
 prebuilt wheel on some new Python versions.)
 
-## 7. Status
+## Status
 
 - [x] **Phase 1** — package scaffold, `SimulationConfig`, `BehavioralFieldEnv`
 - [x] **Phase 2** — `BehavioralAtom`, force model, Verlet integrator
