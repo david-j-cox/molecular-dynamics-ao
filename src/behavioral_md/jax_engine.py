@@ -48,6 +48,8 @@ class ModelSpec(NamedTuple):
     is_drive: jnp.ndarray         # [A] bool (non-directional, non-consummatory, valenced)
     action_atom_idx: jnp.ndarray  # [n_actions] atom index of each action atom
     action_ids: jnp.ndarray       # [n_actions] env action id of each action atom
+    baseline: jnp.ndarray         # [A] initial/baseline activation
+    approach_food_idx: int        # atom index of approach_food (cue drive target)
 
 
 def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
@@ -65,7 +67,9 @@ def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
     is_move = np.zeros(a, bool)
     is_consum = np.zeros(a, bool)
     is_drive = np.zeros(a, bool)
+    baseline = np.zeros(a)
     for i, atom in enumerate(atoms):
+        baseline[i] = atom.baseline_activation
         for j, s in enumerate(STIMULI):
             sens[i, j] = atom.sensitivity.get(s, 0.0)
         cexp[i] = atom.contact_exponent
@@ -91,6 +95,8 @@ def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
         is_drive=jnp.asarray(is_drive),
         action_atom_idx=jnp.asarray(action_idx),
         action_ids=jnp.asarray(np.array(_ACTION_IDS)),
+        baseline=jnp.asarray(baseline),
+        approach_food_idx=names.index("approach_food"),
     )
 
 
@@ -156,6 +162,60 @@ def integrate(
     return new, activation
 
 
+# Movement deltas by env action id (0 no-op, 1 up, 2 down, 3 left, 4 right,
+# 5 consume, 6 pause), matching gridworld._MOVES.
+_DELTAS = jnp.array(
+    [[0.0, 0.0], [0.0, 1.0], [0.0, -1.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
+)
+
+
+def observe(
+    positions: jnp.ndarray,    # [O, 2]
+    sources: jnp.ndarray,      # [O, C, 2]  source positions in STIMULI order
+    biomass: jnp.ndarray,      # [O]
+    config: SimulationConfig,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Batched sensory observation: (intensity [O,C], direction [O,C,2], food_contact [O]).
+
+    Matches `gridworld._build_observation`: exp(-d/range) intensity (food scaled
+    by remaining biomass), unit direction to each source, and a biomass-scaled
+    food contact signal within consume_radius.
+    """
+    diff = sources - positions[:, None, :]                          # [O, C, 2]
+    dist = jnp.linalg.norm(diff, axis=2)                            # [O, C]
+    direction = jnp.where(dist[..., None] > 1e-9, diff / jnp.clip(dist[..., None], 1e-9, None), 0.0)
+    intensity = jnp.exp(-dist / config.sensor_range)               # [O, C]
+    biomass_frac = biomass / config.food_carrying_capacity         # [O]
+    intensity = intensity.at[:, _FOOD].multiply(biomass_frac)
+    in_range = dist[:, _FOOD] <= config.consume_radius
+    food_contact = jnp.where(in_range, biomass_frac, 0.0)
+    return intensity, direction, food_contact
+
+
+def env_step(
+    positions: jnp.ndarray,        # [O, 2]
+    action: jnp.ndarray,           # [O] int
+    food_pos: jnp.ndarray,         # [O, 2]
+    danger_pos: jnp.ndarray,       # [O, 2]
+    biomass: jnp.ndarray,          # [O]
+    food_reinforces: jnp.ndarray,  # [O] bool
+    config: SimulationConfig,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Batched env transition; returns (new_positions, food_intake, danger_contact, new_biomass)."""
+    new_pos = jnp.clip(positions + _DELTAS[action], 0.0, config.grid_size - 1)
+    d_food = jnp.linalg.norm(new_pos - food_pos, axis=1)
+    in_range = (d_food <= config.consume_radius) & food_reinforces
+    available = jnp.clip(biomass - config.food_min_biomass, 0.0, None)
+    intake = jnp.where(in_range, jnp.minimum(config.food_intake_rate, available), 0.0)
+    k = config.food_carrying_capacity
+    biomass = biomass - intake
+    biomass = biomass + config.food_regrowth_rate * biomass * (1.0 - biomass / k)
+    biomass = jnp.clip(biomass, config.food_min_biomass, k)
+    d_danger = jnp.linalg.norm(new_pos - danger_pos, axis=1)
+    danger_contact = jnp.where(d_danger <= config.consume_radius, 1.0, 0.0)
+    return new_pos, intake, danger_contact, biomass
+
+
 def emission_probs(
     spec: ModelSpec, activation: jnp.ndarray, config: SimulationConfig
 ) -> jnp.ndarray:
@@ -207,6 +267,107 @@ def learn_step(
         * (target[:, :, None] - history)
     )
     return jnp.clip(history + dv, config.history_weight_min, config.history_weight_max)
+
+
+_DANGER = STIMULI.index("danger")
+_CUE = STIMULI.index("cue")
+
+
+class SimState(NamedTuple):
+    """Per-organism simulation state (one entry per organism in every array)."""
+
+    positions: jnp.ndarray   # [O, 2]
+    biomass: jnp.ndarray     # [O]
+    energy: jnp.ndarray      # [O]
+    alive: jnp.ndarray       # [O] bool
+    activation: jnp.ndarray  # [O, A]
+    previous: jnp.ndarray    # [O, A]
+    history: jnp.ndarray     # [O, A, C]
+    eligibility: jnp.ndarray # [O, A]
+    cue_weights: jnp.ndarray # [O, K]
+
+
+def initial_state(spec, cfg, n_org, position, n_receptors):
+    """Construct a fresh SimState for ``n_org`` organisms at a start position."""
+    a, c = spec.sensitivity.shape
+    act0 = jnp.broadcast_to(spec.baseline, (n_org, a))
+    pos0 = jnp.broadcast_to(jnp.asarray(position, float), (n_org, 2))
+    return SimState(
+        positions=pos0, biomass=jnp.full(n_org, cfg.food_carrying_capacity),
+        energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
+        activation=act0, previous=act0, history=jnp.zeros((n_org, a, c)),
+        eligibility=jnp.zeros((n_org, a)), cue_weights=jnp.zeros((n_org, n_receptors)),
+    )
+
+
+def make_simulate(spec, cfg, sources, food_reinforces, cue_value, cue_centers):
+    """Return a jitted ``run(state, key) -> (final_state, energy_trace)`` for one life.
+
+    Closes over the static model/config/layout so atom arrays and config scalars
+    become compile-time constants; `lax.scan` runs all timesteps for the whole
+    population as one fused, batched computation.
+    """
+    food_pos, danger_pos = sources[:, _FOOD], sources[:, _DANGER]
+    af = spec.approach_food_idx
+    beta, lr_cue = cfg.cue_generalization_beta, cfg.cue_learning_rate
+
+    def step(state: SimState, key_t):
+        intensity, direction, contact = observe(state.positions, sources, state.biomass, cfg)
+        dgain = deficit_gain(state.energy, cfg)
+        force = compute_force(
+            spec, state.activation, state.history, intensity, direction, contact, dgain
+        )
+        cue_act = intensity[:, _CUE][:, None] * jnp.exp(
+            -beta * jnp.abs(cue_value[:, None] - cue_centers[None, :])
+        )
+        cue_drive = jnp.sum(state.cue_weights * cue_act, axis=1)
+        force = force.at[:, af].add(cue_drive)
+
+        new_act, new_prev = integrate(spec, state.activation, state.previous, force, cfg)
+        elig = update_eligibility(state.eligibility, new_act, cfg)
+        action = sample_actions(spec, emission_probs(spec, new_act, cfg), key_t)
+
+        new_pos, intake, danger_c, new_bio = env_step(
+            state.positions, action, food_pos, danger_pos, state.biomass, food_reinforces, cfg
+        )
+        intensity2, _d2, contact2 = observe(new_pos, sources, new_bio, cfg)
+
+        moved = (action >= 1) & (action <= 4)
+        cost = cfg.basal_metabolism + jnp.where(moved, cfg.move_cost, cfg.rest_cost)
+        new_energy = jnp.clip(
+            state.energy + intake - cfg.danger_energy_loss * danger_c - cost,
+            0.0, cfg.energy_capacity,
+        )
+        appetitive = (intake > 0).astype(jnp.float32)
+        aversive = (danger_c > 0).astype(jnp.float32)
+        new_hist = learn_step(spec, state.history, elig, intensity2, appetitive, aversive,
+                              contact2 > 0, danger_c > 0, cfg)
+        elig_af = jnp.clip(elig[:, af], 0.0, None)
+        cue_err = cfg.reinforcement_asymptote * appetitive - cue_drive
+        cue_upd = jnp.where((contact2 > 0)[:, None],
+                            lr_cue * elig_af[:, None] * cue_act * cue_err[:, None], 0.0)
+        new_cue_w = jnp.clip(state.cue_weights + cue_upd,
+                             cfg.history_weight_min, cfg.history_weight_max)
+
+        a1, a2 = state.alive, state.alive[:, None]  # freeze dead organisms
+        new = SimState(
+            positions=jnp.where(a2, new_pos, state.positions),
+            biomass=jnp.where(a1, new_bio, state.biomass),
+            energy=jnp.where(a1, new_energy, state.energy),
+            alive=state.alive & (new_energy > 0.0),
+            activation=jnp.where(a2, new_act, state.activation),
+            previous=jnp.where(a2, new_prev, state.previous),
+            history=jnp.where(a1[:, None, None], new_hist, state.history),
+            eligibility=jnp.where(a2, elig, state.eligibility),
+            cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
+        )
+        return new, new.energy
+
+    def scanned(state: SimState, keys):
+        """Run len(keys) timesteps; return (final_state, per-step energy [T, O])."""
+        return jax.lax.scan(step, state, keys)
+
+    return jax.jit(scanned)
 
 
 def validate_against_numpy(n_org: int = 4, seed: int = 0) -> float:
@@ -301,11 +462,54 @@ def validate_emission(n_org: int = 5, seed: int = 2) -> float:
     return float(np.max(np.abs(jax_p - np_p)))
 
 
+def validate_env(n_org: int = 8, seed: int = 3) -> float:
+    """Max abs difference vs the NumPy gridworld over random position+action+biomass."""
+    from behavioral_md.environments import BehavioralFieldEnv
+
+    rng = np.random.default_rng(seed)
+    cfg = SimulationConfig(grid_size=10)
+    layout = {"position": [1, 1], "food": [6, 6], "danger": [2, 8], "light": [0, 9], "cue": [8, 3]}
+    env = BehavioralFieldEnv(cfg)
+    env.reset(seed=seed, options={"layout": layout})
+    sources_np = np.stack([env.food_pos, env.danger_pos, env.light_pos, env.cue_pos])  # [C,2]
+    sources = jnp.asarray(np.broadcast_to(sources_np, (n_org, *sources_np.shape)))
+
+    pos = rng.integers(0, cfg.grid_size, size=(n_org, 2)).astype(float)
+    action = rng.integers(0, 7, size=n_org)
+    biomass = rng.uniform(cfg.food_min_biomass, cfg.food_carrying_capacity, size=n_org)
+    food_pos = jnp.asarray(np.broadcast_to(env.food_pos, (n_org, 2)))
+    danger_pos = jnp.asarray(np.broadcast_to(env.danger_pos, (n_org, 2)))
+
+    new_pos, intake, danger, new_bio = env_step(
+        jnp.asarray(pos), jnp.asarray(action), food_pos, danger_pos, jnp.asarray(biomass),
+        jnp.ones(n_org, bool), cfg,
+    )
+    inten, direction, contact = observe(new_pos, sources, new_bio, cfg)
+
+    diffs = []
+    for o in range(n_org):
+        env.position = pos[o].copy()
+        env.food_biomass = float(biomass[o])
+        obs, _r, _t, _tr, info = env.step(int(action[o]))
+        diffs += [
+            np.abs(np.asarray(new_pos[o]) - env.position).max(),
+            abs(float(intake[o]) - info["food_intake"]),
+            abs(float(danger[o]) - info["danger_contact"]),
+            abs(float(new_bio[o]) - info["food_biomass"]),
+            abs(float(contact[o]) - float(obs["food_contact"][0])),
+        ]
+        for j, s in enumerate(STIMULI):
+            diffs.append(abs(float(inten[o, j]) - float(obs[f"{s}_intensity"][0])))
+            diffs.append(np.abs(np.asarray(direction[o, j]) - obs[f"{s}_vector"]).max())
+    return float(np.max(diffs))
+
+
 if __name__ == "__main__":
     checks = {
         "force": validate_against_numpy(),
         "learning": validate_learning(),
         "emission": validate_emission(),
+        "environment": validate_env(),
     }
     for name, diff in checks.items():
         flag = "OK" if diff < 1e-6 else "MISMATCH"

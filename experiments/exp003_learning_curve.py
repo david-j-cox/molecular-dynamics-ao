@@ -78,8 +78,9 @@ def main() -> None:
 
     # Aggregate per decay: mean curve across seeds.
     out: dict[str, Any] = {"n_episodes": N_EPISODES, "steps": STEPS, "by_decay": {}}
-    print(f"\n{'decay':>6} | {'contact_rate':^17} | {'survived(steps)':^17} | {'hw_food(drive)':^17}")
-    print(f"{'':>6} | {'early':>7} {'late':>7} | {'early':>7} {'late':>7} | {'early':>7} {'late':>7}")
+    sub = " | ".join([f"{'early':>5} {'late':>5}"] * 3)
+    print("\n(columns: contact_rate | survived | hw_food(drive))")
+    print(f"{'decay':>6} | {sub}")
     for d in decays:
         rows = [r for r in results if r["decay"] == d]
         cr = np.array([r["contact_rate"] for r in rows])   # (seeds, episodes)
