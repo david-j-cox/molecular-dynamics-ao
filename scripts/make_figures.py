@@ -25,7 +25,7 @@ from behavioral_md.visualization import (
     plot_energy,
     plot_food_biomass,
     plot_learning_curve,
-    plot_trajectory,
+    plot_occupancy_landscape,
     plot_weight_acquisition,
 )
 
@@ -87,7 +87,7 @@ def main() -> None:
     figs = [
         plot_learning_curve(summaries_df, FIG_DIR / "learning_curve.png"),
         plot_weight_acquisition(weights_df, FIG_DIR / "weight_acquisition.png"),
-        plot_trajectory(rep_log, best, FIG_DIR / "trajectory.png"),
+        plot_occupancy_landscape(rep_log, best, FIG_DIR / "occupancy_landscape.png"),
         plot_energy(rep_log, best, FIG_DIR / "energy.png"),
         plot_food_biomass(rep_log, best, FIG_DIR / "food_biomass.png"),
         plot_atom_series(rep_log, best, "atom_activation", action_atoms,

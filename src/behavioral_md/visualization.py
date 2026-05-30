@@ -140,6 +140,57 @@ def plot_energy(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
     return _save(fig, path)
 
 
+def plot_occupancy_landscape(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
+    """3D occupancy "landscape": height at each cell = time the organism spent there.
+
+    Camping shows as a tall peak. Sources are marked above the surface.
+    """
+    steps = _episode_slice(log, episode).drop_duplicates("timestep").sort_values("timestep")
+    xs = steps["x"].to_numpy().astype(int)
+    ys = steps["y"].to_numpy().astype(int)
+    g = int(max(xs.max(), ys.max())) + 1
+    dwell = np.zeros((g, g))
+    for xi, yi in zip(xs, ys, strict=True):
+        dwell[xi, yi] += 1.0
+    gx, gy = np.meshgrid(np.arange(g), np.arange(g), indexing="ij")
+
+    fig = plt.figure(figsize=(7.5, 6))
+    ax = fig.add_subplot(projection="3d")
+    ax.plot_surface(gx, gy, dwell, cmap="Greys", edgecolor="0.5", linewidth=0.2,
+                    alpha=0.9, rstride=1, cstride=1)
+
+    top = dwell.max() * 1.08 if dwell.max() > 0 else 1.0
+    for key, (label, marker, facecolor) in _SOURCE_STYLE.items():
+        cx = f"{key}_x"
+        if cx in steps:
+            sx, sy = int(steps[cx].iloc[0]), int(steps[f"{key}_y"].iloc[0])
+            ax.scatter([sx], [sy], [top], marker=marker, s=140, facecolors=facecolor,
+                       edgecolors="black", linewidths=1.2, label=label, depthshade=False)
+
+    ax.set_xlabel("X position", fontsize=16, labelpad=10)
+    ax.set_ylabel("Y position", fontsize=16, labelpad=10)
+    ax.set_zlabel("Time spent (steps)", fontsize=16, labelpad=10)
+    ax.tick_params(labelsize=11)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.0, 0.9), frameon=False, fontsize=14)
+    ax.view_init(elev=42, azim=-130)
+    return _save(fig, path)
+
+
+def plot_acquisition_latency(summaries: pd.DataFrame, path: str | Path) -> Path:
+    """Latency to first food vs. life (mean +/- 95% CI over agents).
+
+    ``summaries`` must have columns: seed, episode, latency.
+    """
+    episodes, mat = _pivot(summaries, "latency")
+    mean, ci = _mean_ci(mat, axis=0)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    _band(ax, episodes, mean, ci, "Latency", "-", "o")
+    ax.set_xlabel("Life (episode)")
+    ax.set_ylabel("Latency to food (steps)")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
 def plot_food_biomass(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
     """Food-patch biomass over one life (shows the deplete/regrow VI dynamic)."""
     steps = _episode_slice(log, episode).drop_duplicates("timestep").sort_values("timestep")

@@ -70,13 +70,19 @@ VISUALIZATION (visualization.py)
 [x] Energy trajectory + death marker.
 [x] Learned-weight-across-lives (history forming).
 [x] scripts/make_figures.py generates the set into outputs/figures/.
+[x] 3D occupancy landscape (height = time spent per cell; camping = a peak).
+    Replaces the 2D trajectory in the standard set.
+[x] Acquisition latency curve (run_demo) with 95% CI.
 [ ] Day/night shading on time-series (after Phase 5).
 [ ] Generalization gradient; matching plots (relative response vs relative reinf).
 [ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
 
 DEMOS (scripts/)
 ----------------
-[ ] run_demo.py            acquisition (approach/survival improves over lives)
+[x] run_demo.py            acquisition: FIXED layout, weak innate food drive ->
+                           latency to food drops ~152 -> ~106 over 40 lives
+                           (100 agents, 95% CI), reach 0.55 -> 0.73. Clean
+                           negatively-accelerated acquisition curve.
 [ ] run_extinction_demo.py extinction (food no longer reinforces -> approach weakens;
                            needs omission/decay handling in learning)
 [ ] run_generalization_demo.py  cue generalization gradient (train one cue value,
