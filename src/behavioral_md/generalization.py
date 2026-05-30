@@ -48,15 +48,25 @@ class CueReceptorField:
         return float(self.weights @ (intensity * self._tuning(value)))
 
     def learn(self, eligibility: float, mag: float, rate: float, lam: float) -> None:
-        """Rescorla-Wagner update on the receptors active this step.
+        """Rescorla-Wagner update with a SUMMED (elemental) prediction error.
 
-        ``mag`` is the teaching signal (1 reinforced, 0 omitted); ``rate`` is the
-        acquisition or extinction rate; ``lam`` the asymptote. Receptors that were
-        active (near the presented value) move toward ``lam*mag``.
+        ``mag`` is the teaching signal (1 reinforced, 0 omitted); ``rate`` the
+        learning rate; ``lam`` the asymptote. The error uses the *summed*
+        prediction across the active receptors (the current conditioned
+        response), so all active receptors share one error term:
+
+            error = lam*mag - sum_j w_j * activation_j
+            dw_k  = rate * eligibility * activation_k * error
+
+        This is self-limiting (the total prediction settles at lam*mag, not each
+        receptor) and, crucially, lets a non-reinforced cue (S-) drive its
+        receptors NEGATIVE wherever an excitatory gradient already predicts
+        reinforcement -- the inhibition that produces peak shift.
         """
-        target = lam * mag
+        v_pred = float(self.weights @ self.last_activation)
+        error = lam * mag - v_pred
         self.weights = np.clip(
-            self.weights + rate * eligibility * self.last_activation * (target - self.weights),
+            self.weights + rate * eligibility * self.last_activation * error,
             self.lo,
             self.hi,
         )

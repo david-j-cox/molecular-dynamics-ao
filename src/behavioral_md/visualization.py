@@ -386,16 +386,36 @@ def plot_generalization_gradient(
     responses: np.ndarray,
     trained_value: float,
     path: str | Path,
+    s_minus: float | None = None,
 ) -> Path:
     """Generalization gradient: conditioned response vs cue value (mean +/- 95% CI).
 
-    ``responses`` is an (agents, values) array of probed conditioned responses;
-    a dotted line marks the trained value.
+    ``responses`` is an (agents, values) array of probed conditioned responses. A
+    dotted line marks S+ (``trained_value``); if ``s_minus`` is given (a
+    discrimination/peak-shift test), a dashed line marks S- and a solid line marks
+    the empirical peak, so any peak shift away from S- is visible.
     """
     mean, ci = _mean_ci(responses, axis=0)
     fig, ax = plt.subplots(figsize=(8, 4))
     _band(ax, values, mean, ci, "response", "-", "o")
-    ax.axvline(trained_value, color="black", ls=":", lw=1.2)
+    span = float(values[-1] - values[0]) or 1.0
+
+    def mark(v: float, ls: str, label: str) -> None:
+        ax.axvline(v, color="black", ls=ls, lw=1.2)
+        # Label just right of the line (left if near the right edge) to avoid
+        # overlapping the curve or other labels.
+        right = v < values[0] + 0.85 * span
+        ax.annotate(
+            label, xy=(v, 1.0), xycoords=("data", "axes fraction"),
+            xytext=(4 if right else -4, -4), textcoords="offset points",
+            ha="left" if right else "right", va="top", fontsize=12,
+            annotation_clip=False,
+        )
+
+    mark(trained_value, ":", "S+")
+    if s_minus is not None:
+        mark(float(values[int(np.argmax(mean))]), "-", "peak")
+        mark(s_minus, "--", "S-")
     ax.set_xlabel("Test cue value")
     ax.set_ylabel("Conditioned response")
     ax.set_ylim(bottom=0)

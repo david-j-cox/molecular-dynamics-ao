@@ -111,6 +111,10 @@ DEMOS (scripts/)
                            value-tuned receptors (Shepard tuning); train at v0,
                            probe across values -> emergent gradient peaked at v0
                            (~38% drop at extremes), 100 agents, 95% CI.
+[x] run_peak_shift_demo.py  peak shift: discrimination S+ vs S- (summed-error
+                           elemental receptor learning) -> gradient peak shifts
+                           PAST S+ away from S- (Hanson 1959). Controlled
+                           balanced procedure (foraging can't balance exposure).
 
 METRICS (metrics.py)
 --------------------
