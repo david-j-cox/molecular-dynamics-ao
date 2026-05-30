@@ -41,8 +41,8 @@ Gymnasium is used **only** as the environment interface — not for RL training.
 Built incrementally. Current progress:
 
 - [x] **Phase 1** — package scaffold, `SimulationConfig`, `BehavioralFieldEnv`
-- [ ] Phase 2 — `BehavioralAtom`, force calculation, Verlet integrator
-- [ ] Phase 3 — `Organism`, simulation loop, logging
+- [x] **Phase 2** — `BehavioralAtom`, force calculation (directional projection), Verlet integrator
+- [ ] Phase 3 — `Organism`, learning rule, simulation loop, logging
 - [ ] Phase 4 — visualization, metrics, tests
 - [ ] Phase 5 — acquisition / extinction / generalization demos
 

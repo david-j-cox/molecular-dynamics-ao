@@ -29,9 +29,22 @@ class SimulationConfig(BaseModel):
     max_steps: int = Field(200, ge=1, description="Max timesteps per episode.")
 
     # --- Learning ----------------------------------------------------------
+    learning_rule: Literal["rw", "linear"] = Field(
+        "rw",
+        description=(
+            "History-weight update rule. 'rw' = error-correcting Rescorla-Wagner "
+            "(negatively accelerated acquisition, graceful extinction); 'linear' = "
+            "the literal spec rule w += lr*consequence*eligibility with clipping."
+        ),
+    )
     learning_rate: float = Field(0.05, ge=0.0, description="History-weight update rate.")
     eligibility_decay: float = Field(
         0.9, ge=0.0, le=1.0, description="Per-step decay of the eligibility trace."
+    )
+    reinforcement_asymptote: float = Field(
+        1.0,
+        gt=0.0,
+        description="Lambda: asymptotic associative strength per unit consequence (RW rule).",
     )
 
     # --- Activation bounds -------------------------------------------------
