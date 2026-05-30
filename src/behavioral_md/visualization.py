@@ -254,11 +254,19 @@ def plot_force_decomposition_grid(
     for ax, name in zip(axes, atom_names, strict=False):
         a = ep[ep["atom_name"] == name].sort_values("timestep")
         t = a["timestep"]
+        cols = [c for c, _ in _FORCE_COMPONENTS if c in a]
+        # Per-panel normalization by max magnitude: force is unitless, so this
+        # puts each atom on [-1, 1] (or [0, 1] if all-positive) while preserving
+        # the relative sizes of the components within the atom.
+        scale = float(np.nanmax(np.abs(a[cols].to_numpy()))) if cols else 1.0
+        scale = scale if scale > 1e-9 else 1.0
+        any_negative = bool((a[cols].to_numpy() < -1e-9).any()) if cols else False
         for (col, label), (ls, marker) in zip(_FORCE_COMPONENTS, _BW_CYCLE, strict=False):
             if col in a:
-                ax.plot(t, a[col], color="black", ls=ls, lw=0.9, marker=marker, ms=4,
-                        markevery=max(1, len(a) // 12), label=label)
+                ax.plot(t, a[col] / scale, color="black", ls=ls, lw=0.9, marker=marker,
+                        ms=4, markevery=max(1, len(a) // 12), label=label)
         ax.axhline(0, color="0.6", lw=0.4)
+        ax.set_ylim(-1.08, 1.08) if any_negative else ax.set_ylim(-0.04, 1.08)
         ax.spines.top.set_visible(False)
         ax.spines.right.set_visible(False)
         # In-panel atom label (upper right), prettified to readable text.
@@ -271,7 +279,7 @@ def plot_force_decomposition_grid(
         ax.set_visible(False)
     for i, ax in enumerate(axes[:n]):
         if i % ncols == 0:  # left column
-            ax.set_ylabel("Force")
+            ax.set_ylabel("Force (normalized)")
         if i + ncols >= n:  # no visible panel below -> bottom edge
             ax.set_xlabel("Time (steps)")
 
@@ -299,14 +307,25 @@ def plot_atom_series(
     atom_names: list[str],
     path: str | Path,
     ylabel: str,
+    normalize: bool = False,
 ) -> Path:
-    """Time series of a per-atom quantity (activation / force / hw_*) for one life."""
+    """Time series of a per-atom quantity (activation / force / hw_*) for one life.
+
+    With ``normalize=True`` all series are divided by the shared max magnitude
+    (force is unitless), putting them on [-1, 1] for comparison.
+    """
     ep = _episode_slice(log, episode)
+    series = {n: ep[ep["atom_name"] == n].sort_values("timestep") for n in atom_names}
+    scale = 1.0
+    if normalize:
+        vals = np.concatenate([s[column].to_numpy() for s in series.values()])
+        scale = float(np.nanmax(np.abs(vals))) if len(vals) else 1.0
+        scale = scale if scale > 1e-9 else 1.0
+        ylabel = f"{ylabel} (normalized)"
     fig, ax = plt.subplots(figsize=(8, 3.8))
-    for name, (ls, marker) in zip(atom_names, _BW_CYCLE, strict=False):
-        a = ep[ep["atom_name"] == name].sort_values("timestep")
-        ax.plot(a["timestep"], a[column], color="black", ls=ls, lw=1.0,
-                marker=marker, ms=3, markevery=max(1, len(a) // 18), label=name)
+    for (name, a), (ls, marker) in zip(series.items(), _BW_CYCLE, strict=False):
+        ax.plot(a["timestep"], a[column] / scale, color="black", ls=ls, lw=1.0,
+                marker=marker, ms=4, markevery=max(1, len(a) // 18), label=name)
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel(ylabel)
     _legend_outside(ax, ncol=1)

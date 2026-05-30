@@ -98,7 +98,7 @@ def main() -> None:
         plot_atom_series(rep_log, best, "atom_activation", action_atoms,
                          FIG_DIR / "activation.png", ylabel="Activation"),
         plot_atom_series(rep_log, best, "atom_force", drive_atoms,
-                         FIG_DIR / "drive_force.png", ylabel="Force"),
+                         FIG_DIR / "drive_force.png", ylabel="Force", normalize=True),
         plot_force_decomposition_grid(
             rep_log, mature_ep,
             drive_atoms + ["consume", "pause", "explore"] + action_atoms[:4],
