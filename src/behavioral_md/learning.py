@@ -47,55 +47,61 @@ class EligibilityTrace:
         self.trace[:] = 0.0
 
 
-def _source_channels(consequence: float, source: str | None) -> list[str]:
-    if source is not None:
-        return [source]
-    if consequence > 0:
-        return ["food"]
-    if consequence < 0:
-        return ["danger"]
-    return []
-
-
 def update_history(
     atoms: list[BehavioralAtom],
     eligibility: EligibilityTrace,
     intensities: dict[str, float],
-    consequence: float,
+    appetitive: float,
+    aversive: float,
     config: SimulationConfig,
     *,
     source: str | None = None,
 ) -> None:
-    """Apply one history-weight update in place to all atoms.
+    """Update *drive-atom* history weights from valence-split teaching signals.
 
-    ``intensities`` maps each stimulus channel to its current intensity in
-    [0, 1]. ``source`` optionally forces the credited channel (used by
-    ``source_only`` and to pair a neutral cue with a consequence).
+    Two-tier model: only drive atoms (nonzero ``valence``) learn. An
+    approach-valence atom (``valence > 0``) is taught by ``appetitive``
+    (reinforcement); an avoid-valence atom (``valence < 0``) by ``aversive``
+    (punishment). Both signals strengthen the disposition (weights grow toward
+    +lambda) -- the atom's valence handles approach/avoid direction in the
+    expression, so the weight is always a positive "strength of disposition".
+
+    Credit is assigned across present stimulus channels per ``credit_assignment``
+    (rw_independent: each present cue independently -> conditioning/generalization;
+    rw_competitive: cues share one error -> blocking; source_only: only the atom's
+    own stimulus). ``source`` optionally forces a paired cue (e.g. cue->food).
+    Updates fire only on consequence events (appetitive or aversive > 0) or when a
+    ``source`` is explicitly paired.
     """
+    if appetitive <= 0.0 and aversive <= 0.0 and source is None:
+        return
+
     lr = config.learning_rate
     lam = config.reinforcement_asymptote
     lo, hi = config.history_weight_min, config.history_weight_max
-    c = float(consequence)
     rule = config.learning_rule
     scheme = config.credit_assignment
 
-    # Which channels are eligible to update?
-    if scheme == "source_only":
-        channels = _source_channels(c, source)
-    else:
-        # All present channels (plus an explicitly paired source, if given).
-        channels = [s for s in STIMULI if intensities.get(s, 0.0) > 1e-6]
+    for i, atom in enumerate(atoms):
+        if atom.valence == 0.0:
+            continue  # only drive atoms learn (two-tier)
+        mag = appetitive if atom.valence > 0.0 else aversive
+        if mag <= 0.0 and source is None:
+            continue
+        e_i = float(eligibility.trace[i])
+        if e_i <= 0.0:
+            continue  # only credit positively-engaged drives
+
+        # Channels eligible to update for this atom.
+        if scheme == "source_only":
+            channels = [atom.stimulus] if atom.stimulus else []
+        else:
+            channels = [s for s in STIMULI if intensities.get(s, 0.0) > 1e-6]
         if source is not None and source not in channels:
             channels.append(source)
-    if not channels:
-        return
-
-    for i, atom in enumerate(atoms):
-        e_i = float(eligibility.trace[i])
-        if e_i == 0.0:
+        if not channels:
             continue
 
-        # Competitive RW shares one prediction across this atom's present cues.
         v_pred_shared = (
             sum(atom.history_weights.get(s, 0.0) * intensities.get(s, 0.0) for s in channels)
             if scheme == "rw_competitive"
@@ -111,9 +117,9 @@ def update_history(
 
             v = atom.history_weights.get(s, 0.0)
             if rule == "linear":
-                dv = lr * c * e_i * intensity
-            else:  # rw
+                dv = lr * mag * e_i * intensity
+            else:  # rw, strengthening toward +lambda*mag
                 v_pred = v_pred_shared if v_pred_shared is not None else v
-                dv = lr * e_i * intensity * (lam * c - v_pred)
+                dv = lr * e_i * intensity * (lam * mag - v_pred)
 
             atom.history_weights[s] = float(np.clip(v + dv, lo, hi))

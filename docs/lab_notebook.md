@@ -377,3 +377,44 @@ support coherent learning. Options:
    rectified eligibility), not a signed history weight.
 Energy/survival mechanics committed as WIP; learning effectiveness pending this
 decision.
+
+---
+
+## 2026-05-30 — RESOLVED: two-tier + valence-split learning works
+
+User chose **Option 1 (two-tier)**. Implemented:
+- **Drive atoms** (approach_food, avoid_danger, approach_light, orient_to_cue):
+  non-directional, sign-stable, tagged with a `stimulus` and `valence`
+  (+approach / -avoid). They carry the learning history.
+- **Movement atoms**: topographies with no sensitivity/history; their force is
+  the *expression* of the drive atoms projected onto each move direction via the
+  live stimulus geometry (`sum_k valence_k * activation_k * dot(stim_dir_k, move_dir)`).
+- **Valence-split teaching signals**: `ConsequenceModel.learning_signals` returns
+  `(appetitive, aversive)`. Appetitive (reinforcement) trains approach-valence
+  drives; aversive (punishment) trains avoid-valence drives. Both *strengthen*
+  the disposition (weights grow toward +lambda); valence handles direction in the
+  expression. This removes the cross-valence contamination (danger no longer
+  trains the food drive) and fixes the avoidance sign (punishment strengthens
+  avoidance instead of driving its weight negative).
+- Learning signals normalized to ~1 per event (raw per-step energy ~0.05 is too
+  small an RW target); the energy *reserve* still uses raw objective energy.
+
+**Exp 003 re-run (72 organisms x 60 lives, sensor_range=4):** learning now has the
+right sign and rises.
+
+| eligibility_decay | hw_food(drive) early->late | survived early->late |
+|---|---|---|
+| 0.90 | 0.267 -> 1.000 | 182 -> 178 |
+| 0.95 | 0.514 -> 0.785 | 163 -> 156 |
+| 0.99 | -0.469 -> -1.957 | 128 -> 114 |
+
+Temporal-weighting result: decay 0.9-0.95 is the sweet spot; **0.99 is too long**
+(credits stimuli not actually driving the approach -> weight goes negative).
+
+**Remaining bottleneck (separate from learning):** stronger learned approach does
+NOT yet raise contact rate / survival, because the organism cannot reliably
+*stay* at food -- the consummatory `consume` holds it only until the next softmax
+draw knocks it off, and when sated nothing keeps it near food, so it orbits and
+drifts. This staying-at-food / patch-residence problem is the next target (likely
+emission stickiness when consummatory, and/or a "stay while feeding" mechanism).
+Architecture (two-tier) committed.

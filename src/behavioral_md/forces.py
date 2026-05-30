@@ -78,6 +78,17 @@ class ForceCalculator:
     ) -> None:
         self.atoms = atoms
         self.n = len(atoms)
+        self.index = {a.name: i for i, a in enumerate(atoms)}
+        # Spatial drive atoms expressed through movement: non-directional,
+        # non-consummatory, with a stimulus + nonzero valence.
+        self.drive_atoms = [
+            a
+            for a in atoms
+            if a.direction is None
+            and not a.consummatory
+            and a.stimulus is not None
+            and a.valence != 0.0
+        ]
         self.config = config or SimulationConfig()
         if coupling_matrix is None:
             coupling_matrix = default_coupling_matrix(atoms)
@@ -113,40 +124,55 @@ class ForceCalculator:
             deficit**self.config.deficit_exponent
         )
 
+        # Current activations (used by both coupling and the movement expression).
+        activations = np.array([a.activation for a in self.atoms])
+
         for i, atom in enumerate(self.atoms):
+            if atom.direction is not None:
+                # MOVEMENT atom (topography): no sensitivity/history of its own.
+                # It EXPRESSES the drive atoms, projecting each drive's activation
+                # onto this atom's direction via the live stimulus geometry.
+                # valence sign gives approach (+) vs. avoid (-).
+                express = 0.0
+                for k, drive in enumerate(self.drive_atoms):
+                    stim_dir = sensory[drive.stimulus].direction
+                    express += (
+                        drive.valence
+                        * activations[self.index[drive.name]]
+                        * float(np.dot(stim_dir, atom.direction))
+                    )
+                sensory_drive[i] = atom.readiness * express
+                fatigue[i] = atom.fatigue
+                continue
+
+            # DRIVE / consummatory / modulatory atoms (non-directional, learnable).
             s_drive = 0.0
             h_drive = 0.0
             for s in STIMULI:
                 field = sensory[s]
                 if s == "food" and atom.consummatory:
-                    # Consummatory atoms use the sharp binary contact signal and
-                    # are non-directional (geom=1): they fire only AT food.
-                    eff_intensity = field.contact
-                    geom = 1.0
+                    eff_intensity = field.contact  # sharp binary; fires only at food
                 else:
-                    geom = self._geometry(atom, field)
                     eff_intensity = field.intensity**atom.contact_exponent
-                s_drive += atom.sensitivity.get(s, 0.0) * eff_intensity * geom
-                h_drive += atom.history_weights.get(s, 0.0) * eff_intensity * geom
+                s_drive += atom.sensitivity.get(s, 0.0) * eff_intensity
+                h_drive += atom.history_weights.get(s, 0.0) * eff_intensity
 
-            # Energy deficit drives food-directed behavior (objective: energy is
-            # worth more nearer the death boundary -> state-dependent foraging).
+            # Energy deficit amplifies food-directed drive (state-dependent
+            # foraging): the food drive atom and the consummatory atom.
             food = sensory["food"]
             if atom.consummatory:
-                # Hunger amplifies consummatory behavior only when at food.
                 m_drive = deficit_gain * food.contact
+            elif atom.stimulus == "food":
+                m_drive = deficit_gain * food.intensity
             else:
-                geom_food = self._geometry(atom, food)
-                m_drive = deficit_gain * food.intensity**atom.contact_exponent * geom_food
+                m_drive = 0.0
 
-            # readiness is a momentary gain on stimulus-evoked drive.
             sensory_drive[i] = atom.readiness * s_drive
             history_drive[i] = atom.readiness * h_drive
             motivational_drive[i] = atom.readiness * m_drive
             fatigue[i] = atom.fatigue
 
         # Coupling: row i receives sum_j C[i, j] * activation_j.
-        activations = np.array([a.activation for a in self.atoms])
         coupling_drive = self.coupling_matrix @ activations
 
         components = ForceComponents(

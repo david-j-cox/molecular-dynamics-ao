@@ -80,6 +80,13 @@ class BehavioralAtom:
     # signal rather than the broad navigation field, so they fire ONLY at food.
     # This keeps the organism stationary at food (consummatory > locomotion there).
     consummatory: bool = False
+    # Two-tier learning. A *drive* atom is a non-directional, sign-stable
+    # response class tagged with the stimulus it tracks and a valence
+    # (+1 approach, -1 avoid). Learning lives on drive atoms; their activation is
+    # *expressed* through the (topographic) movement atoms via the live stimulus
+    # geometry. Movement atoms carry no stimulus/valence -- they only express.
+    stimulus: str | None = None
+    valence: float = 0.0
 
     @property
     def activation(self) -> float:
@@ -118,6 +125,8 @@ def _atom(
     direction: tuple[float, float] | None = None,
     contact_exponent: float = 1.0,
     consummatory: bool = False,
+    stimulus: str | None = None,
+    valence: float = 0.0,
 ) -> BehavioralAtom:
     """Construct an atom initialized at its baseline activation (zero velocity)."""
     state = np.array([baseline], dtype=np.float64)
@@ -133,37 +142,39 @@ def _atom(
         direction=None if direction is None else np.array(direction, dtype=np.float64),
         contact_exponent=contact_exponent,
         consummatory=consummatory,
+        stimulus=stimulus,
+        valence=valence,
     )
 
 
 def default_atom_set() -> list[BehavioralAtom]:
-    """The minimum atom set from the spec, with interpretable starting params.
+    """Two-tier atom set.
 
-    Innate (sensory) tendencies are deliberately weak so that learning history
-    can take over: food has weak innate approach, danger has innate avoidance
-    (negative sensitivity on movement atoms), the cue is neutral (trained by the
-    demos).
+    *Drive atoms* (non-directional, sign-stable) carry the learning history: each
+    tracks one ``stimulus`` with an approach/avoid ``valence``. Innate
+    sensitivities are weak so learning history can take over; the cue starts
+    neutral (trained by the demos). *Movement atoms* are topographies that carry
+    no sensitivity/history -- they only express the drive atoms through the live
+    stimulus geometry (handled in the force calculator). ``consume`` is a
+    contact-gated consummatory response; ``pause``/``explore`` modulate movement
+    via coupling.
     """
     atoms = [
-        # --- Non-directional "drive" / response-class atoms ----------------
-        _atom("approach_food", sensitivity={"food": 0.5}),
-        _atom("avoid_danger", sensitivity={"danger": 1.0}),
-        _atom("approach_light", sensitivity={"light": 0.3}),
-        _atom("orient_to_cue", sensitivity={"cue": 0.0}),  # neutral until trained
-        # consume is consummatory: driven by a sharp binary food-contact signal,
-        # so it fires only AT food and holds the organism there to feed.
+        # --- Drive atoms (learn; expressed through movement) ----------------
+        _atom("approach_food", stimulus="food", valence=1.0, sensitivity={"food": 0.5}),
+        _atom("avoid_danger", stimulus="danger", valence=-1.0, sensitivity={"danger": 1.0}),
+        _atom("approach_light", stimulus="light", valence=1.0, sensitivity={"light": 0.3}),
+        _atom("orient_to_cue", stimulus="cue", valence=1.0, sensitivity={"cue": 0.0}),
+        # --- Consummatory + modulatory atoms --------------------------------
+        # consume fires only AT food (sharp binary contact) and holds position.
         _atom("consume", sensitivity={"food": 1.0}, consummatory=True),
-        # Freezing is evoked by *proximal* threat, so danger is contact-gated
-        # (otherwise distant danger drives constant freezing under a broad field).
+        # Freezing is evoked by *proximal* threat (contact-gated danger).
         _atom("pause", mass=1.5, sensitivity={"danger": 0.5}, contact_exponent=4.0),
-        _atom("explore", baseline=0.2, sensitivity={}),
-        # --- Directional movement atoms ------------------------------------
-        # Weak innate food approach (+) and innate danger avoidance (-) enter
-        # via sensitivity; the sign of the *history* weight is what learning
-        # tunes (approach vs. avoid) per the directional-projection model.
-        _atom("move_up", sensitivity={"food": 1.5, "danger": -0.4}, direction=(0.0, 1.0)),
-        _atom("move_down", sensitivity={"food": 1.5, "danger": -0.4}, direction=(0.0, -1.0)),
-        _atom("move_left", sensitivity={"food": 1.5, "danger": -0.4}, direction=(-1.0, 0.0)),
-        _atom("move_right", sensitivity={"food": 1.5, "danger": -0.4}, direction=(1.0, 0.0)),
+        _atom("explore", baseline=0.2),
+        # --- Movement atoms (topographies; express the drive atoms) ---------
+        _atom("move_up", direction=(0.0, 1.0)),
+        _atom("move_down", direction=(0.0, -1.0)),
+        _atom("move_left", direction=(-1.0, 0.0)),
+        _atom("move_right", direction=(1.0, 0.0)),
     ]
     return atoms

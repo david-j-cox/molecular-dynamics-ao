@@ -34,10 +34,9 @@ N_EPISODES = 60
 STEPS = 1000
 
 
-def _move_food_weight(org: Organism) -> float:
-    return float(
-        np.mean([a.history_weights["food"] for a in org.atoms if a.name.startswith("move_")])
-    )
+def _drive_food_weight(org: Organism) -> float:
+    """Food weight of the approach_food DRIVE atom (the two-tier learner)."""
+    return float(org.atoms[org.index["approach_food"]].history_weights["food"])
 
 
 def worker(cell: dict[str, Any]) -> dict[str, Any]:
@@ -46,6 +45,7 @@ def worker(cell: dict[str, Any]) -> dict[str, Any]:
         max_steps=STEPS,
         seed=cell["seed"],
         eligibility_decay=cell["decay"],
+        sensor_range=4.0,
         n_episodes=N_EPISODES,
     )
     env = BehavioralFieldEnv(cfg)
@@ -58,7 +58,7 @@ def worker(cell: dict[str, Any]) -> dict[str, Any]:
         r = run_episode(env, org, cfg, ep, None, reset_options=None, seed=cell["seed"] * 1000 + ep)
         contact_rate.append(r["n_consumed"] / r["steps"])
         survived.append(r["steps"])
-        hw_food.append(_move_food_weight(org))
+        hw_food.append(_drive_food_weight(org))
     return {
         "decay": cell["decay"],
         "seed": cell["seed"],
@@ -78,7 +78,7 @@ def main() -> None:
 
     # Aggregate per decay: mean curve across seeds.
     out: dict[str, Any] = {"n_episodes": N_EPISODES, "steps": STEPS, "by_decay": {}}
-    print(f"\n{'decay':>6} | {'contact_rate':^17} | {'survived(steps)':^17} | {'hw_food(move)':^17}")
+    print(f"\n{'decay':>6} | {'contact_rate':^17} | {'survived(steps)':^17} | {'hw_food(drive)':^17}")
     print(f"{'':>6} | {'early':>7} {'late':>7} | {'early':>7} {'late':>7} | {'early':>7} {'late':>7}")
     for d in decays:
         rows = [r for r in results if r["decay"] == d]

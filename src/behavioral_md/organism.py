@@ -141,7 +141,7 @@ class Organism:
             danger_contact=float(info.get("danger_contact", 0.0)),
         )
         intake = self.consequence_model.energy_delta(event)
-        consequence = self.consequence_model.learning_signal(event)
+        appetitive, aversive = self.consequence_model.learning_signals(event)
 
         # 2. Objective energy bookkeeping (intake minus metabolic expenditure).
         expenditure = cfg.basal_metabolism + (
@@ -152,14 +152,15 @@ class Organism:
             self.alive = False
             self.cause_of_death = "danger" if event.danger_contact > 0.0 else "starvation"
 
-        # 3. Learning-history update (recency-weighted credit across present cues).
+        # 3. Learning-history update on the drive atoms (valence-split credit).
         intensities = self._intensities(observation)
         source = info.get("credit_source")  # demos may pair a neutral cue
         update_history(
             self.atoms,
             self.eligibility,
             intensities,
-            consequence,
+            appetitive,
+            aversive,
             cfg,
             source=source,
         )

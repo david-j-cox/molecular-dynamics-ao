@@ -37,30 +37,41 @@ class ConsequenceModel:
     """Interface mapping a :class:`ConsequenceEvent` to energy + learning signals."""
 
     def energy_delta(self, event: ConsequenceEvent) -> float:
+        """Change to the physical energy reserve (intake minus injury loss)."""
         raise NotImplementedError
 
-    def learning_signal(self, event: ConsequenceEvent) -> float:
+    def learning_signals(self, event: ConsequenceEvent) -> tuple[float, float]:
+        """Return ``(appetitive, aversive)`` teaching signals, each >= 0.
+
+        ``appetitive`` trains approach-valence drives (reinforcement);
+        ``aversive`` trains avoid-valence drives (punishment). Splitting them
+        keeps reinforcement and punishment from contaminating each other and is
+        the natural place to encode their asymmetry.
+        """
         raise NotImplementedError
 
 
 @dataclass
 class DeltaEnergy(ConsequenceModel):
-    """Default: consequence = change in energy. Symmetric currency, no asymmetry.
+    """Default: energy reserve changes by intake - injury; teaching signals are
+    the occurrence of reinforcement (feeding) and punishment (danger contact).
 
-    ``danger_loss`` is the energy removed per unit danger contact (the punisher
-    magnitude). Food intake is delivered directly as energy.
+    The reserve uses the raw (objective) energy units; the learning signals are
+    normalized to ~1 per event so associative strength is well-scaled (the tiny
+    per-step energy amounts would otherwise produce negligible learning). The
+    reinforcement/punishment magnitude/asymmetry will be elaborated in the other
+    consequence models.
     """
 
     danger_loss: float = 0.15
 
-    def _delta(self, event: ConsequenceEvent) -> float:
+    def energy_delta(self, event: ConsequenceEvent) -> float:
         return event.food_intake - self.danger_loss * event.danger_contact
 
-    def energy_delta(self, event: ConsequenceEvent) -> float:
-        return self._delta(event)
-
-    def learning_signal(self, event: ConsequenceEvent) -> float:
-        return self._delta(event)
+    def learning_signals(self, event: ConsequenceEvent) -> tuple[float, float]:
+        appetitive = 1.0 if event.food_intake > 0.0 else 0.0
+        aversive = 1.0 if event.danger_contact > 0.0 else 0.0
+        return appetitive, aversive
 
 
 # --- Planned models (asymmetry / competitive suppression / injury) ----------
