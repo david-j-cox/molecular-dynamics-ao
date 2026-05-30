@@ -105,15 +105,16 @@ class ForceCalculator:
             for s in STIMULI:
                 field = sensory[s]
                 geom = self._geometry(atom, field)
-                s_drive += atom.sensitivity.get(s, 0.0) * field.intensity * geom
-                h_drive += atom.history_weights.get(s, 0.0) * field.intensity * geom
+                eff_intensity = field.intensity**atom.contact_exponent
+                s_drive += atom.sensitivity.get(s, 0.0) * eff_intensity * geom
+                h_drive += atom.history_weights.get(s, 0.0) * eff_intensity * geom
 
             # Motivating operation: hunger scales the (learned) pull of food.
             food = sensory["food"]
             geom_food = self._geometry(atom, food)
             m_drive = (
                 hunger
-                * food.intensity
+                * food.intensity**atom.contact_exponent
                 * atom.history_weights.get("food", 0.0)
                 * geom_food
             )

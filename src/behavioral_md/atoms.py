@@ -72,6 +72,10 @@ class BehavioralAtom:
     sensitivity: dict[str, float] = field(default_factory=dict)
     history_weights: dict[str, float] = field(default_factory=dict)
     direction: np.ndarray | None = None
+    # Exponent applied to stimulus intensity for this atom. 1.0 = linear distal
+    # sensing (approach/locomotion). A large value makes the atom respond only
+    # near maximal intensity, i.e. on contact -- used for consummatory responses.
+    contact_exponent: float = 1.0
 
     @property
     def activation(self) -> float:
@@ -108,6 +112,7 @@ def _atom(
     sensitivity: dict[str, float] | None = None,
     history: dict[str, float] | None = None,
     direction: tuple[float, float] | None = None,
+    contact_exponent: float = 1.0,
 ) -> BehavioralAtom:
     """Construct an atom initialized at its baseline activation (zero velocity)."""
     state = np.array([baseline], dtype=np.float64)
@@ -121,6 +126,7 @@ def _atom(
         sensitivity=dict.fromkeys(STIMULI, 0.0) | (sensitivity or {}),
         history_weights=dict.fromkeys(STIMULI, 0.0) | (history or {}),
         direction=None if direction is None else np.array(direction, dtype=np.float64),
+        contact_exponent=contact_exponent,
     )
 
 
@@ -134,20 +140,21 @@ def default_atom_set() -> list[BehavioralAtom]:
     """
     atoms = [
         # --- Non-directional "drive" / response-class atoms ----------------
-        _atom("approach_food", sensitivity={"food": 0.2}),
+        _atom("approach_food", sensitivity={"food": 0.5}),
         _atom("avoid_danger", sensitivity={"danger": 1.0}),
         _atom("approach_light", sensitivity={"light": 0.3}),
         _atom("orient_to_cue", sensitivity={"cue": 0.0}),  # neutral until trained
-        _atom("consume", sensitivity={"food": 1.0}),
+        # consume is contact-gated (responds only at near-maximal food intensity).
+        _atom("consume", sensitivity={"food": 1.0}, contact_exponent=6.0),
         _atom("pause", mass=1.5, sensitivity={"danger": 0.5}),
         _atom("explore", baseline=0.2, sensitivity={}),
         # --- Directional movement atoms ------------------------------------
         # Weak innate food approach (+) and innate danger avoidance (-) enter
         # via sensitivity; the sign of the *history* weight is what learning
         # tunes (approach vs. avoid) per the directional-projection model.
-        _atom("move_up", sensitivity={"food": 0.2, "danger": -0.5}, direction=(0.0, 1.0)),
-        _atom("move_down", sensitivity={"food": 0.2, "danger": -0.5}, direction=(0.0, -1.0)),
-        _atom("move_left", sensitivity={"food": 0.2, "danger": -0.5}, direction=(-1.0, 0.0)),
-        _atom("move_right", sensitivity={"food": 0.2, "danger": -0.5}, direction=(1.0, 0.0)),
+        _atom("move_up", sensitivity={"food": 0.5, "danger": -0.4}, direction=(0.0, 1.0)),
+        _atom("move_down", sensitivity={"food": 0.5, "danger": -0.4}, direction=(0.0, -1.0)),
+        _atom("move_left", sensitivity={"food": 0.5, "danger": -0.4}, direction=(-1.0, 0.0)),
+        _atom("move_right", sensitivity={"food": 0.5, "danger": -0.4}, direction=(1.0, 0.0)),
     ]
     return atoms

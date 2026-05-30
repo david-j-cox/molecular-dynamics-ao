@@ -37,6 +37,15 @@ class SimulationConfig(BaseModel):
             "the literal spec rule w += lr*consequence*eligibility with clipping."
         ),
     )
+    credit_assignment: Literal["rw_competitive", "rw_independent", "source_only"] = Field(
+        "rw_independent",
+        description=(
+            "How consequence credit is allocated across present stimulus channels. "
+            "'rw_competitive' = cues share one error term (blocking/overshadowing); "
+            "'rw_independent' = each channel has its own error term (no competition); "
+            "'source_only' = only the channel matching the consequence source updates."
+        ),
+    )
     learning_rate: float = Field(0.05, ge=0.0, description="History-weight update rate.")
     eligibility_decay: float = Field(
         0.9, ge=0.0, le=1.0, description="Per-step decay of the eligibility trace."
@@ -45,6 +54,20 @@ class SimulationConfig(BaseModel):
         1.0,
         gt=0.0,
         description="Lambda: asymptotic associative strength per unit consequence (RW rule).",
+    )
+
+    # --- Fatigue (within-bout response decrement) --------------------------
+    fatigue_gain: float = Field(
+        0.0, ge=0.0, description="Fatigue accrued per step per unit positive activation (0 = off)."
+    )
+    fatigue_decay: float = Field(
+        0.9, ge=0.0, le=1.0, description="Per-step recovery (decay) of fatigue."
+    )
+
+    # --- Action emission ---------------------------------------------------
+    emission_threshold: float = Field(
+        -1e9,
+        description="Min action-atom activation to emit a directed action; below it emits no-op.",
     )
 
     # --- Activation bounds -------------------------------------------------
