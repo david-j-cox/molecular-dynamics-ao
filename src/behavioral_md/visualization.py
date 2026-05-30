@@ -156,8 +156,12 @@ def plot_occupancy_landscape(log: pd.DataFrame, episode: int, path: str | Path) 
 
     fig = plt.figure(figsize=(7.5, 6))
     ax = fig.add_subplot(projection="3d")
-    ax.plot_surface(gx, gy, dwell, cmap="Greys", edgecolor="0.5", linewidth=0.2,
-                    alpha=0.9, rstride=1, cstride=1)
+    # Filled surface for the relief, plus a black wireframe so every cell (incl.
+    # the z=0 floor) is visible as a mesh.
+    ax.plot_surface(gx, gy, dwell, cmap="Greys", edgecolor="black", linewidth=0.35,
+                    alpha=0.85, rstride=1, cstride=1, antialiased=True)
+    ax.plot_wireframe(gx, gy, dwell, color="black", linewidth=0.4,
+                      rstride=1, cstride=1, alpha=0.6)
 
     top = dwell.max() * 1.08 if dwell.max() > 0 else 1.0
     for key, (label, marker, facecolor) in _SOURCE_STYLE.items():
