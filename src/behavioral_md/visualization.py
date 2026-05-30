@@ -279,7 +279,7 @@ def plot_force_decomposition_grid(
         ax.set_visible(False)
     for i, ax in enumerate(axes[:n]):
         if i % ncols == 0:  # left column
-            ax.set_ylabel("Force (normalized)")
+            ax.set_ylabel("Normalized\nForce")
         if i + ncols >= n:  # no visible panel below -> bottom edge
             ax.set_xlabel("Time (steps)")
 
@@ -321,7 +321,7 @@ def plot_atom_series(
         vals = np.concatenate([s[column].to_numpy() for s in series.values()])
         scale = float(np.nanmax(np.abs(vals))) if len(vals) else 1.0
         scale = scale if scale > 1e-9 else 1.0
-        ylabel = f"{ylabel} (normalized)"
+        ylabel = f"Normalized\n{ylabel}"
     fig, ax = plt.subplots(figsize=(8, 3.8))
     for (name, a), (ls, marker) in zip(series.items(), _BW_CYCLE, strict=False):
         ax.plot(a["timestep"], a[column] / scale, color="black", ls=ls, lw=1.0,
