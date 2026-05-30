@@ -362,6 +362,25 @@ def plot_learning_curve(summaries: pd.DataFrame, path: str | Path) -> Path:
     return _save(fig, path)
 
 
+def plot_extinction(summaries: pd.DataFrame, transition: int, path: str | Path) -> Path:
+    """Train -> extinction across lives (mean +/- 95% CI over agents).
+
+    ``summaries`` needs columns: seed, episode, hw_food, steps_at_food. A dotted
+    line marks the reinforced -> extinction transition.
+    """
+    panels = [("hw_food", "Learned food weight"), ("steps_at_food", "Steps at food")]
+    fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True, constrained_layout=True)
+    for ax, (col, ylabel) in zip(axes, panels, strict=True):
+        episodes, mat = _pivot(summaries, col)
+        mean, ci = _mean_ci(mat, axis=0)
+        _band(ax, episodes, mean, ci, ylabel, "-", "o")
+        ax.axvline(transition - 0.5, color="black", ls=":", lw=1.2)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(bottom=0)
+    axes[-1].set_xlabel("Life (episode)")
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,

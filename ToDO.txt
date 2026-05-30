@@ -51,6 +51,23 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 [ ] Add a `press` atom for the chamber (vs reusing consume).
 [ ] Reproduce classic signatures: VR high steady rate, FI scallop, conc VI-VI matching.
 
+DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
+---------------------------------------------------------
+[x] Pluggable LearningRule interface (mirrors ConsequenceModel): RescorlaWagner
+    + LinearOperator, selected by config.learning_model.
+[x] RescorlaWagner: error-correcting w/ omission decay (lambda=0 on
+    non-reinforced exposure, gated to contact) + asymmetric acq/ext rates.
+    Acquisition latency 152->106; trained hw_food 1.0 extinguishes to ~0 over
+    a few unreinforced lives (run_extinction_demo).
+[ ] Dual excitatory/inhibitory (Konorski/Pearce-Hall/Bouton): separate w+ (grows)
+    and w- (grows on omission, decays/context-gated) -> spontaneous recovery,
+    renewal, rapid reacquisition.
+[ ] Momentum-modulated decay (Nevin & Grace): extinction rate scaled by
+    accumulated reinforcement / atom mass -> resistance to change, PREE.
+[ ] Pearce-Hall variable associability (learning rate ~ |prediction error|).
+[ ] Resurgence as Choice (Shahan & Craig, 2017, JEAB): resurgence via the
+    matching/behavioral-momentum framework.
+
 CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
 -------------------------------------------------------
 [ ] Subtractive (de Villiers) direct-suppression model.
@@ -75,6 +92,7 @@ VISUALIZATION (visualization.py)
 [x] 3D occupancy landscape (height = time spent per cell; camping = a peak).
     Replaces the 2D trajectory in the standard set.
 [x] Acquisition latency curve (run_demo) with 95% CI.
+[x] Force-decomposition grid (per-atom, normalized); extinction (train->ext).
 [ ] Day/night shading on time-series (after Phase 5).
 [ ] Generalization gradient; matching plots (relative response vs relative reinf).
 [ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
@@ -85,8 +103,9 @@ DEMOS (scripts/)
                            latency to food drops ~152 -> ~106 over 40 lives
                            (100 agents, 95% CI), reach 0.55 -> 0.73. Clean
                            negatively-accelerated acquisition curve.
-[ ] run_extinction_demo.py extinction (food no longer reinforces -> approach weakens;
-                           needs omission/decay handling in learning)
+[x] run_extinction_demo.py extinction: train then food_reinforces=False ->
+                           approach_food.hw_food decays 1.0 -> ~0; behavioral
+                           steps-at-food fall. 100 agents, 95% CI.
 [ ] run_generalization_demo.py  cue generalization gradient (train one cue value,
                            test similar/dissimilar; relies on cue conditioning)
 

@@ -29,12 +29,13 @@ class SimulationConfig(BaseModel):
     max_steps: int = Field(200, ge=1, description="Max timesteps per episode.")
 
     # --- Learning ----------------------------------------------------------
-    learning_rule: Literal["rw", "linear"] = Field(
-        "rw",
+    learning_model: Literal["rescorla_wagner", "linear"] = Field(
+        "rescorla_wagner",
         description=(
-            "History-weight update rule. 'rw' = error-correcting Rescorla-Wagner "
-            "(negatively accelerated acquisition, graceful extinction); 'linear' = "
-            "the literal spec rule w += lr*consequence*eligibility with clipping."
+            "Pluggable decremental-learning rule. 'rescorla_wagner' = "
+            "error-correcting with omission decay (lambda=0 on non-reinforced "
+            "exposure) and asymmetric acquisition/extinction rates; 'linear' = "
+            "strengthen-only w += lr*mag*eligibility*intensity (no extinction)."
         ),
     )
     credit_assignment: Literal["rw_competitive", "rw_independent", "source_only"] = Field(
@@ -46,7 +47,17 @@ class SimulationConfig(BaseModel):
             "'source_only' = only the channel matching the consequence source updates."
         ),
     )
-    learning_rate: float = Field(0.05, ge=0.0, description="History-weight update rate.")
+    learning_rate: float = Field(
+        0.05, ge=0.0, description="Acquisition rate: history-weight update toward +lambda."
+    )
+    extinction_rate: float = Field(
+        0.02,
+        ge=0.0,
+        description=(
+            "Extinction rate: decay toward 0 on non-reinforced exposure. Usually "
+            "< learning_rate (extinction is slower than acquisition; yields PREE)."
+        ),
+    )
     eligibility_decay: float = Field(
         0.95,
         ge=0.0,

@@ -19,7 +19,7 @@ from behavioral_md.forces import (
     ForceComponents,
     sensory_from_observation,
 )
-from behavioral_md.learning import EligibilityTrace, update_history
+from behavioral_md.learning import EligibilityTrace, make_learning_rule
 
 # Movement actions (cost more energy than resting/consuming).
 _MOVE_ACTIONS = frozenset({1, 2, 3, 4})
@@ -43,6 +43,7 @@ class Organism:
         self.eligibility = EligibilityTrace(len(self.atoms), self.config.eligibility_decay)
         self.rng = rng or np.random.default_rng(self.config.seed)
         self.consequence_model = make_consequence_model(self.config)
+        self.learning_rule = make_learning_rule(self.config)
 
         # Objective physical state.
         self.energy = self.config.energy_init
@@ -152,16 +153,22 @@ class Organism:
             self.alive = False
             self.cause_of_death = "danger" if event.danger_contact > 0.0 else "starvation"
 
-        # 3. Learning-history update on the drive atoms (valence-split credit).
+        # 3. Learning-history update on the drive atoms (valence-split credit),
+        #    via the pluggable learning rule (acquisition + extinction). Learning
+        #    fires only on contact exposure to the source (food location / danger),
+        #    so weights are not eroded by traveling toward a distant source.
         intensities = self._intensities(observation)
+        at_food = float(np.asarray(observation.get("food_contact", 0.0)).ravel()[0]) > 0.0
+        on_danger = float(info.get("danger_contact", 0.0)) > 0.0
         source = info.get("credit_source")  # demos may pair a neutral cue
-        update_history(
+        self.learning_rule.update(
             self.atoms,
             self.eligibility,
             intensities,
             appetitive,
             aversive,
-            cfg,
+            appetitive_exposure=at_food,
+            aversive_exposure=on_danger,
             source=source,
         )
 
