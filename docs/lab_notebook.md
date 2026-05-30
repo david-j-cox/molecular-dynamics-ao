@@ -239,3 +239,57 @@ schedule response patterns (chamber).
 - `press` atom for the chamber (vs. reusing `consume`).
 - Parallelism approach (multiprocessing first vs. JAX now).
 - Discriminative-stimulus (S+/S-delta) semantics -- deferred by user.
+
+---
+
+## 2026-05-30 — Reinforcement/punishment asymmetry: literature + modular plan
+
+User pushback: modeling danger as an instantaneous energy debit ("injury") is
+too crude and collapses the **fundamental asymmetry between reinforcement and
+punishment**. Objectively, injury is not energy spent at the moment of contact;
+it is (1) a **delayed healing cost** -- extra energy to heal *plus* keep living,
+raising the metabolic burden over a recovery window -- and (2) a **repertoire
+impairment** -- specific responses are disabled/weakened while healing (the
+"I can only use one arm" point), which is itself a competitive-suppression
+mechanism. Decision: keep ΔE for now, but make the consequence/punishment model
+**modular** so these can be explored.
+
+### Literature (for write-up defense)
+- **Asymmetry is empirical.** A single punisher subtracts more value than a
+  single reinforcer adds; punishment also lowers sensitivity to reinforcement and
+  biases toward the unpunished alternative (Rasmussen & Newland, 2008, JEAB).
+- **Direct/subtractive suppression** (de Villiers, 1980): punisher subtracts from
+  the same response's value. `B1/B2 = (R1 - c*P1)/(R2 - c*P2)`.
+- **Competitive suppression** (Deluty, 1976): punishing a response strengthens
+  *competing* responses; suppression is reallocation, not direct weakening.
+  `B1/B2 = (R1 + c*P2)/(R2 + c*P1)`. (Matches the "repertoire impairment" intuition.)
+- **Concatenated GML** allows asymmetry via separate sensitivities:
+  `log(B1/B2) = a_r*log(R1/R2) - a_p*log(P1/P2) + log b`, `a_r != a_p`.
+- **Klapes & Riley (2018, JEAB), "Toward a contemporary quantitative model of
+  punishment":** five GML-based models (additive/Deluty x2, subtractive/de
+  Villiers x2, concatenated GML); information-theoretic selection casts doubt on
+  the subtractive model being the "true" account (it does not convincingly beat
+  plain GML).
+- **Klapes & McDowell (2025, JEAB):** contemporary model for **continuous choice**
+  under combined reinforcing + punishing contingencies.
+- Critchfield et al. (2003): direct vs. competitive suppression test, mixed
+  support for direct suppression in human choice.
+
+### Design implication: pluggable `ConsequenceModel`
+Route every consequence through an interface so the organism core never hard-codes
+how reinforcement/punishment act. Planned implementations:
+- `DeltaEnergy` (default now): consequence = ΔE; danger = energy loss; symmetric currency.
+- `Subtractive` (de Villiers): punisher subtracts from the punished response's drive/weight.
+- `CompetitiveSuppression` (Deluty): punisher boosts competing atoms' drive.
+- `ConcatenatedAsymmetric` (Klapes): separate reinforcement/punishment sensitivities.
+- `InjuryHealing`: contact triggers a delayed healing energy cost (recovery window)
+  + temporary impairment of specific atoms (repertoire loss), not an instant debit.
+
+This is added to the Phase-4 open items; ΔE remains the default until we explore
+the alternatives.
+
+### Sources
+- https://onlinelibrary.wiley.com/doi/10.1002/jeab.70009 (Klapes & McDowell, 2025)
+- https://pubmed.ncbi.nlm.nih.gov/29509286/ (Klapes & Riley, 2018)
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC2251321/ (Rasmussen & Newland, 2008)
+- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1284944/ (Critchfield et al., 2003)
