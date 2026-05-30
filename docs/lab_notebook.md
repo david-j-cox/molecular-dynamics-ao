@@ -121,3 +121,121 @@ Proposed: change *defaults* to velocity-damping (overdamped) + softmax emission,
 keeping pure-Verlet and argmax reachable via config so nothing is lost. Awaiting
 user input on the dynamics framing before editing core. Bug-1 fix
 (`contact_exponent`) already applied to core and committed.
+
+**RESOLVED 2026-05-30:** user approved overdamped Verlet + softmax as defaults,
+literal forms kept as config switches. See the Phase-4 design entry below.
+
+---
+
+## 2026-05-30 — Phase 4 design: long-life energy-budget foraging (PLAN)
+
+Major redirection agreed with the user. This entry is the design of record; all
+numeric values marked *(proposed)* are starting points to calibrate, not commitments.
+
+### Settled design decisions (with rationale)
+
+1. **Eating does not end the episode.** Model life in the long run. Lives run
+   ~10,000 steps. Episodes end only on **death** (energy reserve depleted).
+2. **Timescale:** 1 step = 15 min; **96 steps = 1 day** *(expandable)*. A
+   10,000-step life ≈ 104 days.
+3. **Motivation -> objective energy budget** (behavioral ecology), replacing the
+   hunger/MO construct. Energy is a conserved reserve with literal in/out flows.
+   Nothing is "valued" or "established."
+4. **Energy -> behavior coupling: convex marginal value of energy.** The
+   food-directed force rises steeply as the reserve approaches starvation
+   (state-dependent / risk-sensitive foraging). Objective: energy is worth more
+   nearer the death boundary, so foraging pressure is a function of the
+   measurable reserve, not a posited motivational state.
+5. **Light = global ambient sun** `L(t) in [0,1]`, cycling over the 96-step day.
+   It is a discriminative *context / setting event*, sensed as a scalar (no
+   direction to move toward). Distinct from the localized discriminative stimuli
+   (old "light"/"cue" point sources = S+/S-delta/neutral signals) which remain a
+   separate construct to develop later.
+6. **Darkness raises risk, graded with a low floor.** `danger_sensed =
+   danger_true * (floor + (1-floor)*L)`, floor ~0.2 *(proposed)*. Night vision is
+   poor but nonzero; a near-starving organism rationally accepts elevated night
+   risk to feed (couples to #4).
+7. **Food = multiple renewable patches** (lean 2-3) with **logistic regrowth**,
+   growth rate proportional to `L` (grows in daylight), drawn down on
+   consumption. Food is also sensed more strongly in daylight (same graded form
+   as danger). Multiple independently-regrowing patches make patch-foraging
+   (marginal-value theorem) and **concurrent-schedule matching** emerge.
+8. **Schedules: both, on one engine.** (a) The grid yields interval-like
+   schedules and matching *naturally* from concurrent patch regrowth (faithful to
+   the molar/foraging reading of operant behavior -- Baum, Rachlin). (b) A
+   separate minimal **operant chamber** (feeder + `press` response, no
+   navigation) reuses the same Organism/atoms/forces/learning for textbook-clean
+   FR/VR/FI/VI curves and conc VI-VI matching.
+9. **Dynamics/emission defaults:** overdamped Verlet (velocity damping `-c*v`) +
+   softmax emission (Luce/matching). Literal pure-Verlet and argmax stay as
+   config switches. (Justified by Exp 001.)
+10. **Death is a dependent variable.** Log time-to-death, cause, and the energy
+    trajectory leading up to it, so survival/mortality patterns can defend the
+    modeling choices in write-up.
+
+### Objective energy model (proposed equations + numbers)
+
+Reserve `E` normalized to [0, 1]; `E_init = 0.5`. Per step:
+
+```
+E <- E - basal - move_cost(action) + intake - danger_cost
+basal        = 0.01            (proposed; matches user's metabolic anchor)
+move_cost    = 0.005 for a move, ~0.001 for pause/no-op   (proposed)
+intake       = energy drawn from the patch when consuming  (see patches)
+danger_cost  = 0.1 * danger_sensed   (injury = energy loss; objective)  (proposed)
+death when E <= 0  -> episode ends
+```
+
+- **Consequence = change in energy from contingent events** (food gain +,
+  danger loss -). This is what feeds the learning update -- the reinforcer is
+  literally energy, not an abstract +/-1. (Baseline metabolism/movement are
+  non-contingent costs, not learning consequences.)
+- **Convex coupling:** food-directed drive multiplied by `g(E) = (1 - E)**2`
+  *(proposed; 1/E variant available)*.
+
+### Food patch dynamics (proposed)
+
+Per patch, biomass `B in [0, K]`, `K = 1`:
+```
+B <- B + r * L * B * (1 - B/K)        # logistic growth, daylight-gated
+r = 0.05 (proposed)
+on consume at patch: bite = min(B, 0.2);  B -= bite;  intake = yield * bite
+yield = 1.0 (proposed)
+food_sensed = B * (floor_f + (1-floor_f)*L),  floor_f ~0.3 (proposed)
+```
+
+### Day/night (proposed)
+
+```
+L(t) = 0.5 * (1 - cos(2*pi * (t mod 96) / 96))   # 0 at midnight, 1 at midday
+```
+
+### Compute / parallelism (proposed)
+
+Start with **multiprocessing across independent lives/conditions** (e.g. 64
+lives/condition); near-linear speedup, no rewrite. JAX vectorization deferred.
+
+### Logging / metrics additions
+
+Add to the per-step log: `energy`, `light`, per-patch `biomass`, `cause_of_death`.
+New metrics: survival curves, time-to-death distributions, death-cause breakdown,
+day/night activity and mortality, patch allocation vs. relative intake (matching),
+schedule response patterns (chamber).
+
+### Proposed build order (phases)
+
+- **4a** Dynamics/emission defaults: damping + softmax in core (controller must
+  work before a 10k-step life is viable).
+- **4b** Energy budget: reserve, costs, food=energy intake, danger=energy loss,
+  death; convex coupling replacing `hunger`. Death-pattern logging.
+- **4c** Persistent episodes (eating no longer terminates); long lives.
+- **4d** Multi-patch logistic food + daylight-gated growth/visibility.
+- **5**  Global ambient sun + graded light-gating of danger and food.
+- **6**  Operant chamber env + schedule layer; FR/VR/FI/VI + conc VI-VI matching.
+- **7**  Parallel runner; metrics + figures incl. death-pattern analysis.
+
+### Open / proposed (awaiting confirmation)
+- All *(proposed)* numbers above (energy magnitudes, growth rates, floors).
+- `press` atom for the chamber (vs. reusing `consume`).
+- Parallelism approach (multiprocessing first vs. JAX now).
+- Discriminative-stimulus (S+/S-delta) semantics -- deferred by user.
