@@ -20,14 +20,16 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
-from behavioral_md.atoms import STIMULI, default_atom_set
+from behavioral_md.atoms import ACTION_ATOMS, STIMULI, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.forces import default_coupling_matrix
 
 _FOOD = STIMULI.index("food")
+_ACTION_IDS = tuple(sorted(ACTION_ATOMS))  # env action ids in emission order
 
 
 class ModelSpec(NamedTuple):
@@ -44,6 +46,8 @@ class ModelSpec(NamedTuple):
     is_movement: jnp.ndarray      # [A] bool
     is_consummatory: jnp.ndarray  # [A] bool
     is_drive: jnp.ndarray         # [A] bool (non-directional, non-consummatory, valenced)
+    action_atom_idx: jnp.ndarray  # [n_actions] atom index of each action atom
+    action_ids: jnp.ndarray       # [n_actions] env action id of each action atom
 
 
 def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
@@ -76,6 +80,8 @@ def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
         is_drive[i] = (atom.direction is None) and (not atom.consummatory) \
             and (atom.stimulus is not None) and (atom.valence != 0.0)
     coupling = default_coupling_matrix(atoms)
+    names = [atom.name for atom in atoms]
+    action_idx = np.array([names.index(ACTION_ATOMS[i]) for i in _ACTION_IDS])
     return ModelSpec(
         sensitivity=jnp.asarray(sens), direction=jnp.asarray(direction),
         valence=jnp.asarray(valence), stim_channel=jnp.asarray(stim_ch),
@@ -83,6 +89,8 @@ def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
         mass=jnp.asarray(mass), coupling=jnp.asarray(coupling),
         is_movement=jnp.asarray(is_move), is_consummatory=jnp.asarray(is_consum),
         is_drive=jnp.asarray(is_drive),
+        action_atom_idx=jnp.asarray(action_idx),
+        action_ids=jnp.asarray(np.array(_ACTION_IDS)),
     )
 
 
@@ -148,6 +156,59 @@ def integrate(
     return new, activation
 
 
+def emission_probs(
+    spec: ModelSpec, activation: jnp.ndarray, config: SimulationConfig
+) -> jnp.ndarray:
+    """Softmax (Luce / matching) probabilities over action atoms. Shape [O, n_actions]."""
+    acts = activation[:, spec.action_atom_idx]
+    z = acts / config.softmax_temperature
+    z = z - z.max(axis=1, keepdims=True)
+    p = jnp.exp(z)
+    return p / p.sum(axis=1, keepdims=True)
+
+
+def sample_actions(spec: ModelSpec, probs: jnp.ndarray, key: jax.Array) -> jnp.ndarray:
+    """Sample one env action id per organism from the emission probabilities."""
+    idx = jax.random.categorical(key, jnp.log(probs))
+    return spec.action_ids[idx]
+
+
+def update_eligibility(eligibility: jnp.ndarray, activation: jnp.ndarray,
+                       config: SimulationConfig) -> jnp.ndarray:
+    """Recency-weighted trace: e <- decay * e + activation. Shape [O, A]."""
+    return config.eligibility_decay * eligibility + activation
+
+
+def learn_step(
+    spec: ModelSpec,
+    history: jnp.ndarray,           # [O, A, C]
+    eligibility: jnp.ndarray,       # [O, A]
+    intensity: jnp.ndarray,         # [O, C]
+    appetitive: jnp.ndarray,        # [O]
+    aversive: jnp.ndarray,          # [O]
+    appetitive_exposure: jnp.ndarray,  # [O] bool
+    aversive_exposure: jnp.ndarray,    # [O] bool
+    config: SimulationConfig,
+) -> jnp.ndarray:
+    """Batched valence-split Rescorla-Wagner update (rw_independent); matches
+    `learning.RescorlaWagner.update`. Returns new history weights."""
+    approach = spec.valence > 0.0                                   # [A]
+    is_learner = spec.valence != 0.0                                # [A]
+    mag = jnp.where(approach[None, :], appetitive[:, None], aversive[:, None])      # [O, A]
+    exposed = jnp.where(approach[None, :], appetitive_exposure[:, None],
+                        aversive_exposure[:, None])                  # [O, A]
+    gate = is_learner[None, :] & exposed & (eligibility > 0.0)       # [O, A]
+    rate = jnp.where(mag > 0.0, config.learning_rate, config.extinction_rate)       # [O, A]
+    target = config.reinforcement_asymptote * mag                   # [O, A]
+    present = intensity > 1e-6                                       # [O, C]
+    dv = (
+        gate[:, :, None] * present[:, None, :]
+        * rate[:, :, None] * eligibility[:, :, None] * intensity[:, None, :]
+        * (target[:, :, None] - history)
+    )
+    return jnp.clip(history + dv, config.history_weight_min, config.history_weight_max)
+
+
 def validate_against_numpy(n_org: int = 4, seed: int = 0) -> float:
     """Return the max abs difference in force vs the NumPy engine on random state."""
     from behavioral_md.forces import ForceCalculator, SensoryField
@@ -186,7 +247,66 @@ def validate_against_numpy(n_org: int = 4, seed: int = 0) -> float:
     return float(np.max(np.abs(jax_force - np_force)))
 
 
+def validate_learning(n_org: int = 4, seed: int = 1) -> float:
+    """Max abs difference in updated history weights vs NumPy RescorlaWagner."""
+    from behavioral_md.learning import EligibilityTrace, RescorlaWagner
+
+    rng = np.random.default_rng(seed)
+    cfg = SimulationConfig()
+    atoms = default_atom_set()
+    spec = build_spec(atoms, cfg)
+    a, c = len(atoms), len(STIMULI)
+
+    elig = rng.uniform(0, 2, size=(n_org, a))
+    hist = rng.normal(size=(n_org, a, c)) * 0.3
+    inten = rng.uniform(0, 1, size=(n_org, c)) * (rng.uniform(size=(n_org, c)) > 0.3)
+    app = (rng.uniform(size=n_org) > 0.5).astype(float)
+    avr = (rng.uniform(size=n_org) > 0.5).astype(float)
+    app_exp = rng.uniform(size=n_org) > 0.3
+    avr_exp = rng.uniform(size=n_org) > 0.3
+
+    jax_hist = np.asarray(learn_step(
+        spec, jnp.asarray(hist), jnp.asarray(elig), jnp.asarray(inten),
+        jnp.asarray(app), jnp.asarray(avr), jnp.asarray(app_exp), jnp.asarray(avr_exp), cfg,
+    ))
+
+    rule = RescorlaWagner(cfg)
+    np_hist = hist.copy()
+    for o in range(n_org):
+        for i, atom in enumerate(atoms):
+            atom.history_weights = {s: np_hist[o, i, j] for j, s in enumerate(STIMULI)}
+        trace = EligibilityTrace(a, cfg.eligibility_decay)
+        trace.trace = elig[o].copy()
+        intensities = {s: float(inten[o, j]) for j, s in enumerate(STIMULI)}
+        rule.update(atoms, trace, intensities, float(app[o]), float(avr[o]),
+                    appetitive_exposure=bool(app_exp[o]), aversive_exposure=bool(avr_exp[o]))
+        for i, atom in enumerate(atoms):
+            for j, s in enumerate(STIMULI):
+                np_hist[o, i, j] = atom.history_weights[s]
+    return float(np.max(np.abs(jax_hist - np_hist)))
+
+
+def validate_emission(n_org: int = 5, seed: int = 2) -> float:
+    """Max abs difference in softmax emission probabilities vs the NumPy rule."""
+    rng = np.random.default_rng(seed)
+    cfg = SimulationConfig()
+    atoms = default_atom_set()
+    spec = build_spec(atoms, cfg)
+    act = rng.normal(size=(n_org, len(atoms))) * 3
+    jax_p = np.asarray(emission_probs(spec, jnp.asarray(act), cfg))
+    idx = np.asarray(spec.action_atom_idx)
+    z = act[:, idx] / cfg.softmax_temperature
+    z = z - z.max(axis=1, keepdims=True)
+    np_p = np.exp(z) / np.exp(z).sum(axis=1, keepdims=True)
+    return float(np.max(np.abs(jax_p - np_p)))
+
+
 if __name__ == "__main__":
-    diff = validate_against_numpy()
-    print(f"max |JAX force - NumPy force| = {diff:.2e}")
-    print("OK -- JAX force matches NumPy" if diff < 1e-6 else "MISMATCH")
+    checks = {
+        "force": validate_against_numpy(),
+        "learning": validate_learning(),
+        "emission": validate_emission(),
+    }
+    for name, diff in checks.items():
+        flag = "OK" if diff < 1e-6 else "MISMATCH"
+        print(f"{name:10s} max |JAX - NumPy| = {diff:.2e}  {flag}")
