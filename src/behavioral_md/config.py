@@ -48,7 +48,13 @@ class SimulationConfig(BaseModel):
     )
     learning_rate: float = Field(0.05, ge=0.0, description="History-weight update rate.")
     eligibility_decay: float = Field(
-        0.9, ge=0.0, le=1.0, description="Per-step decay of the eligibility trace."
+        0.95,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Per-step decay of the eligibility trace (temporal weighting of credit). "
+            "Exp 003 sweet spot ~0.9-0.95; 0.99 is too long and inverts learning."
+        ),
     )
     reinforcement_asymptote: float = Field(
         1.0,
@@ -139,7 +145,12 @@ class SimulationConfig(BaseModel):
     # --- Environment geometry ----------------------------------------------
     grid_size: int = Field(10, ge=3, description="Side length of the square grid.")
     sensor_range: float = Field(
-        10.0, gt=0.0, description="Distance scale for stimulus intensity falloff."
+        4.0,
+        gt=0.0,
+        description=(
+            "Distance scale for stimulus intensity falloff (exp(-d/range)). "
+            "Local enough for a clean gradient on a ~10-cell grid (Exp 003)."
+        ),
     )
     consume_radius: float = Field(
         1.0, ge=0.0, description="Max distance to food at which 'consume' succeeds."

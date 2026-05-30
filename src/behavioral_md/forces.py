@@ -193,7 +193,11 @@ def default_coupling_matrix(atoms: list[BehavioralAtom]) -> np.ndarray:
       - avoid_danger inhibits consume
       - pause inhibits all movement
       - explore excites all movement (gated to low stimulus control elsewhere)
-    Magnitudes are kept small so coupling modulates rather than dominates.
+      - consume strongly inhibits all movement (consummatory behavior competes
+        with locomotion: you don't walk away mid-meal -> stable feeding)
+    Magnitudes are kept small so coupling modulates rather than dominates,
+    EXCEPT the consume->movement inhibition, which must dominate to hold the
+    organism at food.
     """
     idx = {a.name: i for i, a in enumerate(atoms)}
     n = len(atoms)
@@ -210,6 +214,8 @@ def default_coupling_matrix(atoms: list[BehavioralAtom]) -> np.ndarray:
     for m in move_atoms:
         link(m, "pause", -0.30)
         link(m, "explore", 0.20)
+        # Consummatory behavior suppresses locomotion -> stays at food to feed.
+        link(m, "consume", -1.5)
     # Freezing to danger suppresses consumption.
     link("consume", "pause", -0.20)
 

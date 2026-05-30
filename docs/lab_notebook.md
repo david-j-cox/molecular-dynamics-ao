@@ -418,3 +418,38 @@ draw knocks it off, and when sated nothing keeps it near food, so it orbits and
 drifts. This staying-at-food / patch-residence problem is the next target (likely
 emission stickiness when consummatory, and/or a "stay while feeding" mechanism).
 Architecture (two-tier) committed.
+
+---
+
+## 2026-05-30 — Option 1: consummatory inhibits locomotion -> positive learning curve
+
+Staying-at-food fix (user chose Option 1): added strong coupling
+`consume -> movement = -1.5` (consummatory behavior competes with / suppresses
+locomotion: "don't walk away mid-meal"). Kept `approach_food -> consume = +0.30`
+(removing it cut survival 5/16 -> 2/16; it helps survivors lock onto food).
+
+Single long life (3000 steps, food adjacent, 16 seeds): survival 0/16 -> **5/16**
+camp at food and live indefinitely. Outcome is bimodal -- organisms that
+establish feeding survive; others fail to reach/lock on and die. Reaching+locking
+on is now the fragile step.
+
+**Across-lives learning curve (Exp 003 re-run, decay sweep, sensor_range=4):**
+the camping mechanism + two-tier learning finally yields a positive acquisition
+curve.
+
+| eligibility_decay | contact early->late | survived early->late | hw_food early->late |
+|---|---|---|---|
+| 0.90 | 0.143 -> 0.136 | 189 -> 191 | 0.509 -> 1.000 |
+| 0.95 | 0.117 -> 0.144 | 160 -> 204 | 0.420 -> 0.500 |
+| 0.99 | 0.116 -> 0.092 | 162 -> 134 | 0.335 -> -0.748 |
+
+decay **0.95 is the sweet spot**: contact rate, survival, AND the learned food
+weight all rise across lives. Promoted to defaults: `eligibility_decay=0.95`,
+`sensor_range=4.0` (with `damping_coef=10`, softmax `T=0.3` from Phase 4a).
+
+Effect sizes are modest (survival +28%, contact +23% early->late) but the sign is
+right -- the organism gets better at foraging and surviving the longer it lives.
+Amplifying the effect (learning rate, reach reliability) and the bimodal
+reach-failure are open tuning items; the qualitative acquisition result needed
+for the demos is in hand. Phase 4 (energy foraging + learning) is functionally
+complete; next is Phase 5 (day/night) or amplifying/again-parallel tuning.
