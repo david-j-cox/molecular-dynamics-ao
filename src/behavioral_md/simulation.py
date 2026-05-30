@@ -42,6 +42,7 @@ class DataLogger:
         terminated: bool,
         truncated: bool,
         intensities: dict[str, float],
+        sources: dict[str, np.ndarray] | None = None,
     ) -> None:
         comp = organism.last_components
         base = {
@@ -60,6 +61,11 @@ class DataLogger:
             "energy": organism.energy,
             "alive": organism.alive,
         }
+        # Source positions (constant within an episode) for trajectory plots.
+        if sources is not None:
+            for name, pos in sources.items():
+                base[f"{name}_x"] = float(pos[0])
+                base[f"{name}_y"] = float(pos[1])
         for i, atom in enumerate(organism.atoms):
             row = dict(base)
             row.update(
@@ -126,6 +132,14 @@ def run_episode(
     obs, info = env.reset(seed=seed, options=reset_options)
     organism.reset(obs)
 
+    # Source positions are fixed within a life; capture once for trajectory plots.
+    sources = {
+        "food": info["food_pos"],
+        "danger": info["danger_pos"],
+        "light": info["light_pos"],
+        "cue": info["cue_pos"],
+    }
+
     latency = config.max_steps  # censored if food never consumed
     first_consumed = False
     n_consumed = 0
@@ -150,6 +164,7 @@ def run_episode(
                 terminated=terminated,
                 truncated=truncated,
                 intensities=organism.last_intensities,
+                sources=sources,
             )
 
         steps = t + 1

@@ -134,7 +134,7 @@ class ForceCalculator:
                 # onto this atom's direction via the live stimulus geometry.
                 # valence sign gives approach (+) vs. avoid (-).
                 express = 0.0
-                for k, drive in enumerate(self.drive_atoms):
+                for drive in self.drive_atoms:
                     stim_dir = sensory[drive.stimulus].direction
                     express += (
                         drive.valence

@@ -58,12 +58,14 @@ DISCRIMINATIVE STIMULI (separate from ambient sun)
 
 VISUALIZATION (visualization.py)
 --------------------------------
-[ ] Trajectory plot; activation-over-time; force-over-time; history-weight-over-time.
-[ ] Latency-to-food / contact-rate / survival across lives (learning curves).
-[ ] Energy trajectory + death markers; day/night shading.
+[x] Trajectory plot; activation-over-time; force-over-time (drive atoms).
+[x] Latency-to-food / contact-rate / survival across lives (learning curve).
+[x] Energy trajectory + death marker.
+[x] Learned-weight-across-lives (history forming).
+[x] scripts/make_figures.py generates the set into outputs/figures/.
+[ ] Day/night shading on time-series (after Phase 5).
 [ ] Generalization gradient; matching plots (relative response vs relative reinf).
 [ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
-[ ] Save figures to outputs/figures/.
 
 DEMOS (scripts/)
 ----------------
