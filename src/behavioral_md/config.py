@@ -156,6 +156,23 @@ class SimulationConfig(BaseModel):
         1.0, ge=0.0, description="Max distance to food at which 'consume' succeeds."
     )
 
+    # --- Food as a renewable resource -------------------------------------
+    # Food biomass depletes when eaten and regrows logistically toward a
+    # carrying capacity. Depleting then waiting for regrowth gives interval-like
+    # (VI) availability; food intensity/contact scale with biomass so a spent
+    # patch is less visible/edible and the organism leaves until it regrows.
+    food_carrying_capacity: float = Field(
+        1.0, gt=0.0, description="K: max food biomass at a patch."
+    )
+    food_regrowth_rate: float = Field(
+        0.1, ge=0.0, description="r: logistic regrowth rate per step (dB = r*B*(1-B/K))."
+    )
+    food_min_biomass: float = Field(
+        0.2,
+        ge=0.0,
+        description="Uneatable remnant; floor from which the patch regrows (logistic).",
+    )
+
     # --- Rendering ---------------------------------------------------------
     render_mode: Literal["human", "rgb_array", "none"] = Field(
         "none", description="Gymnasium render mode."

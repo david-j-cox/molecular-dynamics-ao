@@ -103,6 +103,7 @@ class BehavioralFieldEnv(gym.Env):
         self.light_pos = np.zeros(2, dtype=np.float64)
         self.cue_pos = np.zeros(2, dtype=np.float64)
         self.barriers: set[tuple[int, int]] = set()
+        self.food_biomass = self.config.food_carrying_capacity
         self.t = 0
         self.last_consequence = 0.0
         self._window = None  # pygame surface, lazily created
@@ -147,6 +148,7 @@ class BehavioralFieldEnv(gym.Env):
         self.cue_pos = np.asarray(explicit.get("cue", place()), dtype=np.float64)
         self.barriers = set(explicit.get("barriers", set()))
 
+        self.food_biomass = self.config.food_carrying_capacity
         self.t = 0
         self.last_consequence = 0.0
 
@@ -166,13 +168,24 @@ class BehavioralFieldEnv(gym.Env):
         # action 0 (no-op), 5 (consume), 6 (pause) do not move the organism.
 
         # Foraging world: ingestion happens on CONTACT with food (time-at-patch
-        # feeding), not via a consume action. Food persists -- eating does NOT
-        # end the world. (The instrumental consume/press operant lives in the
-        # operant-chamber environment instead.)
-        at_food = (
-            self.food_reinforces
-            and self._distance(self.position, self.food_pos) <= self.consume_radius
+        # feeding), not via a consume action. Food is a renewable resource: it
+        # depletes when eaten and regrows logistically, so a spent patch becomes
+        # unavailable until it regrows (interval-like / VI). The world is
+        # continuous -- eating does NOT end it.
+        cfg = self.config
+        in_range = self._distance(self.position, self.food_pos) <= self.consume_radius
+        food_intake = 0.0
+        if in_range and self.food_reinforces:
+            food_intake = min(cfg.food_intake_rate, self.food_biomass - cfg.food_min_biomass)
+            food_intake = max(0.0, food_intake)
+            self.food_biomass -= food_intake
+        # Logistic regrowth toward carrying capacity.
+        k = cfg.food_carrying_capacity
+        self.food_biomass += cfg.food_regrowth_rate * self.food_biomass * (
+            1.0 - self.food_biomass / k
         )
+        self.food_biomass = float(np.clip(self.food_biomass, cfg.food_min_biomass, k))
+        at_food = food_intake > 0.0
 
         # Danger contact: binary for now (Phase 5 will gate detection by light).
         danger_contact = (
@@ -190,7 +203,9 @@ class BehavioralFieldEnv(gym.Env):
         obs = self._build_observation()
         info = self._build_info()
         info["at_food"] = at_food
-        info["food_consumed"] = at_food  # in-contact step (used for latency/intake)
+        info["food_consumed"] = at_food  # fed this step (used for latency)
+        info["food_intake"] = food_intake  # actual energy ingested (biomass-limited)
+        info["food_biomass"] = self.food_biomass
         info["danger_contact"] = danger_contact
         info["action_name"] = ACTIONS[action]
 
@@ -240,13 +255,19 @@ class BehavioralFieldEnv(gym.Env):
         return float(np.exp(-dist / self.sensor_range))
 
     def _build_observation(self) -> dict[str, np.ndarray]:
+        # Food intensity and contact scale with biomass: a depleted patch is less
+        # visible (weaker approach) and less edible (weaker consummatory drive).
+        biomass_frac = self.food_biomass / self.config.food_carrying_capacity
+        in_range = self._distance(self.position, self.food_pos) <= self.consume_radius
         return {
             "position": self.position.astype(np.float32),
             "food_vector": self._unit_vector(self.food_pos),
             "danger_vector": self._unit_vector(self.danger_pos),
             "light_vector": self._unit_vector(self.light_pos),
             "cue_vector": self._unit_vector(self.cue_pos),
-            "food_intensity": np.array([self._intensity(self.food_pos)], dtype=np.float32),
+            "food_intensity": np.array(
+                [self._intensity(self.food_pos) * biomass_frac], dtype=np.float32
+            ),
             "danger_intensity": np.array(
                 [self._intensity(self.danger_pos)], dtype=np.float32
             ),
@@ -254,11 +275,9 @@ class BehavioralFieldEnv(gym.Env):
                 [self._intensity(self.light_pos)], dtype=np.float32
             ),
             "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
-            # Sharp binary contact signal: 1.0 only within consume_radius of food.
+            # Contact signal within consume_radius, scaled by remaining biomass.
             "food_contact": np.array(
-                [1.0 if self._distance(self.position, self.food_pos) <= self.consume_radius
-                 else 0.0],
-                dtype=np.float32,
+                [biomass_frac if in_range else 0.0], dtype=np.float32
             ),
             "last_consequence": np.array([self.last_consequence], dtype=np.float32),
         }

@@ -43,7 +43,7 @@ _BW_CYCLE = [
 ]
 # Source markers for the trajectory map (grayscale + distinct shapes).
 _SOURCE_STYLE = {
-    "food": ("Food", "o", "white"),
+    "food": ("Food", "h", "white"),   # hexagon (distinct from the circle endpoints)
     "danger": ("Danger", "X", "black"),
     "light": ("Light", "*", "0.6"),
     "cue": ("Cue", "s", "0.85"),
@@ -83,22 +83,40 @@ def _episode_slice(log: pd.DataFrame, episode: int) -> pd.DataFrame:
 
 
 def plot_trajectory(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
-    """Path of the organism through the arena for one life, with sources."""
+    """Path of the organism through the arena for one life.
+
+    Direction of travel is shown with sparse, non-overlapping arrows along the
+    route (no time colorbar); start and end are marked, sources are large
+    black-and-white markers.
+    """
     steps = _episode_slice(log, episode).drop_duplicates("timestep").sort_values("timestep")
-    fig, ax = plt.subplots(figsize=(6.5, 5.5))
-    ax.plot(steps["x"], steps["y"], "-", color="0.5", lw=0.8, alpha=0.8, zorder=1)
-    sc = ax.scatter(steps["x"], steps["y"], c=steps["timestep"], cmap="Greys",
-                    s=14, edgecolors="0.3", linewidths=0.2, zorder=2)
-    cb = fig.colorbar(sc, ax=ax)
-    cb.set_label("Time (steps)", fontsize=18, labelpad=12)
-    cb.ax.tick_params(labelsize=12)
-    ax.plot(steps["x"].iloc[0], steps["y"].iloc[0], "o", mfc="black", mec="black",
-            ms=11, label="Start", zorder=3)
+    x = steps["x"].to_numpy()
+    y = steps["y"].to_numpy()
+
+    fig, ax = plt.subplots(figsize=(6.5, 6))
+    ax.plot(x, y, "-", color="0.65", lw=0.8, alpha=0.8, zorder=1)
+
+    # Sparse arrows showing the LOCAL direction of travel along the route (each
+    # arrow is the single-step move at a sampled point, so it follows the path
+    # rather than cutting across the wandering).
+    if len(x) > 2:
+        stride = max(1, len(x) // 18)
+        idx = np.arange(0, len(x) - 1, stride)
+        dx, dy = x[idx + 1] - x[idx], y[idx + 1] - y[idx]
+        moved = (dx != 0) | (dy != 0)
+        ax.quiver(
+            x[idx][moved], y[idx][moved], dx[moved], dy[moved],
+            angles="xy", scale_units="xy", scale=1.0, color="black",
+            width=0.008, headwidth=4, headlength=5, zorder=2,
+        )
+
+    ax.plot(x[0], y[0], "o", mfc="black", mec="black", ms=14, label="Start", zorder=5)
+    ax.plot(x[-1], y[-1], "o", mfc="white", mec="black", mew=1.5, ms=14, label="End", zorder=5)
     for key, (label, marker, facecolor) in _SOURCE_STYLE.items():
         cx = f"{key}_x"
         if cx in steps:
             ax.scatter(steps[cx].iloc[0], steps[f"{key}_y"].iloc[0], marker=marker,
-                       s=180, facecolors=facecolor, edgecolors="black", linewidths=1.2,
+                       s=320, facecolors=facecolor, edgecolors="black", linewidths=1.4,
                        label=label, zorder=4)
     ax.set_xlabel("X position")
     ax.set_ylabel("Y position")
@@ -118,6 +136,17 @@ def plot_energy(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
         ax.text(t_death, ax.get_ylim()[1] * 0.9, " Death", fontsize=12)
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel("Energy reserve")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
+def plot_food_biomass(log: pd.DataFrame, episode: int, path: str | Path) -> Path:
+    """Food-patch biomass over one life (shows the deplete/regrow VI dynamic)."""
+    steps = _episode_slice(log, episode).drop_duplicates("timestep").sort_values("timestep")
+    fig, ax = plt.subplots(figsize=(8, 3.4))
+    ax.plot(steps["timestep"], steps["food_biomass"], color="black", lw=1.2)
+    ax.set_xlabel("Time (steps)")
+    ax.set_ylabel("Food biomass")
     ax.set_ylim(bottom=0)
     return _save(fig, path)
 

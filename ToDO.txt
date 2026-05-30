@@ -15,9 +15,12 @@ DONE (for reference)
 
 TUNING / QUALITY (current foraging model)
 -----------------------------------------
-[ ] Amplify the acquisition effect size (currently ~25% over 60 lives):
-    parallel-sweep learning_rate, reinforcement_asymptote, costs, intake.
-[ ] Reduce bimodal reach-failure (some organisms never lock onto food and die):
+[!] Population learning curve is FLAT (200 agents, tight CI): random per-life
+    food layout swamps the learning signal and camping makes survival trivial.
+    Need a CONTROLLED acquisition protocol (fixed food location across lives)
+    to demonstrate learning -- ties to run_demo.py below.
+[ ] Amplify the acquisition effect size once on a controlled layout.
+[ ] Reduce bimodal reach-failure (some agents never lock onto food and die):
     reach reliability, initial search, possibly state-dependent exploration.
 [ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
 [ ] Revisit whether learning signal should be graded by energy (vs normalized
@@ -34,8 +37,12 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 -------------------------------------------
+[x] Single renewable food patch: logistic regrowth + depletion on contact;
+    food intensity/contact scale with biomass (VI-like availability). Max
+    regrowth (rK/4) < intake rate, so a camper depletes to the floor then lives
+    off the steady regrowth.
 [ ] Multiple renewable food patches (2-3), logistic regrowth (rate prop. to L),
-    drawn down on consumption -> patch foraging + concurrent-schedule matching.
+    -> patch-leaving decisions + concurrent-schedule matching.
 [ ] Operant chamber environment (feeder + press response, no navigation) sharing
     the Organism/atom engine, for clean schedule demos.
 [ ] Schedules: FR, VR, FI, VI; concurrent VI-VI for the matching law (headline).

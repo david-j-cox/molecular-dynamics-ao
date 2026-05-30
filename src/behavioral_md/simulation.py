@@ -42,6 +42,7 @@ class DataLogger:
         terminated: bool,
         truncated: bool,
         intensities: dict[str, float],
+        food_biomass: float = 0.0,
         sources: dict[str, np.ndarray] | None = None,
     ) -> None:
         comp = organism.last_components
@@ -60,6 +61,7 @@ class DataLogger:
             "cue_intensity": intensities["cue"],
             "energy": organism.energy,
             "alive": organism.alive,
+            "food_biomass": food_biomass,
         }
         # Source positions (constant within an episode) for trajectory plots.
         if sources is not None:
@@ -164,6 +166,7 @@ def run_episode(
                 terminated=terminated,
                 truncated=truncated,
                 intensities=organism.last_intensities,
+                food_biomass=float(info.get("food_biomass", 0.0)),
                 sources=sources,
             )
 

@@ -137,7 +137,7 @@ class Organism:
 
         # 1. Contingent events -> energy + learning signal (via the model).
         event = ConsequenceEvent(
-            food_intake=cfg.food_intake_rate if info.get("at_food", False) else 0.0,
+            food_intake=float(info.get("food_intake", 0.0)),  # actual, biomass-limited
             danger_contact=float(info.get("danger_contact", 0.0)),
         )
         intake = self.consequence_model.energy_delta(event)
