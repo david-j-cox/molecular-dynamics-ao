@@ -541,3 +541,20 @@ scale; channels don't) -- the user's design.
 Next: ABABABAB reversal -> damped-oscillator return to equilibrium + Brunt-Vaisala
 frequency vs mass (tie to manuscript Figs 7-9); then concatenated matching law
 (amount/delay/probability).
+
+---
+
+## 2026-05-31 — Multi-alternative matching (N patches)
+
+`matching.py` is already P-patch generic; exp010 places N=5 cue-marked patches on
+a circle around the start (equal travel/COD to each -> no spatial bias), sweeps 16
+random VI configurations, and fits the multi-alternative GML with each alternative
+vs. the pooled rest: log(B_i / Sum_rest) = a*log(R_i / Sum_rest) + log b.
+
+Result: a=0.99, log b=-0.03, R^2=0.75 (5 alts x 16 conditions x 300 organisms x
+6000 steps in ~8s) -- near-perfect matching, vs the 2-patch undermatching (a=0.69).
+The circle geometry puts COD in the matching regime; multi-alternative concurrent
+schedules commonly match well. Data fall in the lower-left (each alternative's
+reinforcement relative to the pooled rest is usually <1 with N=5), and the fit is
+essentially the identity over that range. Same cue-signaled mechanism as 2-patch,
+no new machinery -- just more alternatives.

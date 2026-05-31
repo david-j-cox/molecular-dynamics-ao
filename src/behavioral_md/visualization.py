@@ -461,11 +461,13 @@ def plot_mortality_by_life(mortality: dict, path: str | Path) -> Path:
 
 
 def plot_matching(log_R: np.ndarray, log_B: np.ndarray, a: float, log_b: float,
-                  path: str | Path) -> Path:
+                  path: str | Path,
+                  xlabel: str = "log(R$_L$/R$_R$)",
+                  ylabel: str = "log(B$_L$/B$_R$)") -> Path:
     """Generalized matching law: log behavior ratio vs log reinforcement ratio.
 
-    Points are individual organisms across schedules; the solid line is the GML
-    fit, the dotted line perfect matching (slope 1 through 0).
+    Points are individual organisms (and alternatives) across schedules; the solid
+    line is the GML fit, the dotted line perfect matching (slope 1 through 0).
     """
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(log_R, log_B, s=10, facecolors="none", edgecolors="0.4", linewidths=0.5)
@@ -476,8 +478,8 @@ def plot_matching(log_R: np.ndarray, log_B: np.ndarray, a: float, log_b: float,
             label=f"Fit: a={a:.2f}, log b={log_b:+.2f}")
     ax.axhline(0, color="0.8", lw=0.5)
     ax.axvline(0, color="0.8", lw=0.5)
-    ax.set_xlabel("log(R$_L$/R$_R$)")
-    ax.set_ylabel("log(B$_L$/B$_R$)")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.set_aspect("equal")
     _legend_outside(ax)
     return _save(fig, path)

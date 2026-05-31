@@ -63,6 +63,8 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     a=0.69 (undermatching, as in real animals), R^2=0.80. exp008_matching.
 [x] Sweep COD (patch separation / travel): matching sensitivity a rises with
     COD -- 0.04 (sep2) -> 0.88 (sep14), reproducing Shull & Pliskoff. exp009.
+[x] Multi-alternative matching (exp010): N=5 cue-marked patches on a circle,
+    alt-vs-rest GML a=0.99, R^2=0.75 -- near-perfect matching, no new machinery.
 [ ] ABABABAB reversal -> damped-oscillator return to equilibrium + Brunt-Vaisala
     frequency vs mass (tie to the manuscript's top-down model).
 [ ] Concatenated matching law: exercise amount/delay/probability dimensions.
