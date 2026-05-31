@@ -40,7 +40,7 @@ def main() -> None:
     log_B, log_R = [], []
     for i, (pL, pR) in enumerate(RATE_PAIRS):
         state0 = initial_state(N_ORG, jax.random.key(100 + i))
-        time_at, reinforced = sim(state0, keys, jnp.array([pL, pR]))
+        time_at, reinforced, _amt = sim(state0, keys, jnp.array([pL, pR]))
         time_at = np.asarray(time_at)
         reinforced = np.asarray(reinforced)
         # Discard the first half (acquisition); use steady-state allocation.

@@ -48,7 +48,7 @@ def sensitivity_for_separation(sep: int, keys) -> np.ndarray:
     logB, logR = [], []  # each: list of [n_org] over schedules
     for i, (pL, pR) in enumerate(RATE_PAIRS):
         state0 = initial_state(N_ORG, jax.random.key(1000 * sep + i))
-        time_at, reinforced = sim(state0, keys, jnp.array([pL, pR]))
+        time_at, reinforced, _amt = sim(state0, keys, jnp.array([pL, pR]))
         time_at = np.asarray(time_at)
         reinforced = np.asarray(reinforced)
         with np.errstate(divide="ignore", invalid="ignore"):

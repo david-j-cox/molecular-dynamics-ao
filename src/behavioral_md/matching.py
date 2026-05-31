@@ -69,7 +69,8 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
     start = jnp.asarray(start, float)
     move_dirs = _MOVES                                       # [5, 2]
 
-    def step(state, arm_prob):
+    def step(state, sched):
+        arm_prob, amount = sched          # arm_prob [P] (rate), amount [P] (magnitude)
         pos = state["pos"]
         diff = patch_pos[None, :, :] - pos[:, None, :]       # [O, P, 2]
         dist = jnp.linalg.norm(diff, axis=2)                 # [O, P]
@@ -103,18 +104,21 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         collect = in_range & armed                           # [O, P]
         armed = armed & (~collect)
 
-        # Train cue receptors on collection (summed/elemental RW error, per patch).
-        reinforced_any = collect.any(axis=1)                 # [O]
-        # Use the cue of the collected patch (at most one collected handled via sum).
-        coll_cue_act = jnp.einsum("op,pk->ok", collect.astype(float), cue_act)   # [O, K]
+        # Train cue receptors on collection (summed/elemental RW error). The
+        # teaching magnitude is the collected reinforcer's AMOUNT, so the cue's
+        # learned value tracks reinforcement magnitude (the concatenated-law
+        # amount term), not just its occurrence.
+        collect_f = collect.astype(float)                    # [O, P]
+        mag = jnp.sum(collect_f * amount[None, :], axis=1)    # [O] amount collected
+        coll_cue_act = jnp.einsum("op,pk->ok", collect_f, cue_act)   # [O, K]
         v_pred = jnp.sum(state["w"] * coll_cue_act, axis=1)  # [O]
-        err = mcfg.reinf_asymptote * reinforced_any.astype(float) - v_pred
+        err = mcfg.reinf_asymptote * mag - v_pred
         w = jnp.clip(state["w"] + mcfg.lr_cue * coll_cue_act * err[:, None], -5.0, 5.0)
 
         new_state = {"pos": new_pos, "act": new_act, "prev": state["act"],
                      "w": w, "armed": armed, "key": key}
-        # Outputs this step: presence at each patch, and reinforcers collected.
-        return new_state, (in_range.astype(jnp.float32), collect.astype(jnp.float32))
+        # Outputs: presence at each patch, reinforcer counts, and amount obtained.
+        return new_state, (in_range.astype(jnp.float32), collect_f, collect_f * amount[None, :])
 
     def initial_state(n_org, key):
         P = patch_pos.shape[0]
@@ -128,16 +132,21 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         }
 
     @jax.jit
-    def sim(state0, keys, arm_prob):
-        """state0 from initial_state; keys [T,2] per-step rng; arm_prob [P].
+    def sim(state0, keys, arm_prob, amount=None):
+        """state0 from initial_state; keys [T,2] per-step rng; arm_prob [P] (rate).
 
-        Returns (time_at [O,P], reinforced [O,P]) summed over the T steps.
+        ``amount`` [P] is the reinforcer magnitude per patch (defaults to all 1 =
+        rate-only). Returns per-organism, summed over T steps:
+        (time_at [O,P], count [O,P], amount_obtained [O,P]).
         """
+        if amount is None:
+            amount = jnp.ones(patch_pos.shape[0])
+
         def scan_step(st, k):
             st = {**st, "key": k}
-            return step(st, arm_prob)
+            return step(st, (arm_prob, amount))
 
-        _, (presence, collected) = jax.lax.scan(scan_step, state0, keys)
-        return presence.sum(axis=0), collected.sum(axis=0)
+        _, (presence, count, amt) = jax.lax.scan(scan_step, state0, keys)
+        return presence.sum(axis=0), count.sum(axis=0), amt.sum(axis=0)
 
     return sim, initial_state

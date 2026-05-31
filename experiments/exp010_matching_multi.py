@@ -52,7 +52,7 @@ def main() -> None:
     for c in range(N_CONDITIONS):
         arm = rng.choice(RATE_CHOICES, size=N_PATCHES, replace=True)
         state0 = initial_state(N_ORG, jax.random.key(500 + c))
-        time_at, reinforced = sim(state0, keys, jnp.asarray(arm))
+        time_at, reinforced, _amt = sim(state0, keys, jnp.asarray(arm))
         B = np.asarray(time_at)        # [O, N]
         R = np.asarray(reinforced)     # [O, N]
         totB, totR = B.sum(axis=1, keepdims=True), R.sum(axis=1, keepdims=True)

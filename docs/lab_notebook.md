@@ -558,3 +558,28 @@ schedules commonly match well. Data fall in the lower-left (each alternative's
 reinforcement relative to the pooled rest is usually <1 with N=5), and the fit is
 essentially the identity over that range. Same cue-signaled mechanism as 2-patch,
 no new machinery -- just more alternatives.
+
+---
+
+## 2026-05-31 — Concatenated matching law: AMOUNT term
+
+Added a per-patch reinforcer AMOUNT to matching.py (runtime arg): the cue's
+learned value is trained toward `lambda * amount` collected, so the learned value
+(hence approach) tracks reinforcement magnitude, not just occurrence. sim now
+returns (time_at, count, amount_obtained).
+
+**Exp 011** (identical VI on both patches, sweep amount ratio): amount term
+`log(B_L/B_R) = a_amt*log(A_L/A_R) + log b` -> a_amt=1.28 (slight overmatching),
+R^2=0.79. Rate matching unchanged (regression: exp008 still a=0.69). So the model
+has SEPARABLE sensitivities: a_rate=0.69 (undermatch) vs a_amt=1.28 (overmatch) --
+exactly what the concatenated law allows (a_r != a_amt). The asymmetry is
+mechanistically sensible: obtained-rate is behavior-dependent (feedback ->
+undermatching), whereas programmed amount sets the learning target directly ->
+value ratio ~ amount ratio, amplified by softmax -> overmatching.
+
+Caveat: a consistent bias toward the cue-0.8 patch (log b = -0.29 rate, -0.63
+amount) -- a systematic preference to investigate (likely cue-receptor cross-talk
+or an asymmetry between the two cue values), not yet explained.
+
+Next concatenated-law terms: delay and probability (same per-patch runtime-arg
+pattern).
