@@ -510,6 +510,25 @@ def plot_demand(unit_price: np.ndarray, consumption: np.ndarray, path: str | Pat
     return _save(fig, path)
 
 
+def plot_demand_pair(unit_price: np.ndarray, consumption_rate: np.ndarray,
+                     n_consumed: np.ndarray, path: str | Path) -> Path:
+    """Two panels vs unit price: consumption rate (log-log demand) and the
+    absolute number of reinforcers consumed per session (linear y)."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+    axes[0].plot(unit_price, consumption_rate, color="black", ls="-", marker="o", ms=5)
+    axes[0].set_xscale("log")
+    axes[0].set_yscale("log")
+    axes[0].set_xlabel("Unit Price")
+    axes[0].set_ylabel("Consumption (reinforcers / step)")
+
+    axes[1].plot(unit_price, n_consumed, color="black", ls="-", marker="s", ms=5)
+    axes[1].set_xscale("log")
+    axes[1].set_xlabel("Unit Price")
+    axes[1].set_ylabel("Reinforcers Consumed (per session)")
+    axes[1].set_ylim(bottom=0)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,
