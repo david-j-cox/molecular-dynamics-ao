@@ -639,3 +639,36 @@ softmax (matching) emission converts value to allocation.
 
 Separable sensitivities, all ~0 bias on the odd grid: a_rate~0.56, a_amount~0.97,
 a_prob~0.78, a_delay~0.61. The concatenated matching law is reproduced bottom-up.
+
+---
+
+## 2026-05-31 — Operant chamber + schedules: graded responding, but no molecular signatures
+
+Built `chamber.py` (vectorized): single press response, no navigation, schedules
+FR/VR/FI/VI; pressing driven by learned press-value + energy-deficit motivation,
+damped-Verlet dynamics, logistic emission. Added a RESTORING force (spring toward
+baseline): without it a roughly-constant drive ramps activation to the clip and
+pressing saturates at 1.0; with it, equilibrium activation ~ drive/restoring so
+response rate is GRADED.
+
+**Result (exp015):** graded, reinforcement-maintained pressing (~0.88 resp/step),
+but:
+- response rates are ~EQUAL across VR/VI/FR/FI at matched reinforcement;
+- FI is FLAT within the interval (scallop index +0.001) -- no scallop.
+Tried stronger energy dynamics (food/metabolism so the deficit varies within the
+interval): still flat, undifferentiated.
+
+**Why (the honest boundary).** The classic molecular signatures are not produced
+because this is a MOLAR value model: response strength is a scalar value updated
+on reinforcement OCCURRENCE. The signatures require molecular mechanisms it lacks:
+- VR>VI rate difference: differential reinforcement of inter-response times (VI
+  differentially reinforces long IRTs; VR does not). Needs IRT-level credit.
+- FI scallop / FR break-and-run: temporal/count discrimination of proximity to
+  reinforcement. Needs a clock/counter discriminative stimulus.
+
+So the engine reproduces molar choice/matching well (concatenated GML, COD) but
+molecular within-schedule structure needs added mechanism. FORK for next step:
+(a) IRT-level reinforcement (credit the recent inter-response time) -> VR/VI rate
+difference and rate structure; (b) a time/count discriminative cue (reuse the
+CueReceptorField as a "clock") -> FI scallop / FR break-and-run via the
+generalization gradient over elapsed-time. Chamber + finding committed as WIP.

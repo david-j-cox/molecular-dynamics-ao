@@ -1,0 +1,114 @@
+"""Operant chamber: a single press response under schedules of reinforcement.
+
+No navigation -- the organism either presses or not each step. Pressing is driven
+by the learned value of pressing plus an energy-deficit motivation, integrated
+with the same damped-Verlet dynamics and emitted stochastically (softmax over
+press / no-press). A schedule decides when a press produces a reinforcer:
+
+  FR n : every nth press is reinforced (fixed ratio)
+  VR n : each press reinforced with probability 1/n (variable ratio)
+  FI t : the first press after t steps since the last reinforcer (fixed interval)
+  VI t : the first press after a variable interval (Bernoulli arming, mean t)
+
+The energy budget is included on purpose: a reinforcer raises energy, lowering the
+deficit motivation (a post-reinforcement pause); energy then drains (basal
+metabolism + press effort), raising motivation again and accelerating responding.
+This is the ground-up bet that within-schedule patterns (FR break-and-run, FI
+scallop) and the VR>VI rate difference emerge from energy-driven motivation +
+value learning, rather than being imposed. Vectorized over organisms (NumPy);
+the per-step loop is sequential because schedules carry state.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+
+@dataclass
+class ChamberConfig:
+    dt: float = 0.1
+    damping: float = 10.0
+    # Restoring force toward baseline (a spring): without it a constant drive
+    # ramps activation to the clip and pressing saturates. With it, equilibrium
+    # activation ~ drive/restoring, so response rate is GRADED by drive.
+    restoring: float = 1.0
+    temperature: float = 0.5      # softmax over press/no-press
+    approach_gain: float = 1.0
+    learning_rate: float = 0.05
+    reinf_asymptote: float = 1.0
+    # Energy budget (drives post-reinforcement pausing + acceleration).
+    energy_init: float = 0.6
+    energy_capacity: float = 1.0
+    basal_metabolism: float = 0.004
+    press_cost: float = 0.002     # response effort
+    food_energy: float = 0.25     # energy per reinforcer
+    deficit_exponent: float = 2.0
+    motiv_strength: float = 1.0
+
+
+def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
+                n_org: int, n_steps: int, seed: int = 0):
+    """Run an operant chamber; return per-step records for the population.
+
+    ``schedule`` in {FR, VR, FI, VI}; ``param`` is n (ratio) or t (interval steps).
+    Returns a dict with arrays: presses[T,O], reinforced[T,O],
+    time_since_reinf[T,O] (steps since last reinforcer at each step).
+    """
+    rng = np.random.default_rng(seed)
+    w = np.zeros(n_org)                       # learned value of pressing
+    act = np.zeros(n_org)
+    prev = np.zeros(n_org)
+    energy = np.full(n_org, cfg.energy_init)
+    count = np.zeros(n_org)                   # presses since last reinf (FR/VR)
+    timer = np.zeros(n_org)                   # steps since last reinf (FI)
+    armed = np.zeros(n_org, bool)             # VI
+    tsr = np.zeros(n_org)                     # time since reinforcement
+
+    presses = np.zeros((n_steps, n_org))
+    reinforced_rec = np.zeros((n_steps, n_org))
+    tsr_rec = np.zeros((n_steps, n_org))
+
+    for t in range(n_steps):
+        deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None) ** cfg.deficit_exponent
+        drive = cfg.approach_gain * (w + cfg.motiv_strength * deficit)
+        vel = (act - prev) / cfg.dt
+        net = drive - cfg.damping * vel - cfg.restoring * act   # restoring -> graded equilibrium
+        new = np.clip(2 * act - prev + net * cfg.dt**2, -10.0, 10.0)
+        prev, act = act, new
+
+        p_press = 1.0 / (1.0 + np.exp(-act / cfg.temperature))     # logistic emission
+        press = rng.random(n_org) < p_press
+
+        # Schedule: which presses are reinforced.
+        if schedule == "FR":
+            count += press
+            reinforced = press & (count >= param)
+            count = np.where(reinforced, 0.0, count)
+        elif schedule == "VR":
+            reinforced = press & (rng.random(n_org) < 1.0 / param)
+        elif schedule == "FI":
+            timer += 1.0
+            reinforced = press & (timer >= param)
+            timer = np.where(reinforced, 0.0, timer)
+        elif schedule == "VI":
+            armed |= rng.random(n_org) < 1.0 / param
+            reinforced = press & armed
+            armed = armed & (~reinforced)
+        else:
+            raise ValueError(f"unknown schedule {schedule}")
+
+        # Energy bookkeeping + post-reinforcement dynamics.
+        energy = energy - cfg.basal_metabolism - press * cfg.press_cost
+        energy = np.clip(energy + reinforced * cfg.food_energy, 0.0, cfg.energy_capacity)
+        # Learn the value of pressing on reinforcement (RW toward asymptote).
+        w = np.where(reinforced,
+                     w + cfg.learning_rate * (cfg.reinf_asymptote - w), w)
+
+        tsr_rec[t] = tsr
+        presses[t] = press
+        reinforced_rec[t] = reinforced
+        tsr = np.where(reinforced, 0.0, tsr + 1.0)
+
+    return {"presses": presses, "reinforced": reinforced_rec, "time_since_reinf": tsr_rec}

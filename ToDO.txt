@@ -84,12 +84,21 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 [ ] Fit the sensitivities: which organism params (temperature, approach_gain,
     learning/extinction rates, beta) set each a (a_rate/amount/prob/delay)?
     Map params -> sensitivities; later use JAX autodiff to fit to target a's.
+[ ] Behavioral momentum demonstration: train a response under different
+    reinforcement rates/histories, then disrupt (extinction / prefeeding /
+    distractor); measure resistance to change (persistence) vs reinforcement
+    history and atom mass. Unit inertia already tested (1/mass); this is the
+    molar phenomenon (Nevin & Grace).
 [ ] Multiple renewable food patches in the survival world (patch-leaving).
-[ ] Operant chamber environment (feeder + press response, no navigation) sharing
-    the Organism/atom engine, for clean schedule demos.
-[ ] Schedules: FR, VR, FI, VI; concurrent VI-VI for the matching law (headline).
-[ ] Add a `press` atom for the chamber (vs reusing consume).
-[ ] Reproduce classic signatures: VR high steady rate, FI scallop, conc VI-VI matching.
+[x] Operant chamber (chamber.py): single press response, FR/VR/FI/VI; press-value
+    + energy-deficit motivation, damped-Verlet w/ RESTORING force -> graded,
+    reinforcement-maintained pressing (exp015).
+[!] Molecular schedule SIGNATURES NOT reproduced: rates ~equal across schedules
+    at matched reinforcement; FI flat (no scallop). This molar value model lacks
+    the needed mechanisms. FORK:
+      (a) IRT-level reinforcement (credit recent inter-response time) -> VR>VI.
+      (b) time/count discriminative cue (CueReceptorField as a clock) -> FI
+          scallop / FR break-and-run via the generalization gradient.
 
 DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
 ---------------------------------------------------------
