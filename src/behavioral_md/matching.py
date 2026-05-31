@@ -51,6 +51,15 @@ class MatchConfig(NamedTuple):
     dt: float = 0.1
     temperature: float = 0.3    # softmax (matching) temperature
     approach_gain: float = 3.0  # scales learned value -> movement force
+    # Delay of reinforcement reduces the reinforcer's EFFICACY (its strengthening
+    # effect), the empirical delay-discounting finding -- NOT a credit-assignment
+    # / eligibility-decay effect. In the standard procedure the response occurs,
+    # the experiment blacks out, the delay elapses, and the reinforcer is then
+    # delivered, so attribution is unambiguous; delay simply makes the delivered
+    # reinforcer a weaker strengthener. Modeled as a discount on its teaching signal.
+    delay_discount: str = "hyperbolic"   # "hyperbolic" (Mazur) | "exponential"
+    delay_k: float = 0.5        # hyperbolic: efficacy *= 1/(1 + k*D)
+    delay_tau: float = 5.0      # exponential: efficacy *= exp(-D/tau)
 
 
 def _tuning(centers, beta, value):
@@ -73,8 +82,21 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
     start = jnp.asarray(start, float)
     move_dirs = _MOVES                                       # [5, 2]
 
+    def discount(delay):
+        """Efficacy of a reinforcer delivered after ``delay``, in (0, 1]; 1 at 0.
+
+        Represents reduced strengthening by delayed reinforcement (empirical delay
+        discounting), not a credit-assignment effect.
+        """
+        if mcfg.delay_discount == "exponential":
+            return jnp.exp(-delay / mcfg.delay_tau)
+        return 1.0 / (1.0 + mcfg.delay_k * delay)            # hyperbolic (Mazur)
+
     def step(state, sched):
-        arm_prob, amount = sched          # arm_prob [P] (rate), amount [P] (magnitude)
+        # Per-patch reinforcer dimensions (concatenated matching law):
+        # arm_prob [P] = rate (VI), amount [P] = magnitude, prob [P] = probability
+        # of reinforcement per armed contact, delay [P] = reinforcer delay.
+        arm_prob, amount, prob, delay = sched
         pos = state["pos"]
         diff = patch_pos[None, :, :] - pos[:, None, :]       # [O, P, 2]
         dist = jnp.linalg.norm(diff, axis=2)                 # [O, P]
@@ -99,30 +121,37 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         action = jax.random.categorical(sub, jnp.log(probs))             # [O]
         new_pos = jnp.clip(pos + move_dirs[action], 0.0, mcfg.grid_size - 1)
 
-        # VI: arm each patch (Bernoulli), then collect at an armed patch in range.
+        # VI: arm each patch (Bernoulli). A contact with an armed patch is a
+        # collection OPPORTUNITY; it is reinforced with probability prob_k.
         key, sub2 = jax.random.split(key)
         newly = jax.random.uniform(sub2, state["armed"].shape) < arm_prob[None, :]
         armed = state["armed"] | newly
         d_new = jnp.linalg.norm(patch_pos[None, :, :] - new_pos[:, None, :], axis=2)
         in_range = d_new <= mcfg.consume_radius              # [O, P]
-        collect = in_range & armed                           # [O, P]
-        armed = armed & (~collect)
+        opportunity = in_range & armed                       # [O, P] armed contact
+        key, sub3 = jax.random.split(key)
+        roll = jax.random.uniform(sub3, opportunity.shape)
+        reinforced = opportunity & (roll < prob[None, :])    # PROBABILITY gate
+        armed = armed & (~reinforced)                        # disarm only on reinforcement
 
-        # Train cue receptors on collection (summed/elemental RW error). The
-        # teaching magnitude is the collected reinforcer's AMOUNT, so the cue's
-        # learned value tracks reinforcement magnitude (the concatenated-law
-        # amount term), not just its occurrence.
-        collect_f = collect.astype(float)                    # [O, P]
-        mag = jnp.sum(collect_f * amount[None, :], axis=1)    # [O] amount collected
-        coll_cue_act = jnp.einsum("op,pk->ok", collect_f, cue_act)   # [O, K]
-        v_pred = jnp.sum(state["w"] * coll_cue_act, axis=1)  # [O]
-        err = mcfg.reinf_asymptote * mag - v_pred
-        w = jnp.clip(state["w"] + mcfg.lr_cue * coll_cue_act * err[:, None], -5.0, 5.0)
+        # Train cue receptors on every armed contact (summed/elemental RW error):
+        # reinforced contacts -> target lambda * amount * delay-discount(D)
+        # (AMOUNT and DELAY terms); non-reinforced contacts -> target 0 (extinction
+        # trial -> partial reinforcement makes the value track PROBABILITY ~ p).
+        eff_amount = amount * discount(delay)                # [P] amount x delay-discount
+        opp_f = opportunity.astype(float)                    # [O, P]
+        contact_cue_act = jnp.einsum("op,pk->ok", opp_f, cue_act)            # [O, K]
+        target = jnp.sum(reinforced.astype(float) * (mcfg.reinf_asymptote * eff_amount)[None, :],
+                         axis=1)                             # [O]
+        v_pred = jnp.sum(state["w"] * contact_cue_act, axis=1)
+        err = target - v_pred
+        w = jnp.clip(state["w"] + mcfg.lr_cue * contact_cue_act * err[:, None], -5.0, 5.0)
 
         new_state = {"pos": new_pos, "act": new_act, "prev": state["act"],
                      "w": w, "armed": armed, "key": key}
-        # Outputs: presence at each patch, reinforcer counts, and amount obtained.
-        return new_state, (in_range.astype(jnp.float32), collect_f, collect_f * amount[None, :])
+        rein_f = reinforced.astype(jnp.float32)
+        # Outputs: presence at each patch, reinforcer counts, amount obtained.
+        return new_state, (in_range.astype(jnp.float32), rein_f, rein_f * amount[None, :])
 
     def initial_state(n_org, key):
         P = patch_pos.shape[0]
@@ -136,19 +165,23 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         }
 
     @jax.jit
-    def sim(state0, keys, arm_prob, amount=None):
+    def sim(state0, keys, arm_prob, amount=None, prob=None, delay=None):
         """state0 from initial_state; keys [T,2] per-step rng; arm_prob [P] (rate).
 
-        ``amount`` [P] is the reinforcer magnitude per patch (defaults to all 1 =
-        rate-only). Returns per-organism, summed over T steps:
-        (time_at [O,P], count [O,P], amount_obtained [O,P]).
+        Concatenated-law reinforcer dimensions per patch (each [P], runtime args):
+        ``amount`` magnitude (default 1), ``prob`` probability of reinforcement per
+        armed contact (default 1), ``delay`` reinforcer delay (default 0). Returns
+        per-organism, summed over T steps: (time_at [O,P], count [O,P],
+        amount_obtained [O,P]).
         """
-        if amount is None:
-            amount = jnp.ones(patch_pos.shape[0])
+        p = patch_pos.shape[0]
+        amount = jnp.ones(p) if amount is None else amount
+        prob = jnp.ones(p) if prob is None else prob
+        delay = jnp.zeros(p) if delay is None else delay
 
         def scan_step(st, k):
             st = {**st, "key": k}
-            return step(st, (arm_prob, amount))
+            return step(st, (arm_prob, amount, prob, delay))
 
         _, (presence, count, amt) = jax.lax.scan(scan_step, state0, keys)
         return presence.sum(axis=0), count.sum(axis=0), amt.sum(axis=0)

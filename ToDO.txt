@@ -74,7 +74,10 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 [x] Concatenated matching law -- AMOUNT term (exp011): identical VI, sweep amount
     ratio -> a_amt=0.97 (near-perfect), bias 0 after the geometry fix. Separable
     from rate sensitivity.
-[ ] Concatenated matching law -- DELAY and PROBABILITY terms (same pattern).
+[x] Concatenated matching law -- PROBABILITY (exp013, a_p=0.78) and DELAY
+    (exp014, a_d=0.61, hyperbolic/exponential selectable) terms. All four
+    dimensions (rate/amount/probability/delay) reproduced with separable
+    sensitivities, ~0 bias. Delay = reduced reinforcer EFFICACY (not credit-decay).
 [ ] Multiple renewable food patches in the survival world (patch-leaving).
 [ ] Operant chamber environment (feeder + press response, no navigation) sharing
     the Organism/atom engine, for clean schedule demos.

@@ -613,3 +613,29 @@ the COD sweep (exp009): sep 6 is in the undermatching regime. Pooled GML at larg
 separation (sep 10) degrades (near-exclusive choice, schedule stops modulating);
 exp009's per-organism slope fits with scaled sensing are the systematic COD
 characterization. Headline matching quality is a function of COD, not a single number.
+
+---
+
+## 2026-05-31 — Concatenated matching law complete (rate, amount, probability, delay)
+
+Added the PROBABILITY and DELAY dimensions to matching.py (per-patch runtime
+args), completing the concatenated GML. All four arise from the same mechanism --
+the cue's learned value integrates reinforcement events, each scaled by amount,
+gated by probability, discounted by delay, at a frequency set by rate -- and the
+softmax (matching) emission converts value to allocation.
+
+- **Probability** (exp013): a contact with an armed patch is reinforced w.p. p_k;
+  non-reinforced contacts are extinction trials (target 0). Partial reinforcement
+  -> value ~ p*lambda. Equal VI + equal amount, sweep p: a_p=0.78, bias -0.02,
+  R^2=0.88.
+- **Delay** (exp014): reinforcer delivered after delay D_k reduces its EFFICACY
+  (empirical delay discounting), modeled as a discount on the teaching signal --
+  NOT a credit-assignment/eligibility effect (per user: the standard procedure
+  blacks out during the delay, so attribution is unambiguous; delay just makes
+  the reinforcer a weaker strengthener). Discount form selectable
+  (hyperbolic 1/(1+kD) default | exponential exp(-D/tau)); efficacy-discount only
+  (no procedural blackout). Equal VI + equal amount, sweep D: slope -0.61
+  (correct negative sign), a_d=0.61, bias 0.00, R^2=0.82.
+
+Separable sensitivities, all ~0 bias on the odd grid: a_rate~0.56, a_amount~0.97,
+a_prob~0.78, a_delay~0.61. The concatenated matching law is reproduced bottom-up.
