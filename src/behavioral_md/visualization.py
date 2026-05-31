@@ -422,6 +422,44 @@ def plot_generalization_gradient(
     return _save(fig, path)
 
 
+def plot_survival_curve(steps: np.ndarray, frac_alive: np.ndarray, path: str | Path) -> Path:
+    """Fraction of organisms still alive vs. time within a life (pooled)."""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(steps, frac_alive, color="black", lw=1.5)
+    ax.set_xlabel("Time (steps)")
+    ax.set_ylabel("Fraction Surviving")
+    ax.set_ylim(0, 1.02)
+    return _save(fig, path)
+
+
+def plot_time_to_death(times: np.ndarray, n_steps: int, path: str | Path) -> Path:
+    """Distribution of time-to-death (organisms that died)."""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.hist(times, bins=30, range=(0, n_steps), color="0.5", edgecolor="black")
+    ax.set_xlabel("Time of Death (steps)")
+    ax.set_ylabel("Count")
+    return _save(fig, path)
+
+
+def plot_mortality_by_life(mortality: dict, path: str | Path) -> Path:
+    """Death rate and its cause breakdown across lives (does learning reduce death?)."""
+    n = len(mortality["death_rate"])
+    lives = np.arange(n)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    for key, ls, marker, label in [
+        ("death_rate", "-", "o", "Total"),
+        ("starvation_rate", "--", "s", "Starvation"),
+        ("danger_rate", "-.", "^", "Danger"),
+    ]:
+        ax.plot(lives, mortality[key], color="black", ls=ls, marker=marker, ms=4,
+                markevery=max(1, n // 20), label=label)
+    ax.set_xlabel("Life (episode)")
+    ax.set_ylabel("Death Rate")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,

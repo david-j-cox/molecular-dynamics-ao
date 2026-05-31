@@ -488,3 +488,28 @@ Remaining for a full vectorized engine: stochastic softmax emission (RNG via
 `jax.random`), the valence-split learning update + eligibility, the cue field,
 and a vectorized environment (grid/patches/cue) -- then `scan` over time and
 `vmap`/batch over organisms, plus the phenomena zoo on top.
+
+---
+
+## 2026-05-31 — Death as a dependent variable (capture + first finding)
+
+Wired death-pattern capture through the JAX engine and added `metrics.py`:
+- `SimState.cause_of_death` (0 alive / 1 starvation / 2 danger), set at the death
+  transition; `run_lives` returns per-life `survived` (time-to-death) and
+  `cause_of_death`.
+- `metrics.py`: `time_to_death`, `cause_breakdown`, `survival_curve`
+  (Kaplan-Meier-style), `mortality_by_life`.
+- `visualization.py`: `plot_survival_curve`, `plot_time_to_death`,
+  `plot_mortality_by_life`. `experiments/exp007_death_patterns.py` runs it
+  (3000 organisms x 40 lives in ~6s).
+
+**First finding (single depleting patch; food [4,8], danger [6,7] off-corridor):**
+near-total mortality (~100%); survival curve shows early danger deaths then a
+starvation cliff at ~55 steps (initial energy exhausted). Across lives, a clear
+**cause substitution**: danger-deaths fall (0.28 -> 0.19) as `avoid_danger`'s
+weight grows, but starvation-deaths rise (0.69 -> 0.81) -- learned caution trades
+danger mortality for starvation mortality; total mortality is unchanged. So
+faster food approach (acquisition) does NOT improve survival on one depleting
+patch. This motivates the multiple-patch economy (next), where leaving a spent
+patch for another should make sustained survival, and a learning-driven mortality
+drop, attainable.

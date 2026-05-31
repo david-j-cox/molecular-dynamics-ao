@@ -285,6 +285,10 @@ class SimState(NamedTuple):
     history: jnp.ndarray     # [O, A, C]
     eligibility: jnp.ndarray # [O, A]
     cue_weights: jnp.ndarray # [O, K]
+    cause_of_death: jnp.ndarray  # [O] int: 0 alive, 1 starvation, 2 danger
+
+# Cause-of-death codes (shared with metrics).
+CAUSE_ALIVE, CAUSE_STARVATION, CAUSE_DANGER = 0, 1, 2
 
 
 def initial_state(spec, cfg, n_org, position, n_receptors):
@@ -297,6 +301,7 @@ def initial_state(spec, cfg, n_org, position, n_receptors):
         energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
         activation=act0, previous=act0, history=jnp.zeros((n_org, a, c)),
         eligibility=jnp.zeros((n_org, a)), cue_weights=jnp.zeros((n_org, n_receptors)),
+        cause_of_death=jnp.zeros(n_org, dtype=jnp.int32),
     )
 
 
@@ -353,16 +358,23 @@ def make_simulate(spec, cfg, sources, cue_centers):
                              cfg.history_weight_min, cfg.history_weight_max)
 
         a1, a2 = state.alive, state.alive[:, None]  # freeze dead organisms
+        new_alive = state.alive & (new_energy > 0.0)
+        # Record cause at the death transition (was alive, now not): danger if in
+        # danger contact this step, else starvation. Preserve prior causes.
+        just_died = state.alive & (~new_alive)
+        cause_now = jnp.where(danger_c > 0, CAUSE_DANGER, CAUSE_STARVATION)
+        cause = jnp.where(just_died, cause_now, state.cause_of_death)
         new = SimState(
             positions=jnp.where(a2, new_pos, state.positions),
             biomass=jnp.where(a1, new_bio, state.biomass),
             energy=jnp.where(a1, new_energy, state.energy),
-            alive=state.alive & (new_energy > 0.0),
+            alive=new_alive,
             activation=jnp.where(a2, new_act, state.activation),
             previous=jnp.where(a2, new_prev, state.previous),
             history=jnp.where(a1[:, None, None], new_hist, state.history),
             eligibility=jnp.where(a2, elig, state.eligibility),
             cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
+            cause_of_death=cause,
         )
         # Emit PRESENCE at the food location (contact2 > 0) for LIVING organisms.
         # Presence is the behavioral approach measure and stays meaningful under
@@ -390,6 +402,7 @@ def reset_for_life(state: SimState, spec, cfg, position) -> SimState:
         positions=pos0, biomass=jnp.full(n_org, cfg.food_carrying_capacity),
         energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
         activation=act0, previous=act0, eligibility=jnp.zeros((n_org, a)),
+        cause_of_death=jnp.zeros(n_org, dtype=jnp.int32),
     )
 
 
@@ -409,7 +422,7 @@ def run_lives(sim, spec, cfg, state0, position, n_lives, n_steps, key,
     fr_sched = [True] * n_lives if food_reinforces is None else list(food_reinforces)
     cv_sched = [0.0] * n_lives if cue_value is None else list(cue_value)
 
-    latency, contact, survived, hw_food = [], [], [], []
+    latency, contact, survived, hw_food, cause = [], [], [], [], []
     state = state0
     for life in range(n_lives):
         state = reset_for_life(state, spec, cfg, position)
@@ -420,14 +433,18 @@ def run_lives(sim, spec, cfg, state0, position, n_lives, n_steps, key,
         reached = at_food.sum(axis=0) > 0
         latency.append(jnp.where(reached, jnp.argmax(at_food, axis=0), n_steps))
         contact.append(at_food.sum(axis=0))
-        survived.append(jnp.minimum(jnp.argmax(energy <= 0.0, axis=0)
-                                    + (energy[-1] > 0.0) * n_steps, n_steps))
+        # Time-to-death = first step energy hits 0; n_steps if it survived.
+        died = energy <= 0.0                                   # [T, O]
+        ever_died = died.any(axis=0)
+        survived.append(jnp.where(ever_died, jnp.argmax(died, axis=0), n_steps))
         hw_food.append(state.history[:, af, food_idx])
+        cause.append(state.cause_of_death)                     # 0 alive / 1 starve / 2 danger
     return {
         "latency": np.asarray(jnp.stack(latency)),     # [n_lives, n_org]
         "contact": np.asarray(jnp.stack(contact)),
-        "survived": np.asarray(jnp.stack(survived)),
+        "survived": np.asarray(jnp.stack(survived)),   # time-to-death (steps)
         "hw_food": np.asarray(jnp.stack(hw_food)),
+        "cause_of_death": np.asarray(jnp.stack(cause)),
     }
 
 
