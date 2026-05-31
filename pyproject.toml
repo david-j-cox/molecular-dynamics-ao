@@ -20,7 +20,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "ruff>=0.15"]
+# ruff is pinned EXACTLY so CI is deterministic and local matches it: with a
+# floor (>=) CI would install the latest ruff each run, and a new release could
+# start flagging code that passed before (drift via a moving target). Bump
+# deliberately. The pre-commit hook uses this same pinned ruff (see
+# .pre-commit-config.yaml).
+dev = ["pytest>=7.4", "ruff==0.15.15", "pre-commit>=3.5"]
 # pygame is only needed for the live "human" render; it lacks a prebuilt wheel
 # on some new Python versions, so it is kept optional.
 render = ["pygame>=2.5"]

@@ -377,6 +377,14 @@ python scripts/run_demo.py                     # acquisition demo (writes a figu
 (pygame is optional — `pip install pygame` — for the live render; it has no
 prebuilt wheel on some new Python versions.)
 
+Optional — enable the local pre-commit guard (mirrors CI: ruff on commit, pytest
+on push) so local can't drift from CI. Run with the venv active:
+
+```bash
+pre-commit install                          # ruff on commit
+pre-commit install --hook-type pre-push     # pytest on push
+```
+
 ## Status
 
 - [x] **Phase 1** — package scaffold, `SimulationConfig`, `BehavioralFieldEnv`
