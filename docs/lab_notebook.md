@@ -513,3 +513,31 @@ faster food approach (acquisition) does NOT improve survival on one depleting
 patch. This motivates the multiple-patch economy (next), where leaving a spent
 patch for another should make sustained survival, and a learning-driven mortality
 drop, attainable.
+
+---
+
+## 2026-05-31 — Matching + COD sweep (cue-signaled concurrent VI-VI)
+
+`matching.py` (vectorized JAX): two patches = same reinforcer under different
+discriminative CUES (one cue dimension; green 0.2 / red 0.8), each on its own
+Bernoulli-armed VI. A value-tuned receptor population learns cue->rate; that
+learned value drives damped-Verlet directional approach; emission is softmax
+(matching). Travel between patches = changeover delay (COD). Energy/death omitted
+(steady-state allocation prep). Patches are NOT separate food channels (cues
+scale; channels don't) -- the user's design.
+
+- **Exp 008 (matching):** sweep VI rate ratios, fit GML log(B_L/B_R) =
+  a*log(R_L/R_R) + log b. a=0.69 (undermatching, as in real animals), R^2=0.80;
+  400 organisms x 7 schedules x 4000 steps in ~2s. Matching EMERGES from the
+  mechanism (not imposed as an equilibrium, unlike the manuscript's top-down model).
+- **Exp 009 (COD sweep):** vary patch separation (= travel steps = COD); fit a
+  per organism at each. Result reproduces Shull & Pliskoff: a rises with COD --
+  0.04 (sep 2) -> 0.16 -> 0.32 -> 0.79 (sep 10) -> 0.88 (sep 14), then a
+  sampling-limited point at sep 18 (only 36/400 organisms sampled both patches
+  enough; wide CI). Near-zero COD -> rapid switching -> near-indifference;
+  adequate COD -> matching. Grid scales with separation; sensor_range kept large
+  vs separation to isolate travel/COD from a detectability confound.
+
+Next: ABABABAB reversal -> damped-oscillator return to equilibrium + Brunt-Vaisala
+frequency vs mass (tie to manuscript Figs 7-9); then concatenated matching law
+(amount/delay/probability).

@@ -483,6 +483,20 @@ def plot_matching(log_R: np.ndarray, log_B: np.ndarray, a: float, log_b: float,
     return _save(fig, path)
 
 
+def plot_matching_cod(separations, a_mean, a_ci, path: str | Path) -> Path:
+    """Matching sensitivity (GML slope a) vs. changeover delay (patch separation)."""
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _band(ax, np.asarray(separations), np.asarray(a_mean), np.asarray(a_ci),
+          "sensitivity", "-", "o")
+    ax.axhline(1.0, color="0.5", ls=":", lw=1.0)
+    ax.text(np.asarray(separations).max(), 1.0, " perfect matching", fontsize=11, va="bottom",
+            ha="right")
+    ax.set_xlabel("Patch Separation (travel steps = COD)")
+    ax.set_ylabel("Matching Sensitivity (a)")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,
