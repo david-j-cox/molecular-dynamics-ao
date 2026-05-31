@@ -742,3 +742,27 @@ dissociation; the toggle framework shows each model's signature side by side.
 Note: these timers tick per STEP (time-based) -> FI scallop. The FR/VR pause and
 ratio patterns would use a per-RESPONSE (count-based) tick of the same models --
 a natural next extension.
+
+---
+
+## 2026-05-31 — FR/VR patterns via count-based timing + cumulative records
+
+Made the timing tick MASKABLE (tick(advance)): advance=1/step is a TIME clock
+(FI); advance=press is a COUNT clock (FR). Added ChamberConfig.timing_clock and
+tracked count-since-reinforcer for all schedules.
+
+With the count clock (LeT), FR reproduces the classic pattern:
+- Post-reinforcement pause much larger on FR than VR (FR-20 PRP=4.06 vs VR-20=1.36;
+  FR-40=4.42 vs VR-40=1.68) -- because FR's count->value function is sharply peaked
+  at n (low value at count 0 -> long pause) while VR's is spread (value-at-0 higher).
+- Higher response rate on VR than FR (VR-20 0.91 vs FR-20 0.63) -- the FR pause
+  drags its average down. exp018.
+
+Cumulative records (exp019, plot_cumulative_record): the classic visualization for
+a few AOs with reinforcer pips. FI (time clock) -> SCALLOPS (flat after each pip,
+accelerating into the next); FR (count clock) -> BREAK-AND-RUN staircase (flat
+pause then steep run). Records stacked with full-height offset (no overlap).
+
+Schedule-signature scorecard now: FI scallop (timing), FR break-and-run + FR>VR
+pause + VR>FR rate (count timing), demand-like consumption decline (effort/value).
+Still weak: the molar VR>>VI rate difference (needs feedback-function sensitivity).

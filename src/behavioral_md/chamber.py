@@ -57,6 +57,7 @@ class ChamberConfig:
     motiv_strength: float = 1.0
     # Pluggable interval-timing model (see timing.py): none|homeostatic|set|bet|let.
     timing_model: str = "none"
+    timing_clock: str = "time"     # "time" (tick/step -> FI) | "count" (tick/press -> FR)
     timing_gain: float = 2.0       # scales the timing contribution into the press drive
     timing_lr: float = 0.1         # timing-model learning rate
     timing_states: int = 25        # number of behavioral states (BeT/LeT)
@@ -90,8 +91,12 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
     reinforced_rec = np.zeros((n_steps, n_org))
     tsr_rec = np.zeros((n_steps, n_org))
 
+    ones = np.ones(n_org)
+    prev_press = np.zeros(n_org)              # for the count clock (tick per response)
     for t in range(n_steps):
-        timing.tick()
+        # Advance the timing state: per step (time clock) or per response (count clock,
+        # using the previous step's press so this step's contribution reflects the count).
+        timing.tick(ones if cfg.timing_clock == "time" else prev_press)
         deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None) ** cfg.deficit_exponent
         # Press drive = learned value + energy-deficit motivation + timing signal.
         drive = cfg.approach_gain * (
@@ -105,12 +110,13 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         # Logistic emission with a response threshold (bias): low drive -> a pause.
         p_press = 1.0 / (1.0 + np.exp(-(act - cfg.emission_bias) / cfg.temperature))
         press = rng.random(n_org) < p_press
+        prev_press = press.astype(float)
 
-        # Schedule: which presses are reinforced.
+        # Schedule: which presses are reinforced. count = presses since last
+        # reinforcer (tracked for all schedules, for within-ratio analysis).
+        count += press
         if schedule == "FR":
-            count += press
             reinforced = press & (count >= param)
-            count = np.where(reinforced, 0.0, count)
         elif schedule == "VR":
             reinforced = press & (rng.random(n_org) < 1.0 / param)
         elif schedule == "FI":
@@ -141,6 +147,7 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         # Post-reinforcement: the organism pauses to consume -> press activation
         # resets, so a new interval starts from a low rate (clean scallop / PRP).
         act = np.where(reinforced, 0.0, act)
+        count = np.where(reinforced, 0.0, count)   # reset count-since-reinforcer
 
         tsr_rec[t] = tsr
         presses[t] = press

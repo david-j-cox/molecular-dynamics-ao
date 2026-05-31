@@ -529,6 +529,32 @@ def plot_demand_pair(unit_price: np.ndarray, consumption_rate: np.ndarray,
     return _save(fig, path)
 
 
+def plot_cumulative_record(presses, reinforced, path: str | Path,
+                           max_steps: int | None = None, ylabel: str | None = None) -> Path:
+    """Classic cumulative record: cumulative responses vs time for a few organisms,
+    with reinforcer deliveries marked as pips. ``presses``/``reinforced`` are
+    [T, n_show] arrays (one column per organism shown). FI shows scallops (concave
+    rise); FR shows break-and-run (flat pause then steep run = a staircase)."""
+    presses = np.asarray(presses)
+    reinforced = np.asarray(reinforced)
+    t_max = presses.shape[0] if max_steps is None else min(max_steps, presses.shape[0])
+    steps = np.arange(t_max)
+    n_show = presses.shape[1]
+    cums = [np.cumsum(presses[:t_max, o]) for o in range(n_show)]
+    # Stagger each record by the tallest record's full height (+10% margin) so the
+    # records sit one fully above the next and never overlap/cross.
+    step_offset = max(c[-1] for c in cums) * 1.1 + 5
+    fig, ax = plt.subplots(figsize=(9, 6))
+    for o, cum in enumerate(cums):
+        base = o * step_offset
+        ax.plot(steps, cum + base, color="black", lw=1.0)
+        ri = np.where(reinforced[:t_max, o])[0]
+        ax.plot(ri, cum[ri] + base, "|", color="black", ms=8, mew=1.2)  # reinforcer pips
+    ax.set_xlabel("Time (steps)")
+    ax.set_ylabel(ylabel or "Cumulative Responses (offset)")
+    return _save(fig, path)
+
+
 def plot_fi_scallop(fractions, rates_by_model: dict, path: str | Path) -> Path:
     """FI within-interval response rate vs elapsed fraction, one line per timing model."""
     fig, ax = plt.subplots(figsize=(8, 5))

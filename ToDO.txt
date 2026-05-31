@@ -99,7 +99,10 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     press activation + emission threshold. Effort-opposed value + unit-price-style
     consumption also in (demand decreasing; "demand curve" label dropped as it's
     log-linear, not Hursh-shaped).
-[ ] Count-based timing (tick per RESPONSE) -> FR break-and-run + FR>VR pause.
+[x] Count-based timing (tick per RESPONSE, timing_clock=count): FR break-and-run,
+    FR>VR post-reinforcement pause (4.06 vs 1.36), VR>FR rate. exp018.
+[x] Cumulative records (exp019): FI scallops, FR break-and-run staircase with
+    reinforcer pips -- the classic operant visualization.
 [ ] VR>>VI molar rate difference: still weak; needs feedback-function sensitivity.
 
 DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)

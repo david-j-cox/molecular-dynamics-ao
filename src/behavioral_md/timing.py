@@ -36,7 +36,11 @@ import numpy as np
 
 
 class TimingModel:
-    def tick(self) -> None: ...
+    # ``advance`` is a per-organism [O] amount to advance the internal state this
+    # tick: all-ones for a TIME clock (one unit per step), or the press mask for a
+    # COUNT clock (one unit per response). This is what lets the SAME models time
+    # intervals (FI) or counts (FR) -- the difference is only what drives the tick.
+    def tick(self, advance: np.ndarray) -> None: ...
     def contribution(self) -> np.ndarray: ...
     def update(self, reinforced: np.ndarray) -> None: ...
 
@@ -47,7 +51,7 @@ class HomeostaticTiming(TimingModel):
     def __init__(self, n_org, cfg):
         self._zero = np.zeros(n_org)
 
-    def tick(self):
+    def tick(self, advance):
         pass
 
     def contribution(self):
@@ -67,8 +71,8 @@ class SETTiming(TimingModel):
         self.thr = cfg.set_threshold                       # respond when accum/t_ref > thr
         self.width = cfg.set_width
 
-    def tick(self):
-        self.accum += 1.0                                  # pacemaker (rate 1/step)
+    def tick(self, advance):
+        self.accum += advance                              # pulses (per step) or counts (per press)
 
     def contribution(self):
         # Comparator: responding ramps on as the clock nears the expected time.
@@ -93,9 +97,9 @@ class BeTTiming(TimingModel):
         self.rng = np.random.default_rng(cfg.timing_seed)
         self._idx = np.arange(n_org)
 
-    def tick(self):
-        advance = self.rng.random(self.state.shape) < self.pace
-        self.state = np.minimum(self.state + advance, self.k - 1)
+    def tick(self, advance):
+        step = (self.rng.random(self.state.shape) < self.pace) & (advance > 0)
+        self.state = np.minimum(self.state + step, self.k - 1)
 
     def contribution(self):
         return self.v[self._idx, self.state]
@@ -118,9 +122,10 @@ class LeTTiming(TimingModel):
         self.w = np.zeros((n_org, self.k))                 # learned state->response links
         self.lr = cfg.timing_lr
 
-    def tick(self):
-        # Activation flows forward along the chain (a traveling bump in time).
-        move = self.flow * self.a
+    def tick(self, advance):
+        # Activation flows forward along the chain (a traveling bump), advanced for
+        # organisms whose clock ticked this step (time: all; count: those that pressed).
+        move = self.flow * self.a * advance[:, None]
         self.a = self.a - move
         self.a[:, 1:] += move[:, :-1]                      # last state's flow is absorbed
 
