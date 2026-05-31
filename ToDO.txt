@@ -56,8 +56,17 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     food intensity/contact scale with biomass (VI-like availability). Max
     regrowth (rK/4) < intake rate, so a camper depletes to the floor then lives
     off the steady regrowth.
-[ ] Multiple renewable food patches (2-3), logistic regrowth (rate prop. to L),
-    -> patch-leaving decisions + concurrent-schedule matching.
+[x] Concurrent VI-VI matching via DISCRIMINATIVE CUES (matching.py): two
+    cue-marked patches (one cue dimension, not new food channels) on different VI
+    schedules; learned cue->rate value (CueReceptorField-style) drives approach;
+    travel between patches = COD. GML fit log(B_L/B_R)=a*log(R_L/R_R)+log b gives
+    a=0.69 (undermatching, as in real animals), R^2=0.80. exp008_matching.
+[ ] Sweep COD (patch separation / travel) -> matching sensitivity vs COD
+    (undermatching at short COD; ~2s COD needed, Shull & Pliskoff).
+[ ] ABABABAB reversal -> damped-oscillator return to equilibrium + Brunt-Vaisala
+    frequency vs mass (tie to the manuscript's top-down model).
+[ ] Concatenated matching law: exercise amount/delay/probability dimensions.
+[ ] Multiple renewable food patches in the survival world (patch-leaving).
 [ ] Operant chamber environment (feeder + press response, no navigation) sharing
     the Organism/atom engine, for clean schedule demos.
 [ ] Schedules: FR, VR, FI, VI; concurrent VI-VI for the matching law (headline).

@@ -460,6 +460,29 @@ def plot_mortality_by_life(mortality: dict, path: str | Path) -> Path:
     return _save(fig, path)
 
 
+def plot_matching(log_R: np.ndarray, log_B: np.ndarray, a: float, log_b: float,
+                  path: str | Path) -> Path:
+    """Generalized matching law: log behavior ratio vs log reinforcement ratio.
+
+    Points are individual organisms across schedules; the solid line is the GML
+    fit, the dotted line perfect matching (slope 1 through 0).
+    """
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(log_R, log_B, s=10, facecolors="none", edgecolors="0.4", linewidths=0.5)
+    lim = float(np.nanmax(np.abs([log_R.min(), log_R.max(), log_B.min(), log_B.max()])))
+    xs = np.array([-lim, lim])
+    ax.plot(xs, xs, ls=":", color="0.5", lw=1.0, label="Perfect matching")
+    ax.plot(xs, a * xs + log_b, color="black", lw=1.6,
+            label=f"Fit: a={a:.2f}, log b={log_b:+.2f}")
+    ax.axhline(0, color="0.8", lw=0.5)
+    ax.axvline(0, color="0.8", lw=0.5)
+    ax.set_xlabel("log(R$_L$/R$_R$)")
+    ax.set_ylabel("log(B$_L$/B$_R$)")
+    ax.set_aspect("equal")
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,
