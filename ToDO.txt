@@ -67,9 +67,13 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     alt-vs-rest GML a=0.99, R^2=0.75 -- near-perfect matching, no new machinery.
 [ ] ABABABAB reversal -> damped-oscillator return to equilibrium + Brunt-Vaisala
     frequency vs mass (tie to the manuscript's top-down model).
-[x] Concatenated matching law -- AMOUNT term (exp011): identical VI, sweep
-    amount ratio -> a_amt=1.28, separable from a_rate=0.69. (Bias toward cue-0.8
-    patch to investigate.)
+[x] Canonical counterbalanced matching (exp012): ratios 9:1..1:9 + 1:1,
+    cue<->side counterbalanced. Found a spurious SIDE bias from an even-grid
+    wall asymmetry; fixed with an odd grid (MatchConfig.grid_size 10->11). Bias
+    -> 0 across all matching exps; cue bias provably 0.
+[x] Concatenated matching law -- AMOUNT term (exp011): identical VI, sweep amount
+    ratio -> a_amt=0.97 (near-perfect), bias 0 after the geometry fix. Separable
+    from rate sensitivity.
 [ ] Concatenated matching law -- DELAY and PROBABILITY terms (same pattern).
 [ ] Multiple renewable food patches in the survival world (patch-leaving).
 [ ] Operant chamber environment (feeder + press response, no navigation) sharing

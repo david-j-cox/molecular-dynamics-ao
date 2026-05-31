@@ -36,7 +36,11 @@ _MOVES = jnp.array([[0.0, 1.0], [0.0, -1.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 0.0]
 
 
 class MatchConfig(NamedTuple):
-    grid_size: int = 10
+    # Odd grid so a centered layout has equal wall margins on both sides; an even
+    # grid puts the center at a half-cell and makes patch-to-wall margins
+    # asymmetric, which traps the organism near the closer wall (a spurious side
+    # bias). See exp012 diagnosis.
+    grid_size: int = 11
     sensor_range: float = 8.0
     consume_radius: float = 1.0
     n_receptors: int = 21

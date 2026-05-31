@@ -583,3 +583,33 @@ or an asymmetry between the two cue values), not yet explained.
 
 Next concatenated-law terms: delay and probability (same per-patch runtime-arg
 pattern).
+
+---
+
+## 2026-05-31 — Canonical counterbalanced matching; a spurious side bias found+fixed
+
+User flagged that all matching prep should include a 1:1 condition and
+counterbalance the rich/lean assignment so only the schedule controls responding.
+Built exp012 (canonical conc VI-VI): ratios 9:1, 3:1, 1:1, 1:3, 1:9 (total rate
+constant), cue<->side COUNTERBALANCED (half the organisms cue 0.2 left, half cue
+0.2 right).
+
+**Diagnosis.** At 1:1, log(B_L/B_R) was identical (-0.52) for BOTH cue
+assignments -> intrinsic CUE bias = 0, but a strong SIDE bias toward the right
+patch. Cause: the default 10x10 grid (cells 0-9) put the right patch (x=8) 1 cell
+from the wall and the left patch (x=2) 2 cells from its wall; the closer wall
+traps the organism near the right patch. The layout was not actually symmetric.
+
+**Fix.** Use an odd grid (size 11, center 5) so a centered layout has equal wall
+margins. This removed the bias everywhere:
+- exp008 (rate, sep 6): a 0.69->0.56, bias -0.29 -> -0.01.
+- exp011 (amount): a 1.28->0.97 (now near-perfect amount matching), bias -0.63 -> 0.00.
+- exp012 (canonical): bias -0.01, cue bias exactly 0.
+So the earlier biases were entirely the even-grid artifact; counterbalancing + the
+1:1 control is what exposed it. MatchConfig.grid_size default -> 11.
+
+Note: rate matching at separation 6 is undermatching (a~0.2-0.6), consistent with
+the COD sweep (exp009): sep 6 is in the undermatching regime. Pooled GML at large
+separation (sep 10) degrades (near-exclusive choice, schedule stops modulating);
+exp009's per-organism slope fits with scaled sensing are the systematic COD
+characterization. Headline matching quality is a function of COD, not a single number.
