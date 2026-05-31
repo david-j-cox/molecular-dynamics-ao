@@ -36,9 +36,12 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
     Zoo on JAX so far (each 2000 organisms x 40 lives in ~5s):
       - acquisition (exp005): latency ~135 -> ~73, matches NumPy run_demo.
       - extinction (exp006): hw_food 1.0 -> ~0, steps-at-food 67 -> 5.
-    Next: generalization + peak shift on JAX, then multiple patches (matching).
-[ ] Matching / undermatching; resistance-to-change (momentum); PREE; behavioral
-    contrast; blocking; overshadowing; discounting & demand curves; FR/VR/FI/VI.
+[x] Matching / undermatching done extensively (matching.py: 2-alt, multi-alt, COD
+    curve, full concatenated GML rate/amount/prob/delay). See PHASE 6 below.
+[ ] Generalization + peak shift on JAX (still only NumPy demos; cue field is in
+    the JAX engine, so this is mostly wiring a probe).
+[ ] Resistance-to-change (momentum); PREE; behavioral contrast; blocking;
+    overshadowing; demand curves; FR/VR/FI/VI signatures.
 [ ] Run the battery across parameter ranges as standing model-validity evidence.
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)
@@ -78,6 +81,11 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     (exp014, a_d=0.61, hyperbolic/exponential selectable) terms. All four
     dimensions (rate/amount/probability/delay) reproduced with separable
     sensitivities, ~0 bias. Delay = reduced reinforcer EFFICACY (not credit-decay).
+[ ] Combined-dimension test: vary 2+ concatenated-GML dimensions at once;
+    confirm the law holds additively in log space (sensitivities combine).
+[ ] Fit the sensitivities: which organism params (temperature, approach_gain,
+    learning/extinction rates, beta) set each a (a_rate/amount/prob/delay)?
+    Map params -> sensitivities; later use JAX autodiff to fit to target a's.
 [ ] Multiple renewable food patches in the survival world (patch-leaving).
 [ ] Operant chamber environment (feeder + press response, no navigation) sharing
     the Organism/atom engine, for clean schedule demos.
@@ -129,7 +137,8 @@ VISUALIZATION (visualization.py)
 [x] Force-decomposition grid (per-atom, normalized); extinction (train->ext).
 [ ] Day/night shading on time-series (after Phase 5).
 [x] Generalization gradient (response vs cue value, 95% CI).
-[ ] Matching plots (relative response vs relative reinforcement) -- needs patches.
+[x] Matching plots: plot_matching (GML log-log), plot_matching_cod, peak shift.
+[x] Death-pattern plots: survival curve, time-to-death, mortality-by-life.
 [ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
 
 DEMOS (scripts/)
@@ -152,8 +161,12 @@ DEMOS (scripts/)
 
 METRICS (metrics.py)
 --------------------
-[ ] Latency, contact rate, survival curves, time-to-death distributions,
-    death-cause breakdown, patch allocation vs intake (matching), schedule rates.
+[x] Death patterns (exp007): time_to_death, cause_breakdown, survival_curve
+    (Kaplan-Meier), mortality_by_life. cause_of_death (starvation/danger) tracked
+    in the JAX engine. Finding: on one depleting patch, learned avoidance trades
+    danger deaths for starvation deaths (~100% mortality -- energy-economy bound).
+[x] Matching: GML fits (rate/amount/prob/delay), COD curve, allocation vs intake.
+[ ] Latency / contact-rate already in run_lives; schedule response rates (chamber).
 
 TESTS (tests/)
 --------------
@@ -166,11 +179,11 @@ TESTS (tests/)
 COMPUTE / INFRA
 ---------------
 [~] Parallel parameter sweeps (experiments/_parallel.run_sweep) -- in use.
-[~] JAX vectorization (next major phase; autodiff for fitting). Foundation
-    built + validated: jax_engine.py build_spec/compute_force/integrate match
-    the NumPy engine to ~1e-7. TODO: softmax emission (jax.random), valence-split
-    learning + eligibility, cue field, vectorized env, scan-over-time + batch.
-    Roadmap order: phenomena zoo -> evolution -> model comparison -> real data.
+[x] JAX vectorization: full engine (force/learning/emission/environment all
+    validated vs NumPy <=1e-7); jit + lax.scan over time, batched over organisms;
+    ~84x faster (exp004). matching.py also vectorized. Autodiff available.
+[ ] USE the autodiff: fit organism params to target sensitivities / real data
+    (the original reason for JAX). Roadmap: evolution -> model comparison -> real data.
 [ ] CI / pre-commit (ruff + pytest).
 
 REPO HYGIENE
