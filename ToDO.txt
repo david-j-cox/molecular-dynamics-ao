@@ -166,13 +166,23 @@ METRICS (metrics.py)
 [x] Matching: GML fits (rate/amount/prob/delay), COD curve, allocation vs intake.
 [ ] Latency / contact-rate already in run_lives; schedule response rates (chamber).
 
-TESTS (tests/)
+TESTS (tests/)  -- 32 tests, all passing (pytest)
 --------------
-[ ] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
-[ ] valence-split learning changes weights in expected direction.
-[ ] env reset returns valid observation; step returns Gymnasium 5-tuple.
-[ ] energy bookkeeping conserves; death triggers; organism emits valid action.
-[ ] ConsequenceModel delta-E energy/learning signals.
+[x] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
+[x] valence-split learning changes weights in expected direction; extinction decays;
+    no learning without contact exposure.
+[x] env reset returns valid observation; step returns Gymnasium 5-tuple; truncation;
+    biomass deplete/regrow.
+[x] energy bookkeeping (drains without food); starvation -> death + cause; organism
+    emits valid action.
+[x] ConsequenceModel delta-E energy/learning signals.
+[x] Behavioral momentum: higher atom mass -> smaller per-step activation change for
+    a given force (1/mass scaling) -- inertia / resistance to change.
+[x] JAX engine matches NumPy reference (force/learning/emission/environment <=1e-6;
+    skips if jax not installed).
+[x] Matching: allocation follows richer schedule; 1:1 no side bias (odd grid);
+    GML slope in (0,1) (undermatching).
+[ ] CI to run the suite on push (see COMPUTE/INFRA).
 
 COMPUTE / INFRA
 ---------------
