@@ -182,7 +182,7 @@ TESTS (tests/)  -- 32 tests, all passing (pytest)
     skips if jax not installed).
 [x] Matching: allocation follows richer schedule; 1:1 no side bias (odd grid);
     GML slope in (0,1) (undermatching).
-[ ] CI to run the suite on push (see COMPUTE/INFRA).
+[x] CI runs the suite on push/PR (.github/workflows/ci.yml).
 
 COMPUTE / INFRA
 ---------------
@@ -192,7 +192,8 @@ COMPUTE / INFRA
     ~84x faster (exp004). matching.py also vectorized. Autodiff available.
 [ ] USE the autodiff: fit organism params to target sensitivities / real data
     (the original reason for JAX). Roadmap: evolution -> model comparison -> real data.
-[ ] CI / pre-commit (ruff + pytest).
+[x] CI: GitHub Actions (.github/workflows/ci.yml) runs ruff + pytest on
+    push/PR to dev & main, Python 3.11 + 3.12, with [dev,jax] extras.
 
 REPO HYGIENE
 ------------

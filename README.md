@@ -1,5 +1,7 @@
 # Behavioral Molecular Dynamics Simulation Engine
 
+[![CI](https://github.com/david-j-cox/molecular-dynamics-ao/actions/workflows/ci.yml/badge.svg)](https://github.com/david-j-cox/molecular-dynamics-ao/actions/workflows/ci.yml)
+
 A Python framework that models an organism interacting with an environment using
 an analogy to **molecular dynamics**, built to stay **objective and
 non-mentalistic**: every term reduces to something measurable (energy expended,
