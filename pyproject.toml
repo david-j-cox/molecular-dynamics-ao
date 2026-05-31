@@ -20,10 +20,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "ruff>=0.1"]
+dev = ["pytest>=7.4", "ruff>=0.15"]
 # pygame is only needed for the live "human" render; it lacks a prebuilt wheel
 # on some new Python versions, so it is kept optional.
 render = ["pygame>=2.5"]
+# JAX-vectorized engine (batched population dynamics + autodiff for fitting).
+jax = ["jax[cpu]>=0.10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

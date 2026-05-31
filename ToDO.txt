@@ -1,0 +1,215 @@
+BEHAVIORAL MOLECULAR DYNAMICS ENGINE -- OUTSTANDING WORK
+=========================================================
+Status legend:  [ ] todo   [~] partial/in-progress   [x] done
+Newest planning context: docs/lab_notebook.md (running record).
+
+DONE (for reference)
+--------------------
+[x] Phase 1  package scaffold, SimulationConfig, BehavioralFieldEnv (Gymnasium)
+[x] Phase 2  BehavioralAtom, force model, Verlet integrator
+[x] Phase 3  Organism, learning, simulation loop, long-format logging
+[x] Phase 4a damped Verlet + softmax emission (overdamped + matching-law defaults)
+[x] Phase 4b objective energy budget, persistent lives, death + cause, ConsequenceModel
+[x] Phase 4  two-tier (drive -> movement expression) + valence-split RW learning;
+             consummatory-inhibits-locomotion; first positive acquisition curve
+
+TUNING / QUALITY (current foraging model)
+-----------------------------------------
+[x] Random per-life layout gives a FLAT population learning curve (200 agents);
+    the CONTROLLED protocol in run_demo.py (fixed food cell, weak innate
+    approach_food sensitivity) recovers a clean acquisition curve (latency to
+    food 152 -> 106 over 40 lives). So learning works; random layout just
+    swamps the signal.
+[ ] Amplify the acquisition effect size on the controlled layout (sweep
+    learning_rate, reinforcement_asymptote, energy costs, food_intake_rate).
+[ ] Reduce bimodal reach-failure (some agents never lock onto food and die):
+    reach reliability, initial search, possibly state-dependent exploration.
+[ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
+[ ] Revisit whether learning signal should be graded by energy (vs normalized
+    per-event) while keeping objectivism.
+
+PHENOMENA ZOO (validation battery; runs on the JAX engine)
+----------------------------------------------------------
+[~] Done so far (NumPy demos): acquisition, extinction, generalization, peak shift.
+[x] JAX multi-life wrapper (run_lives/reset_for_life): learning carries over,
+    body resets per life; per-life food_reinforces/cue_value schedules.
+    Zoo on JAX so far (each 2000 organisms x 40 lives in ~5s):
+      - acquisition (exp005): latency ~135 -> ~73, matches NumPy run_demo.
+      - extinction (exp006): hw_food 1.0 -> ~0, steps-at-food 67 -> 5.
+[x] Matching / undermatching done extensively (matching.py: 2-alt, multi-alt, COD
+    curve, full concatenated GML rate/amount/prob/delay). See PHASE 6 below.
+[ ] Generalization + peak shift on JAX (still only NumPy demos; cue field is in
+    the JAX engine, so this is mostly wiring a probe).
+[ ] Resistance-to-change (momentum); PREE; behavioral contrast; blocking;
+    overshadowing; demand curves; FR/VR/FI/VI signatures.
+[ ] Run the battery across parameter ranges as standing model-validity evidence.
+
+PHASE 5 -- DAY/NIGHT (global ambient sun)
+-----------------------------------------
+[ ] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod 96)/96)); 96 steps/day.
+[ ] Danger detectability graded with light (low floor): danger_sensed =
+    danger_true*(floor + (1-floor)*L).
+[ ] Food growth and visibility scale with L (food easier to see / grows in day).
+[ ] Verify risk-sensitive foraging emerges (starving organism accepts night risk).
+[ ] Log light level; add day/night activity + mortality metrics.
+
+PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
+-------------------------------------------
+[x] Single renewable food patch: logistic regrowth + depletion on contact;
+    food intensity/contact scale with biomass (VI-like availability). Max
+    regrowth (rK/4) < intake rate, so a camper depletes to the floor then lives
+    off the steady regrowth.
+[x] Concurrent VI-VI matching via DISCRIMINATIVE CUES (matching.py): two
+    cue-marked patches (one cue dimension, not new food channels) on different VI
+    schedules; learned cue->rate value (CueReceptorField-style) drives approach;
+    travel between patches = COD. GML fit log(B_L/B_R)=a*log(R_L/R_R)+log b gives
+    a=0.69 (undermatching, as in real animals), R^2=0.80. exp008_matching.
+[x] Sweep COD (patch separation / travel): matching sensitivity a rises with
+    COD -- 0.04 (sep2) -> 0.88 (sep14), reproducing Shull & Pliskoff. exp009.
+[x] Multi-alternative matching (exp010): N=5 cue-marked patches on a circle,
+    alt-vs-rest GML a=0.99, R^2=0.75 -- near-perfect matching, no new machinery.
+[x] Canonical counterbalanced matching (exp012): ratios 9:1..1:9 + 1:1,
+    cue<->side counterbalanced. Found a spurious SIDE bias from an even-grid
+    wall asymmetry; fixed with an odd grid (MatchConfig.grid_size 10->11). Bias
+    -> 0 across all matching exps; cue bias provably 0.
+[x] Concatenated matching law -- AMOUNT term (exp011): identical VI, sweep amount
+    ratio -> a_amt=0.97 (near-perfect), bias 0 after the geometry fix. Separable
+    from rate sensitivity.
+[x] Concatenated matching law -- PROBABILITY (exp013, a_p=0.78) and DELAY
+    (exp014, a_d=0.61, hyperbolic/exponential selectable) terms. All four
+    dimensions (rate/amount/probability/delay) reproduced with separable
+    sensitivities, ~0 bias. Delay = reduced reinforcer EFFICACY (not credit-decay).
+[ ] Combined-dimension test: vary 2+ concatenated-GML dimensions at once;
+    confirm the law holds additively in log space (sensitivities combine).
+[ ] Fit the sensitivities: which organism params (temperature, approach_gain,
+    learning/extinction rates, beta) set each a (a_rate/amount/prob/delay)?
+    Map params -> sensitivities; later use JAX autodiff to fit to target a's.
+[ ] Behavioral momentum demonstration: train a response under different
+    reinforcement rates/histories, then disrupt (extinction / prefeeding /
+    distractor); measure resistance to change (persistence) vs reinforcement
+    history and atom mass. Unit inertia already tested (1/mass); this is the
+    molar phenomenon (Nevin & Grace).
+[ ] Multiple renewable food patches in the survival world (patch-leaving).
+[x] Operant chamber (chamber.py): single press response, FR/VR/FI/VI; press-value
+    + energy-deficit motivation, damped-Verlet w/ RESTORING force -> graded,
+    reinforcement-maintained pressing (exp015).
+[x] Pluggable timing models (timing.py): none/homeostatic, SET, BeT, LeT,
+    toggled by ChamberConfig.timing_model. FI scallop reproduced (exp017): none
+    flat, SET/BeT/LeT each scallop with distinct shapes. Needed a leaky-integrator
+    press activation + emission threshold. Effort-opposed value + unit-price-style
+    consumption also in (demand decreasing; "demand curve" label dropped as it's
+    log-linear, not Hursh-shaped).
+[x] Count-based timing (tick per RESPONSE, timing_clock=count): FR break-and-run,
+    FR>VR post-reinforcement pause (4.06 vs 1.36), VR>FR rate. exp018.
+[x] Cumulative records (exp019): FI scallops, FR break-and-run staircase with
+    reinforcer pips -- the classic operant visualization.
+[ ] VR>>VI molar rate difference: still weak; needs feedback-function sensitivity.
+
+DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
+---------------------------------------------------------
+[x] Pluggable LearningRule interface (mirrors ConsequenceModel): RescorlaWagner
+    + LinearOperator, selected by config.learning_model.
+[x] RescorlaWagner: error-correcting w/ omission decay (lambda=0 on
+    non-reinforced exposure, gated to contact) + asymmetric acq/ext rates.
+    Acquisition latency 152->106; trained hw_food 1.0 extinguishes to ~0 over
+    a few unreinforced lives (run_extinction_demo).
+[ ] Dual excitatory/inhibitory (Konorski/Pearce-Hall/Bouton): separate w+ (grows)
+    and w- (grows on omission, decays/context-gated) -> spontaneous recovery,
+    renewal, rapid reacquisition.
+[ ] Momentum-modulated decay (Nevin & Grace): extinction rate scaled by
+    accumulated reinforcement / atom mass -> resistance to change, PREE.
+[ ] Pearce-Hall variable associability (learning rate ~ |prediction error|).
+[ ] Resurgence as Choice (Shahan & Craig, 2017, JEAB): resurgence via the
+    matching/behavioral-momentum framework.
+
+CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
+-------------------------------------------------------
+[ ] Subtractive (de Villiers) direct-suppression model.
+[ ] CompetitiveSuppression (Deluty): punishment strengthens competing responses.
+[ ] ConcatenatedAsymmetric (Klapes): separate reinforcement/punishment sensitivities.
+[ ] InjuryHealing: danger -> delayed healing energy cost + temporary repertoire
+    impairment (disable/weaken specific atoms while healing), not an instant debit.
+[ ] Compare models on choice/allocation data (model selection).
+
+DISCRIMINATIVE STIMULI (separate from ambient sun)
+--------------------------------------------------
+[ ] S+ / S-delta / neutral discriminative stimuli (the localized light/cue slots);
+    stimulus control over reinforcement availability. Design TBD.
+
+VISUALIZATION (visualization.py)
+--------------------------------
+[x] Trajectory plot; activation-over-time; force-over-time (drive atoms).
+[x] Latency-to-food / contact-rate / survival across lives (learning curve).
+[x] Energy trajectory + death marker.
+[x] Learned-weight-across-lives (history forming).
+[x] scripts/make_figures.py generates the set into outputs/figures/.
+[x] 3D occupancy landscape (height = time spent per cell; camping = a peak).
+    Replaces the 2D trajectory in the standard set.
+[x] Acquisition latency curve (run_demo) with 95% CI.
+[x] Force-decomposition grid (per-atom, normalized); extinction (train->ext).
+[ ] Day/night shading on time-series (after Phase 5).
+[x] Generalization gradient (response vs cue value, 95% CI).
+[x] Matching plots: plot_matching (GML log-log), plot_matching_cod, peak shift.
+[x] Death-pattern plots: survival curve, time-to-death, mortality-by-life.
+[ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
+
+DEMOS (scripts/)
+----------------
+[x] run_demo.py            acquisition: FIXED layout, weak innate food drive ->
+                           latency to food drops ~152 -> ~106 over 40 lives
+                           (100 agents, 95% CI), reach 0.55 -> 0.73. Clean
+                           negatively-accelerated acquisition curve.
+[x] run_extinction_demo.py extinction: train then food_reinforces=False ->
+                           approach_food.hw_food decays 1.0 -> ~0; behavioral
+                           steps-at-food fall. 100 agents, 95% CI.
+[x] run_generalization_demo.py  cue generalization gradient: population of
+                           value-tuned receptors (Shepard tuning); train at v0,
+                           probe across values -> emergent gradient peaked at v0
+                           (~38% drop at extremes), 100 agents, 95% CI.
+[x] run_peak_shift_demo.py  peak shift: discrimination S+ vs S- (summed-error
+                           elemental receptor learning) -> gradient peak shifts
+                           PAST S+ away from S- (Hanson 1959). Controlled
+                           balanced procedure (foraging can't balance exposure).
+
+METRICS (metrics.py)
+--------------------
+[x] Death patterns (exp007): time_to_death, cause_breakdown, survival_curve
+    (Kaplan-Meier), mortality_by_life. cause_of_death (starvation/danger) tracked
+    in the JAX engine. Finding: on one depleting patch, learned avoidance trades
+    danger deaths for starvation deaths (~100% mortality -- energy-economy bound).
+[x] Matching: GML fits (rate/amount/prob/delay), COD curve, allocation vs intake.
+[ ] Latency / contact-rate already in run_lives; schedule response rates (chamber).
+
+TESTS (tests/)  -- 32 tests, all passing (pytest)
+--------------
+[x] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
+[x] valence-split learning changes weights in expected direction; extinction decays;
+    no learning without contact exposure.
+[x] env reset returns valid observation; step returns Gymnasium 5-tuple; truncation;
+    biomass deplete/regrow.
+[x] energy bookkeeping (drains without food); starvation -> death + cause; organism
+    emits valid action.
+[x] ConsequenceModel delta-E energy/learning signals.
+[x] Behavioral momentum: higher atom mass -> smaller per-step activation change for
+    a given force (1/mass scaling) -- inertia / resistance to change.
+[x] JAX engine matches NumPy reference (force/learning/emission/environment <=1e-6;
+    skips if jax not installed).
+[x] Matching: allocation follows richer schedule; 1:1 no side bias (odd grid);
+    GML slope in (0,1) (undermatching).
+[x] CI runs the suite on push/PR (.github/workflows/ci.yml).
+
+COMPUTE / INFRA
+---------------
+[~] Parallel parameter sweeps (experiments/_parallel.run_sweep) -- in use.
+[x] JAX vectorization: full engine (force/learning/emission/environment all
+    validated vs NumPy <=1e-7); jit + lax.scan over time, batched over organisms;
+    ~84x faster (exp004). matching.py also vectorized. Autodiff available.
+[ ] USE the autodiff: fit organism params to target sensitivities / real data
+    (the original reason for JAX). Roadmap: evolution -> model comparison -> real data.
+[x] CI: GitHub Actions (.github/workflows/ci.yml) runs ruff + pytest on
+    push/PR to dev & main, Python 3.11 + 3.12, with [dev,jax] extras.
+
+REPO HYGIENE
+------------
+[ ] Open PR from dev -> main once Phase 5/6 land (currently working on dev).
+[ ] Tag a v0.1 once tests + demos pass.
