@@ -672,3 +672,38 @@ molecular within-schedule structure needs added mechanism. FORK for next step:
 difference and rate structure; (b) a time/count discriminative cue (reuse the
 CueReceptorField as a "clock") -> FI scallop / FR break-and-run via the
 generalization gradient over elapsed-time. Chamber + finding committed as WIP.
+
+---
+
+## 2026-05-31 — Operant chamber, take 2: effort + unit price (behavioral economics)
+
+User's insight: a single response in isolation is degenerate ("why not jam the
+lever") -- behavior is choice, and the single-response rate is set against OTHER
+behavior with its own reinforcement (Herrnstein's R_e). Two fixes, kept strictly
+first-principles:
+- **Effort-opposed value with extinction.** The press value is strengthened by
+  reinforced presses and ERODED by unreinforced ones (ordinary RW up/down on the
+  response); pressing costs energy (effort). On ratio schedules every press has
+  the same reinforcement probability -> value stays high -> high rate; on interval
+  schedules, faster pressing makes more presses unreinforced -> value erodes ->
+  rate self-limits. The organism never computes unit price; it emerges.
+- Added a restoring force earlier so rates are graded (not pinned at the clip).
+
+Results:
+- Rate ordering directionally correct but WEAK: VR 0.75 / FR 0.77 > VI 0.71. Full
+  molar VR>>VI needs sensitivity to the feedback FUNCTION (how reinf rate changes
+  with response rate) -- a known hard problem; not fully captured.
+- **Demand curve (exp016): robust.** Sweeping FR size (= unit price =
+  responses*effort/magnitude), consumption falls monotonically 0.88 -> 0.005
+  reinforcers/step; log-log elasticity ~ -0.96. The Hursh demand relation emerges
+  from effort + reinforced-up/unreinforced-down value. (High-FR end is partly an
+  emission-ceiling artifact -> presses max; a give-up/breakpoint would need
+  stronger extinction. Consumption is the robust DV.)
+
+Concurrent chamber (run_concurrent_chamber) also added (M responses, per-response
+effort) but matching/Herrnstein is NOT the goal here per user -- single-response
+schedule signatures are.
+
+OPEN (to discuss, not yet built): the time/count piece for FI scallop and the
+FR/VR post-reinforcement pause. Constraint: 100% first principles, NO mentalism
+(no internal clock that is "read"). See next entry once decided.

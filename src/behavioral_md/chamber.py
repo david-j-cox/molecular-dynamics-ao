@@ -37,6 +37,7 @@ class ChamberConfig:
     temperature: float = 0.5      # softmax over press/no-press
     approach_gain: float = 1.0
     learning_rate: float = 0.05
+    value_extinction: float = 0.02   # unreinforced press erodes press value toward 0
     reinf_asymptote: float = 1.0
     # Energy budget (drives post-reinforcement pausing + acceleration).
     energy_init: float = 0.6
@@ -99,12 +100,17 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         else:
             raise ValueError(f"unknown schedule {schedule}")
 
-        # Energy bookkeeping + post-reinforcement dynamics.
+        # Energy bookkeeping: pressing costs effort (response cost), food restores.
         energy = energy - cfg.basal_metabolism - press * cfg.press_cost
         energy = np.clip(energy + reinforced * cfg.food_energy, 0.0, cfg.energy_capacity)
-        # Learn the value of pressing on reinforcement (RW toward asymptote).
-        w = np.where(reinforced,
-                     w + cfg.learning_rate * (cfg.reinf_asymptote - w), w)
+        # Press value: reinforced press strengthens it; UNREINFORCED press erodes it
+        # (extinction). On ratio schedules every press has the same reinforcement
+        # probability so the value stays high; on interval schedules, faster
+        # pressing makes more presses unreinforced and erodes it -> lower rate.
+        # Unit price (effort/food) and the demand curve emerge; not computed.
+        unreinf_press = press & (~reinforced)
+        w = np.where(reinforced, w + cfg.learning_rate * (cfg.reinf_asymptote - w), w)
+        w = np.where(unreinf_press, w - cfg.value_extinction * w, w)
 
         tsr_rec[t] = tsr
         presses[t] = press
@@ -112,3 +118,75 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         tsr = np.where(reinforced, 0.0, tsr + 1.0)
 
     return {"presses": presses, "reinforced": reinforced_rec, "time_since_reinf": tsr_rec}
+
+
+def run_concurrent_chamber(vi_params, cfg: ChamberConfig, n_org: int, n_steps: int,
+                           seed: int = 0, efforts=None):
+    """Concurrent chamber: M mutually exclusive responses, each on its own VI.
+
+    At each step the organism emits exactly ONE response (softmax over response
+    activations -- behavior is choice). Each response's reinforcer arms on its own
+    VI timer (mean interval = vi_params[r]) and is collected only by emitting that
+    response while armed. This makes a single response's rate sensitive to the
+    reinforcement available for OTHER behavior (Herrnstein's R_e), instead of
+    saturating. ``vi_params`` is a length-M list of mean intervals (one per
+    response; treat response 0 as the "lever", the rest as background behavior).
+
+    ``efforts`` is a length-M per-response ENERGY cost (defaults to cfg.press_cost
+    for every response). Only the EMITTED response's effort is charged, so
+    responding on a higher-effort response costs more energy -- a real cost-benefit
+    that, with a lower-effort alternative, makes "jamming the lever" non-free.
+
+    Returns emission counts [O, M] and reinforcer counts [O, M] (summed over the
+    second half of the run, i.e. steady state).
+    """
+    rng = np.random.default_rng(seed)
+    m = len(vi_params)
+    vi = np.asarray(vi_params, float)
+    effort = (np.full(m, cfg.press_cost) if efforts is None else np.asarray(efforts, float))
+    w = np.zeros((n_org, m))
+    act = np.zeros((n_org, m))
+    prev = np.zeros((n_org, m))
+    energy = np.full(n_org, cfg.energy_init)
+    armed = np.zeros((n_org, m), bool)
+    warm = n_steps // 2
+    emit_count = np.zeros((n_org, m))
+    reinf_count = np.zeros((n_org, m))
+
+    for t in range(n_steps):
+        deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None) ** cfg.deficit_exponent
+        drive = cfg.approach_gain * (w + cfg.motiv_strength * deficit[:, None])
+        vel = (act - prev) / cfg.dt
+        net = drive - cfg.damping * vel - cfg.restoring * act
+        new = np.clip(2 * act - prev + net * cfg.dt**2, -10.0, 10.0)
+        prev, act = act, new
+
+        # Emit exactly one response (softmax / matching over response activations).
+        z = act / cfg.temperature
+        z = z - z.max(axis=1, keepdims=True)
+        p = np.exp(z)
+        p /= p.sum(axis=1, keepdims=True)
+        cum = np.cumsum(p, axis=1)
+        draw = rng.random((n_org, 1))
+        emitted = (draw < cum).argmax(axis=1)               # [O] chosen response
+        onehot = np.zeros((n_org, m), bool)
+        onehot[np.arange(n_org), emitted] = True
+
+        # VI arming per response (time-based); collect only the emitted+armed one.
+        armed |= rng.random((n_org, m)) < (1.0 / vi)[None, :]
+        reinforced = onehot & armed
+        armed = armed & (~reinforced)
+
+        # Charge the EMITTED response's effort (response-contingent), plus basal.
+        step_effort = effort[emitted]
+        energy = energy - cfg.basal_metabolism - step_effort
+        energy = np.clip(energy + reinforced.any(axis=1) * cfg.food_energy,
+                         0.0, cfg.energy_capacity)
+        w = np.where(reinforced, w + cfg.learning_rate * (cfg.reinf_asymptote - w), w)
+
+        if t >= warm:
+            emit_count += onehot
+            reinf_count += reinforced
+
+    return {"emit": emit_count, "reinforced": reinf_count, "steps": n_steps - warm}
+

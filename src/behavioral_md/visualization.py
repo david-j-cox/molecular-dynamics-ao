@@ -499,6 +499,17 @@ def plot_matching_cod(separations, a_mean, a_ci, path: str | Path) -> Path:
     return _save(fig, path)
 
 
+def plot_demand(unit_price: np.ndarray, consumption: np.ndarray, path: str | Path) -> Path:
+    """Behavioral-economic demand curve: consumption vs unit price (log-log)."""
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(unit_price, consumption, color="black", ls="-", marker="o", ms=5)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Unit Price (responses x effort / magnitude)")
+    ax.set_ylabel("Consumption (reinforcers / step)")
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,
