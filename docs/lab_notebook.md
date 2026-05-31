@@ -707,3 +707,38 @@ schedule signatures are.
 OPEN (to discuss, not yet built): the time/count piece for FI scallop and the
 FR/VR post-reinforcement pause. Constraint: 100% first principles, NO mentalism
 (no internal clock that is "read"). See next entry once decided.
+
+---
+
+## 2026-05-31 — Pluggable timing models -> FI scallop (toggleable switches)
+
+Built timing.py: a pluggable TimingModel interface (like ConsequenceModel /
+LearningRule), selected by ChamberConfig.timing_model. Four toggles spanning the
+theory landscape, all vectorized over organisms:
+- none / homeostatic: NO timer (energy carries timing if anything). First-principles.
+- set: Scalar Expectancy Theory -- pacemaker-accumulator + reference memory +
+  comparator. Cognitivist (an internal represented/read time); included for
+  comparison, NOT first-principles.
+- bet: Behavioral Theory of Timing (Killeen & Fetterman) -- stochastic pacemaker
+  drives transitions through behavioral STATES; operant controlled by the state
+  usual at reinforcement.
+- let: Learning to Time (Machado) -- serial behavioral-state activation + LEARNED
+  state->response links (RW); no comparator/stored duration. Most behavioral /
+  least mentalist; maps onto the two-tier atom architecture.
+
+Two chamber fixes were needed to make the timing signal control responding:
+1. Press activation made a LEAKY INTEGRATOR (overdamped limit of damped Verlet),
+   act_tau~3 steps -- the 2nd-order oscillator was either too sluggish (flat) or
+   overshot (post-reinforcement spike) and washed out the within-interval ramp.
+2. An emission THRESHOLD (emission_bias) so low drive = a genuine pause, and the
+   timing signal drives pressing (separate press-value learning off, to isolate timing).
+Also reset press activation on reinforcement (consume -> pause) for a clean PRP.
+
+Result (exp017, FI-25, 400 organisms): "none" is FLAT (no scallop); SET, BeT, LeT
+each produce a clear FI scallop (last-first +0.75..+0.88) with DISTINCT shapes --
+LeT accelerates earliest, SET intermediate, BeT sharpest break-and-run. Clean
+dissociation; the toggle framework shows each model's signature side by side.
+
+Note: these timers tick per STEP (time-based) -> FI scallop. The FR/VR pause and
+ratio patterns would use a per-RESPONSE (count-based) tick of the same models --
+a natural next extension.

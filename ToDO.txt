@@ -93,12 +93,14 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 [x] Operant chamber (chamber.py): single press response, FR/VR/FI/VI; press-value
     + energy-deficit motivation, damped-Verlet w/ RESTORING force -> graded,
     reinforcement-maintained pressing (exp015).
-[!] Molecular schedule SIGNATURES NOT reproduced: rates ~equal across schedules
-    at matched reinforcement; FI flat (no scallop). This molar value model lacks
-    the needed mechanisms. FORK:
-      (a) IRT-level reinforcement (credit recent inter-response time) -> VR>VI.
-      (b) time/count discriminative cue (CueReceptorField as a clock) -> FI
-          scallop / FR break-and-run via the generalization gradient.
+[x] Pluggable timing models (timing.py): none/homeostatic, SET, BeT, LeT,
+    toggled by ChamberConfig.timing_model. FI scallop reproduced (exp017): none
+    flat, SET/BeT/LeT each scallop with distinct shapes. Needed a leaky-integrator
+    press activation + emission threshold. Effort-opposed value + unit-price-style
+    consumption also in (demand decreasing; "demand curve" label dropped as it's
+    log-linear, not Hursh-shaped).
+[ ] Count-based timing (tick per RESPONSE) -> FR break-and-run + FR>VR pause.
+[ ] VR>>VI molar rate difference: still weak; needs feedback-function sensitivity.
 
 DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
 ---------------------------------------------------------

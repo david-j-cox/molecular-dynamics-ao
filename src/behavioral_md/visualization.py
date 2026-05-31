@@ -529,6 +529,18 @@ def plot_demand_pair(unit_price: np.ndarray, consumption_rate: np.ndarray,
     return _save(fig, path)
 
 
+def plot_fi_scallop(fractions, rates_by_model: dict, path: str | Path) -> Path:
+    """FI within-interval response rate vs elapsed fraction, one line per timing model."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for (name, rates), (ls, marker) in zip(rates_by_model.items(), _BW_CYCLE, strict=False):
+        ax.plot(fractions, rates, color="black", ls=ls, marker=marker, ms=6, label=name)
+    ax.set_xlabel("Elapsed Fraction of Interval")
+    ax.set_ylabel("Response Rate")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_weight_acquisition(
     weights: pd.DataFrame,
     path: str | Path,

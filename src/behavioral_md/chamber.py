@@ -25,6 +25,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from behavioral_md.timing import make_timing_model
+
 
 @dataclass
 class ChamberConfig:
@@ -34,7 +36,13 @@ class ChamberConfig:
     # ramps activation to the clip and pressing saturates. With it, equilibrium
     # activation ~ drive/restoring, so response rate is GRADED by drive.
     restoring: float = 1.0
+    # Press activation is a leaky integrator of the drive (the overdamped limit of
+    # damped Verlet): act <- (1-1/tau)*act + (1/tau)*drive. Fast enough to track a
+    # within-interval timing ramp without the overshoot a 2nd-order oscillator
+    # produces (which spikes responding right after reinforcement instead of pausing).
+    act_tau: float = 3.0           # leaky-integrator time constant (steps)
     temperature: float = 0.5      # softmax over press/no-press
+    emission_bias: float = 0.0    # response threshold: p_press = logistic((act - bias)/temp)
     approach_gain: float = 1.0
     learning_rate: float = 0.05
     value_extinction: float = 0.02   # unreinforced press erodes press value toward 0
@@ -47,6 +55,17 @@ class ChamberConfig:
     food_energy: float = 0.25     # energy per reinforcer
     deficit_exponent: float = 2.0
     motiv_strength: float = 1.0
+    # Pluggable interval-timing model (see timing.py): none|homeostatic|set|bet|let.
+    timing_model: str = "none"
+    timing_gain: float = 2.0       # scales the timing contribution into the press drive
+    timing_lr: float = 0.1         # timing-model learning rate
+    timing_states: int = 25        # number of behavioral states (BeT/LeT)
+    timing_init: float = 20.0      # SET initial expected time (steps)
+    timing_seed: int = 0
+    set_threshold: float = 0.7     # SET comparator: respond when accum/t_ref > thr
+    set_width: float = 0.1
+    bet_pace: float = 0.6          # BeT P(state advance) per step
+    let_flow: float = 0.5          # LeT fraction of activation flowing forward/step
 
 
 def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
@@ -58,9 +77,9 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
     time_since_reinf[T,O] (steps since last reinforcer at each step).
     """
     rng = np.random.default_rng(seed)
+    timing = make_timing_model(cfg.timing_model, n_org, cfg)
     w = np.zeros(n_org)                       # learned value of pressing
     act = np.zeros(n_org)
-    prev = np.zeros(n_org)
     energy = np.full(n_org, cfg.energy_init)
     count = np.zeros(n_org)                   # presses since last reinf (FR/VR)
     timer = np.zeros(n_org)                   # steps since last reinf (FI)
@@ -72,14 +91,19 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
     tsr_rec = np.zeros((n_steps, n_org))
 
     for t in range(n_steps):
+        timing.tick()
         deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None) ** cfg.deficit_exponent
-        drive = cfg.approach_gain * (w + cfg.motiv_strength * deficit)
-        vel = (act - prev) / cfg.dt
-        net = drive - cfg.damping * vel - cfg.restoring * act   # restoring -> graded equilibrium
-        new = np.clip(2 * act - prev + net * cfg.dt**2, -10.0, 10.0)
-        prev, act = act, new
+        # Press drive = learned value + energy-deficit motivation + timing signal.
+        drive = cfg.approach_gain * (
+            w + cfg.motiv_strength * deficit + cfg.timing_gain * timing.contribution()
+        )
+        # Leaky integrator (overdamped limit): tracks the drive with time constant
+        # act_tau, fast enough to follow a within-interval timing ramp.
+        alpha = 1.0 / cfg.act_tau
+        act = np.clip((1.0 - alpha) * act + alpha * drive, -10.0, 10.0)
 
-        p_press = 1.0 / (1.0 + np.exp(-act / cfg.temperature))     # logistic emission
+        # Logistic emission with a response threshold (bias): low drive -> a pause.
+        p_press = 1.0 / (1.0 + np.exp(-(act - cfg.emission_bias) / cfg.temperature))
         press = rng.random(n_org) < p_press
 
         # Schedule: which presses are reinforced.
@@ -111,6 +135,12 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         unreinf_press = press & (~reinforced)
         w = np.where(reinforced, w + cfg.learning_rate * (cfg.reinf_asymptote - w), w)
         w = np.where(unreinf_press, w - cfg.value_extinction * w, w)
+
+        # Timing model learns when reinforcement occurred and resets its marker.
+        timing.update(reinforced)
+        # Post-reinforcement: the organism pauses to consume -> press activation
+        # resets, so a new interval starts from a low rate (clean scallop / PRP).
+        act = np.where(reinforced, 0.0, act)
 
         tsr_rec[t] = tsr
         presses[t] = press
