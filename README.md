@@ -134,14 +134,17 @@ flowchart LR
 
 | Law (sketch) | In the engine | Status |
 |---|---|---|
-| Generalized matching law | softmax emission (Luce rule); concurrent matching needs multiple patches | partial |
+| Generalized matching law | softmax emission (Luce rule); `matching.py` concurrent VI-VI | implemented |
+| Concatenated matching law | rate, amount, probability, delay (separable sensitivities) | implemented |
+| Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
+| Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
+| Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
+| Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
-| Behavioral momentum | atom `mass`; momentum-modulated extinction | planned |
-| Delay/probability discounting | — | planned |
-| Demand (exponential) | — | planned |
-| Unit price | — | planned |
+| Behavioral momentum | atom `mass` (unit inertia); molar resistance-to-change | partial |
+| Delay/probability discounting | concatenated-law terms (matching) | implemented |
 | Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
 
 ---
@@ -280,18 +283,40 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
 
 ## Demonstrations
 
-Three classic behavior-analytic phenomena are reproduced; each is a script that
-runs a population of agents (use `--agents N`, default a few hundred) and writes a
-figure to `outputs/figures/` with a 95% CI band:
+A range of classic behavior-analytic phenomena are reproduced from the same
+mechanism. The `scripts/` demos run agent populations (use `--agents N`) and write
+figures with 95% CI bands; the `experiments/` sweeps (`exp0NN`) cover matching,
+schedules, timing, and the JAX engine.
+
+**Foraging / learning** (`scripts/`):
 
 | Demonstration | Script | Result |
 |---|---|---|
-| Acquisition | `scripts/run_demo.py` | latency to food falls (~185 → ~78 steps) across lives |
-| Extinction | `scripts/run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 once food stops reinforcing |
-| Generalization | `scripts/run_generalization_demo.py` | response gradient peaked at the trained cue value |
-| Peak shift | `scripts/run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
+| Acquisition | `run_demo.py` | latency to food falls (~185 → ~78 steps) across lives |
+| Extinction | `run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 when food stops reinforcing |
+| Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value |
+| Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
 
-`scripts/make_figures.py` regenerates the standard figure set (occupancy
+**Choice & matching** (`matching.py`; patches signalled by discriminative cues, not
+separate food channels):
+
+| Phenomenon | Experiment | Result |
+|---|---|---|
+| Generalized matching | `exp008` | undermatching (a≈0.7), classic log-log GML |
+| Changeover delay | `exp009` | sensitivity rises with travel/COD (Shull & Pliskoff) |
+| Multi-alternative matching | `exp010` | near-perfect matching across 5 alternatives |
+| Concatenated law: amount / probability / delay | `exp011`/`exp013`/`exp014` | separable sensitivities per dimension |
+
+**Operant chamber & schedules** (`chamber.py`, `timing.py`):
+
+| Phenomenon | Experiment | Result |
+|---|---|---|
+| FI scallop | `exp017` | flat-then-accelerating; toggleable timing models (SET/BeT/LeT) |
+| FR break-and-run, FR>VR pause | `exp018`/`exp019` | post-reinforcement pause larger on FR; cumulative records |
+| Behavioral economics | `exp016` | consumption falls as response cost (unit price) rises |
+| Death patterns | `exp007` | survival curves, time-to-death, cause breakdown |
+
+`scripts/make_figures.py` regenerates the standard foraging figure set (occupancy
 landscape, energy/biomass traces, learning curves, force-decomposition grid).
 
 ## Performance (JAX engine)
@@ -320,6 +345,10 @@ src/behavioral_md/
   consequence.py         # ConsequenceModel (DeltaEnergy default; asymmetry stubs)
   learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner / linear)
   generalization.py      # CueReceptorField (tuned receptors; generalization & peak shift)
+  matching.py            # concurrent VI-VI via discriminative cues; concatenated matching law
+  chamber.py             # operant chamber: press response, FR/VR/FI/VI, effort/unit-price
+  timing.py              # pluggable interval-timing models (none/SET/BeT/LeT)
+  metrics.py             # death patterns: time-to-death, cause breakdown, survival curve
   organism.py            # Organism: sense -> force -> damped Verlet -> emit -> learn; energy/death
   simulation.py          # run_episode / run_simulation + long-format DataLogger
   parallel.py            # run_sweep: multiprocessing across organisms / parameter cells
@@ -329,7 +358,7 @@ src/behavioral_md/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
                          #   run_peak_shift_demo, make_figures  (each takes --agents N)
-experiments/             # reproducible sweeps/benchmarks (exp001-004) + parallel helper
+experiments/             # reproducible sweeps/benchmarks (exp001-019) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
 outputs/                 # logs/ and figures/ (generated; gitignored)
@@ -357,7 +386,15 @@ prebuilt wheel on some new Python versions.)
   lives; two-tier valence-split learning; consummatory competition.
 - [x] **Learning phenomena** — acquisition, extinction (pluggable
   `LearningRule`), generalization, and peak shift (cue receptor population).
+- [x] **Choice & matching** — concurrent VI-VI via discriminative cues; the
+  changeover-delay effect; multi-alternative matching; the concatenated matching
+  law (rate / amount / probability / delay).
+- [x] **Operant chamber & schedules** — FI scallop, FR break-and-run, FR>VR pause
+  (cumulative records); pluggable interval-timing models (SET / BeT / LeT);
+  effort-based / unit-price consumption.
 - [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster (autodiff-ready).
-- [ ] **Next** — phenomena zoo on the JAX engine, then evolution, model
-  comparison, real-data fitting; plus day/night, operant schedules + matching,
-  multiple food patches, tests (see `ToDO.txt`).
+- [x] **Tests + CI** — 32-test pytest suite, GitHub Actions (ruff + pytest).
+- [ ] **Next** — molar VR≫VI rate difference; behavioral momentum (molar);
+  day/night ambient sun; multiple food patches; punishment-asymmetry consequence
+  models; using the JAX autodiff for fitting → evolution → model comparison →
+  real data (see `ToDO.txt`).
