@@ -300,18 +300,21 @@ def initial_state(spec, cfg, n_org, position, n_receptors):
     )
 
 
-def make_simulate(spec, cfg, sources, food_reinforces, cue_value, cue_centers):
-    """Return a jitted ``run(state, key) -> (final_state, energy_trace)`` for one life.
+def make_simulate(spec, cfg, sources, cue_centers):
+    """Return a jitted ``sim(state, keys, food_reinforces, cue_value)`` for one life.
 
     Closes over the static model/config/layout so atom arrays and config scalars
-    become compile-time constants; `lax.scan` runs all timesteps for the whole
-    population as one fused, batched computation.
+    become compile-time constants; `food_reinforces` and `cue_value` are runtime
+    arguments so they can vary across lives (e.g. extinction, discrimination)
+    without recompiling. `lax.scan` runs all timesteps for the whole population as
+    one fused, batched computation.
     """
     food_pos, danger_pos = sources[:, _FOOD], sources[:, _DANGER]
     af = spec.approach_food_idx
     beta, lr_cue = cfg.cue_generalization_beta, cfg.cue_learning_rate
 
-    def step(state: SimState, key_t):
+    def step(carry, key_t):
+        state, food_reinforces, cue_value = carry
         intensity, direction, contact = observe(state.positions, sources, state.biomass, cfg)
         dgain = deficit_gain(state.energy, cfg)
         force = compute_force(
@@ -361,11 +364,18 @@ def make_simulate(spec, cfg, sources, food_reinforces, cue_value, cue_centers):
             eligibility=jnp.where(a2, elig, state.eligibility),
             cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
         )
-        return new, (new.energy, (intake > 0).astype(jnp.float32))
+        # Emit PRESENCE at the food location (contact2 > 0) for LIVING organisms.
+        # Presence is the behavioral approach measure and stays meaningful under
+        # extinction (food present but non-reinforcing), where intake is 0 by
+        # construction. Masking by `alive` avoids counting an organism frozen at
+        # the food location after death.
+        at_food_flag = ((contact2 > 0) & new.alive).astype(jnp.float32)
+        return (new, food_reinforces, cue_value), (new.energy, at_food_flag)
 
-    def scanned(state: SimState, keys):
-        """Run len(keys) timesteps; return (final_state, (energy[T,O], fed[T,O]))."""
-        return jax.lax.scan(step, state, keys)
+    def scanned(state: SimState, keys, food_reinforces, cue_value):
+        """Run len(keys) timesteps; return (final_state, (energy[T,O], at_food[T,O]))."""
+        (final, _fr, _cv), out = jax.lax.scan(step, (state, food_reinforces, cue_value), keys)
+        return final, out
 
     return jax.jit(scanned)
 
@@ -383,27 +393,41 @@ def reset_for_life(state: SimState, spec, cfg, position) -> SimState:
     )
 
 
-def run_lives(sim, spec, cfg, state0, position, n_lives, n_steps, key):
+def run_lives(sim, spec, cfg, state0, position, n_lives, n_steps, key,
+              food_reinforces=None, cue_value=None):
     """Run ``n_lives`` lives (learning carries over); return per-life metrics.
 
-    ``sim`` is a jitted ``scanned`` from :func:`make_simulate`. Returns a dict of
-    [n_lives, n_org] arrays: latency to first food, contact count, steps survived.
+    ``sim`` is the jitted function from :func:`make_simulate`. ``food_reinforces``
+    is a per-life bool schedule (length ``n_lives``; default all True) and
+    ``cue_value`` a per-life cue value (default all 0). Returns a dict of
+    [n_lives, n_org] arrays: latency, contact count, steps survived, and the
+    end-of-life ``hw_food`` (approach_food's learned food-channel weight).
     """
-    latency, contact, survived = [], [], []
+    n_org = state0.energy.shape[0]
+    food_idx = STIMULI.index("food")
+    af = spec.approach_food_idx
+    fr_sched = [True] * n_lives if food_reinforces is None else list(food_reinforces)
+    cv_sched = [0.0] * n_lives if cue_value is None else list(cue_value)
+
+    latency, contact, survived, hw_food = [], [], [], []
     state = state0
     for life in range(n_lives):
         state = reset_for_life(state, spec, cfg, position)
         keys = jax.random.split(jax.random.fold_in(key, life), n_steps)
-        state, (energy, fed) = sim(state, keys)
-        any_fed = fed.sum(axis=0) > 0
-        latency.append(jnp.where(any_fed, jnp.argmax(fed, axis=0), n_steps))
-        contact.append(fed.sum(axis=0))
+        fr = jnp.full(n_org, bool(fr_sched[life]))
+        cv = jnp.full(n_org, float(cv_sched[life]))
+        state, (energy, at_food) = sim(state, keys, fr, cv)
+        reached = at_food.sum(axis=0) > 0
+        latency.append(jnp.where(reached, jnp.argmax(at_food, axis=0), n_steps))
+        contact.append(at_food.sum(axis=0))
         survived.append(jnp.minimum(jnp.argmax(energy <= 0.0, axis=0)
                                     + (energy[-1] > 0.0) * n_steps, n_steps))
+        hw_food.append(state.history[:, af, food_idx])
     return {
         "latency": np.asarray(jnp.stack(latency)),     # [n_lives, n_org]
         "contact": np.asarray(jnp.stack(contact)),
         "survived": np.asarray(jnp.stack(survived)),
+        "hw_food": np.asarray(jnp.stack(hw_food)),
     }
 
 

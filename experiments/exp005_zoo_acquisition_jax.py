@@ -42,10 +42,7 @@ def main() -> None:
     spec = build_spec(_weak_innate_atoms(), cfg)
     sources_np = np.stack([LAYOUT[k] for k in ("food", "danger", "light", "cue")], dtype=float)
     sources = jnp.broadcast_to(jnp.asarray(sources_np), (N_ORG, 4, 2))
-    sim = make_simulate(
-        spec, cfg, sources, jnp.ones(N_ORG, bool),
-        jnp.zeros(N_ORG), jnp.linspace(0.0, 1.0, cfg.n_cue_receptors),
-    )
+    sim = make_simulate(spec, cfg, sources, jnp.linspace(0.0, 1.0, cfg.n_cue_receptors))
     state0 = initial_state(spec, cfg, N_ORG, LAYOUT["position"], cfg.n_cue_receptors)
 
     t0 = time.perf_counter()

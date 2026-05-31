@@ -32,8 +32,11 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------
 [~] Done so far (NumPy demos): acquisition, extinction, generalization, peak shift.
 [x] JAX multi-life wrapper (run_lives/reset_for_life): learning carries over,
-    body resets per life. First zoo entry on JAX: acquisition curve (2000
-    organisms x 40 lives in ~5s; latency 175 -> 66, matches NumPy run_demo).
+    body resets per life; per-life food_reinforces/cue_value schedules.
+    Zoo on JAX so far (each 2000 organisms x 40 lives in ~5s):
+      - acquisition (exp005): latency ~135 -> ~73, matches NumPy run_demo.
+      - extinction (exp006): hw_food 1.0 -> ~0, steps-at-food 67 -> 5.
+    Next: generalization + peak shift on JAX, then multiple patches (matching).
 [ ] Matching / undermatching; resistance-to-change (momentum); PREE; behavioral
     contrast; blocking; overshadowing; discounting & demand curves; FR/VR/FI/VI.
 [ ] Run the battery across parameter ranges as standing model-validity evidence.

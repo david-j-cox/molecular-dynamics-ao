@@ -32,20 +32,20 @@ def jax_run(n_org: int, n_steps: int, seed: int = 0):
     spec = build_spec(config=cfg)
     sources_np = np.stack([LAYOUT[k] for k in ("food", "danger", "light", "cue")], dtype=float)
     sources = jnp.broadcast_to(jnp.asarray(sources_np), (n_org, 4, 2))
-    food_reinforces = jnp.ones(n_org, bool)
-    cue_value = jnp.full(n_org, CUE_VALUE)
     cue_centers = jnp.linspace(0.0, 1.0, cfg.n_cue_receptors)
-    sim = make_simulate(spec, cfg, sources, food_reinforces, cue_value, cue_centers)
+    sim = make_simulate(spec, cfg, sources, cue_centers)
     state0 = initial_state(spec, cfg, n_org, LAYOUT["position"], cfg.n_cue_receptors)
     keys = jax.random.split(jax.random.key(seed), n_steps)
+    fr = jnp.ones(n_org, bool)
+    cv = jnp.full(n_org, CUE_VALUE)
 
     t0 = time.perf_counter()
-    final, energy = sim(state0, keys)            # includes JIT compile
+    final, (energy, _fed) = sim(state0, keys, fr, cv)   # includes JIT compile
     final.energy.block_until_ready()
     t_compile = time.perf_counter() - t0
 
     t0 = time.perf_counter()
-    final, energy = sim(state0, keys)            # steady-state
+    final, (energy, _fed) = sim(state0, keys, fr, cv)   # steady-state
     final.energy.block_until_ready()
     t_run = time.perf_counter() - t0
     return t_compile, t_run, np.asarray(final.energy), np.asarray(final.alive)
