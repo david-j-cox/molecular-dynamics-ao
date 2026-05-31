@@ -32,17 +32,11 @@ import numpy as np
 from behavioral_md._kernels import exp_falloff, safe_unit
 from behavioral_md.config import SimulationConfig
 from behavioral_md.jax_engine import (
-    _CUE,
     _DELTAS,
     CAUSE_DANGER,
     CAUSE_STARVATION,
-    compute_force,
-    deficit_gain,
-    emission_probs,
-    integrate,
-    learn_step,
-    sample_actions,
-    update_eligibility,
+    drive_integrate_emit,
+    learn_with_cue,
 )
 
 
@@ -94,9 +88,7 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
     danger_pos = jnp.asarray(danger_pos, float)
     light_pos = jnp.asarray(light_pos, float)
     cue_pos = jnp.asarray(cue_pos, float)
-    af = spec.approach_food_idx
     k_cap = cfg.food_carrying_capacity
-    beta, lr_cue = cfg.cue_generalization_beta, cfg.cue_learning_rate
 
     def observe(pos, biomass):
         """Multi-patch sensory observation, returns the C-channel arrays plus the
@@ -133,19 +125,11 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
     def step(carry, key_t):
         state, food_reinforces, cue_value = carry
         intensity, direction, contact, _on = observe(state.positions, state.biomass)
-        dgain = deficit_gain(state.energy, cfg)
-        force = compute_force(
-            spec, state.activation, state.history, intensity, direction, contact, dgain
+        new_act, new_prev, elig, action, cue_act, cue_drive = drive_integrate_emit(
+            spec, cfg, state.activation, state.previous, state.history, state.eligibility,
+            intensity, direction, contact, state.energy, state.cue_weights,
+            cue_value, cue_centers, key_t,
         )
-        cue_act = intensity[:, _CUE][:, None] * jnp.exp(
-            -beta * jnp.abs(cue_value[:, None] - cue_centers[None, :])
-        )
-        cue_drive = jnp.sum(state.cue_weights * cue_act, axis=1)
-        force = force.at[:, af].add(cue_drive)
-
-        new_act, new_prev = integrate(spec, state.activation, state.previous, force, cfg)
-        elig = update_eligibility(state.eligibility, new_act, cfg)
-        action = sample_actions(spec, emission_probs(spec, new_act, cfg), key_t)
 
         # Move, then resolve food at the new position.
         new_pos = jnp.clip(state.positions + _DELTAS[action], 0.0, cfg.grid_size - 1)
@@ -178,14 +162,10 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
         )
         appetitive = (intake > 0).astype(jnp.float32)
         aversive = (danger_c > 0).astype(jnp.float32)
-        new_hist = learn_step(spec, state.history, elig, intensity2, appetitive, aversive,
-                              contact2 > 0, danger_c > 0, cfg)
-        elig_af = jnp.clip(elig[:, af], 0.0, None)
-        cue_err = cfg.reinforcement_asymptote * appetitive - cue_drive
-        cue_upd = jnp.where((contact2 > 0)[:, None],
-                            lr_cue * elig_af[:, None] * cue_act * cue_err[:, None], 0.0)
-        new_cue_w = jnp.clip(state.cue_weights + cue_upd,
-                             cfg.history_weight_min, cfg.history_weight_max)
+        new_hist, new_cue_w = learn_with_cue(
+            spec, cfg, state.history, elig, state.cue_weights, intensity2, contact2,
+            danger_c, appetitive, aversive, cue_act, cue_drive,
+        )
 
         a1, a2 = state.alive, state.alive[:, None]
         new_alive = state.alive & (new_energy > 0.0)

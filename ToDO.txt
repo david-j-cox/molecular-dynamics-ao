@@ -231,6 +231,10 @@ CODE QUALITY / REPRODUCIBILITY
     weak_innate_atoms, save_results_json) + behavioral_md/_kernels.py (exp_falloff,
     safe_unit) dedupe experiment + JAX-engine copy-paste; removed _parallel.py
     passthrough; fixed exp002/003 standalone runnability.
+[x] Consolidated the near-duplicate JAX per-step loops: jax_engine.make_simulate
+    and forage.make_forage_sim now share drive_integrate_emit (force+cue+integrate+
+    emit) and learn_with_cue (RW + cue update); they differ only in observe and the
+    env transition. Verified 0/26 drift, validators <1e-6, P=1 exact.
 
 COMPUTE / INFRA
 ---------------

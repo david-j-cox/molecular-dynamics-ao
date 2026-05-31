@@ -932,3 +932,13 @@ equivalence); the unimplemented consequence-model stubs stay as documented futur
 work; chamber/matching keep hardcoded activation/weight clip bounds (they use their
 own config objects, values already match the SimulationConfig defaults). No
 mechanism numerics changed -- this sweep was structural.
+
+Follow-up structural change (same verification: 0/26 drift, validators <1e-6, P=1
+== make_simulate 0.0, 38 tests): the near-duplicate per-step loops in
+jax_engine.make_simulate and forage.make_forage_sim were factored into two shared
+functions in jax_engine -- drive_integrate_emit (deficit-scaled force + cue drive +
+damped-Verlet integrate + eligibility + softmax emission) and learn_with_cue
+(valence-split RW + cue-receptor update). Both engines' step functions now differ
+only where they should: observe (single vs multi-patch salience) and the env
+transition (single-patch env_step vs multi-patch deplete/regrow + functional
+response). The shared physics/learning lives in one place.
