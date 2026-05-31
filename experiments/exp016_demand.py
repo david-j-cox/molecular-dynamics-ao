@@ -39,7 +39,9 @@ def main() -> None:
         cons = r["reinforced"][warm:].mean()               # reinforcers per step
         total = r["reinforced"][warm:].sum(axis=0).mean()  # per organism, per session
         price = fr * cfg.press_cost / cfg.food_energy
-        prices.append(price); consumption.append(cons); rates.append(rate)
+        prices.append(price)
+        consumption.append(cons)
+        rates.append(rate)
         n_consumed.append(total)
         print(f"{fr:>4} {price:>10.3f} {rate:>10.3f} {cons:>10.5f} {total:>10.1f}")
 
