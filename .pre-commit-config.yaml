@@ -1,0 +1,24 @@
+# Local guard that mirrors CI (.github/workflows/ci.yml): ruff on every commit,
+# the pytest suite on push. Uses the project's own installed tools (the venv,
+# with ruff/pytest pinned in pyproject [dev]) so local can't drift from CI.
+#
+# Enable once per clone:
+#   pip install -e ".[dev]" pre-commit
+#   pre-commit install              # ruff on commit
+#   pre-commit install --hook-type pre-push   # pytest on push
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint, CI scope)
+        entry: ruff check src/ experiments/ tests/ scripts/
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: pytest
+        name: pytest (full suite)
+        entry: pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
