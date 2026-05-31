@@ -19,9 +19,9 @@ from typing import Any
 
 import pandas as pd
 
-from behavioral_md.atoms import default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
+from behavioral_md.experiment_utils import weak_innate_atoms
 from behavioral_md.organism import Organism
 from behavioral_md.parallel import run_sweep
 from behavioral_md.simulation import run_episode
@@ -38,20 +38,12 @@ INNATE_FOOD = 0.2  # weak innate approach so acquisition has room to show
 LAYOUT = {"position": [4, 4], "food": [4, 8], "danger": [9, 0], "light": [0, 9], "cue": [8, 4]}
 
 
-def _weak_innate_atoms():
-    atoms = default_atom_set()
-    for a in atoms:
-        if a.name == "approach_food":
-            a.sensitivity["food"] = INNATE_FOOD
-    return atoms
-
-
 def agent_worker(cell: dict[str, Any]) -> dict[str, Any]:
     seed = cell["seed"]
     cfg = SimulationConfig(n_episodes=N_LIVES, max_steps=STEPS, seed=seed,
                            sensor_range=SENSOR_RANGE)
     env = BehavioralFieldEnv(cfg)
-    org = Organism(cfg, atoms=_weak_innate_atoms())
+    org = Organism(cfg, atoms=weak_innate_atoms(INNATE_FOOD))
     rows = []
     for ep in range(N_LIVES):
         r = run_episode(env, org, cfg, ep, None, {"layout": LAYOUT}, seed=seed * 1000 + ep)

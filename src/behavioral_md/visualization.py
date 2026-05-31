@@ -460,6 +460,103 @@ def plot_mortality_by_life(mortality: dict, path: str | Path) -> Path:
     return _save(fig, path)
 
 
+def plot_giveup_density(dist, observed, ci, predicted, path: str | Path,
+                        corrected=None) -> Path:
+    """Marginal-value theorem: give-up density vs travel distance between patches.
+
+    Solid black = observed patch biomass at the moment of leaving (mean +/- 95%
+    CI); dashed gray = the frictionless salience crossover exp(-D / sensor_range).
+    If ``corrected`` is given, dotted black = the tenacity-scaled prediction
+    kappa * exp(-D/range) (consummatory perseveration), which accounts for the
+    organism depleting past the indifference point.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.errorbar(dist, np.asarray(observed), yerr=np.asarray(ci), fmt="o-", color="black",
+                ms=5, capsize=3, label="Observed")
+    ax.plot(dist, np.asarray(predicted), ls="--", marker="s", ms=4, color="0.5",
+            label=r"Salience crossover $e^{-D/\lambda}$")
+    if corrected is not None:
+        ax.plot(dist, np.asarray(corrected), ls=":", marker="^", ms=5, color="black",
+                label=r"Tenacity-scaled $\kappa\, e^{-D/\lambda}$")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Density\n(patch biomass at leaving)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_momentum(rate_rich, rate_lean, onset: int, path: str | Path,
+                  ylabel: str = "Press Rate (per step)") -> Path:
+    """Behavioral momentum: per-component response rate across sessions.
+
+    Solid black = rich component (high reinforcement rate), dashed gray = lean.
+    The dotted vertical line marks the disruptor onset; momentum is the rich
+    component falling proportionally LESS (greater resistance to change).
+    """
+    rich, lean = np.asarray(rate_rich), np.asarray(rate_lean)
+    s = np.arange(len(rich))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(s, rich, color="black", ls="-", marker="o", ms=4, label="Rich (high reinf. rate)")
+    ax.plot(s, lean, color="0.45", ls="--", marker="s", ms=4, label="Lean (low reinf. rate)")
+    ax.axvline(onset - 0.5, color="0.6", ls=":", lw=1.0)
+    ax.text(onset - 0.5, ax.get_ylim()[1], " disruptor", fontsize=11, va="top", ha="left")
+    ax.set_xlabel("Session")
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_giveup_regimes(dist, const_mean, const_ci, bio_mean, bio_ci,
+                        path: str | Path) -> Path:
+    """Give-up density vs travel distance under two resource models.
+
+    Solid = constant intake (time-at-patch); dashed = biomass-scaled intake
+    (Holling functional response). Both show the MVT decline; the comparison
+    isolates how within-patch diminishing returns reshape the gradient.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.errorbar(dist, np.asarray(const_mean), yerr=np.asarray(const_ci), fmt="o-",
+                color="black", ms=5, capsize=3, label="Constant intake")
+    ax.errorbar(dist, np.asarray(bio_mean), yerr=np.asarray(bio_ci), fmt="s--",
+                color="0.45", ms=5, capsize=3, label="Biomass-scaled intake")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Density\n(patch biomass at leaving)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_giveup_rate(dist, rate_mean, rate_ci, path: str | Path) -> Path:
+    """Charnov marginal value: give-up intake RATE vs travel distance.
+
+    Under the functional response, instantaneous intake rate = food_intake_rate *
+    biomass_frac, so the rate at the moment of leaving falls with travel distance
+    -- the marginal-value-theorem prediction that the give-up rate tracks the
+    (travel-dependent) environment-wide optimal rate.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _band(ax, dist, np.asarray(rate_mean), np.asarray(rate_ci), "give-up rate", "-", "o")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Intake Rate\n(energy/step at leaving)")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
+def plot_residence_time(dist, observed, ci, path: str | Path) -> Path:
+    """Marginal-value theorem: patch residence time vs travel distance."""
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _band(ax, dist, np.asarray(observed), np.asarray(ci), "residence", "-", "o")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Residence Time\n(steps on patch before leaving)")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
 def plot_matching(log_R: np.ndarray, log_B: np.ndarray, a: float, log_b: float,
                   path: str | Path,
                   xlabel: str = "log(R$_L$/R$_R$)",

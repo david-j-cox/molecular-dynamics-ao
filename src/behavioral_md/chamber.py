@@ -67,6 +67,28 @@ class ChamberConfig:
     set_width: float = 0.1
     bet_pace: float = 0.6          # BeT P(state advance) per step
     let_flow: float = 0.5          # LeT fraction of activation flowing forward/step
+    # Pavlovian component->reinforcer association (behavioral-momentum "mass").
+    # In a multiple schedule each component stimulus accrues a context value via
+    # an omission-RW rule: it grows toward ctx_asymptote on reinforced steps and
+    # decays toward 0 on non-reinforced steps WHILE THE COMPONENT IS PRESENT, so
+    # its steady state is graded by that component's reinforcement RATE (~ p*lambda)
+    # -- NOT by responding. It feeds the press drive additively, so a rich
+    # component sustains responding under disruption (resistance to change). The
+    # omission rate is kept well below the acquisition rate so the association is
+    # slow to erode -- the source of momentum / persistence.
+    ctx_learning_rate: float = 0.05    # context value growth on reinforced steps
+    ctx_omission_rate: float = 0.002   # context value decay per non-reinforced step
+    ctx_asymptote: float = 2.0         # lambda for the context->reinforcer value
+    ctx_drive_gain: float = 0.5        # how much context value adds to the press drive
+    # Behavioral momentum = MASS = resistance to CHANGE (the project's core Verlet
+    # metaphor). The context->reinforcer association confers inertia: it divides
+    # the rate at which the response value extinguishes, so mass_c = 1 +
+    # momentum_mass_gain * ctx_c. With gain 0 the context value only adds to the
+    # drive (no inertia) -- which gives momentum under satiation but REVERSES under
+    # extinction. With gain > 0 reinforcement rate slows value erosion, so the rich
+    # component resists extinction too (Nevin & Grace). Opt-in (default 0) so the
+    # mechanism can be shown to be necessary rather than assumed.
+    momentum_mass_gain: float = 0.0
 
 
 def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
@@ -226,4 +248,105 @@ def run_concurrent_chamber(vi_params, cfg: ChamberConfig, n_org: int, n_steps: i
             reinf_count += reinforced
 
     return {"emit": emit_count, "reinforced": reinf_count, "steps": n_steps - warm}
+
+
+def run_multiple_schedule(vi_params, cfg: ChamberConfig, n_org: int,
+                          comp_steps: int, n_baseline: int, n_disruption: int,
+                          disruptor: str = "extinction", seed: int = 0):
+    """Multiple schedule for behavioral momentum (Nevin & Grace).
+
+    K components are presented successively, each ``comp_steps`` steps, one after
+    another within a session; ``vi_params[k]`` is component k's mean VI interval
+    (small = rich, large = lean). The single press response is shared, but each
+    component stimulus carries its own Pavlovian context value (cfg.ctx_*), which
+    settles at a level graded by that component's reinforcement RATE and feeds the
+    press drive. After ``n_baseline`` sessions a disruptor is applied for
+    ``n_disruption`` sessions:
+
+      'extinction'  -- reinforcement withheld in every component.
+      'satiation'   -- energy clamped to capacity (deficit ~ 0), reinforcement
+                       still delivered (a prefeeding / motivational disruptor).
+
+    Resistance to change is the per-component press rate during disruption relative
+    to its own baseline. Momentum predicts the RICH component is more resistant
+    (its rate falls more slowly in proportion). Returns per-session, per-component
+    press rate, reinforcement rate, and end context value. Arrays [n_sessions, K].
+    """
+    rng = np.random.default_rng(seed)
+    vi = np.asarray(vi_params, float)
+    k = len(vi)
+    n_sessions = n_baseline + n_disruption
+
+    v = np.zeros((n_org, k))                 # per-component press value (response->reinf)
+    ctx = np.zeros((n_org, k))               # per-component context value (Pavlovian mass)
+    energy = np.full(n_org, cfg.energy_init)
+    alpha = 1.0 / cfg.act_tau
+
+    press_rate = np.zeros((n_sessions, k))   # mean over organisms + component steps
+    reinf_rate = np.zeros((n_sessions, k))
+    ctx_rec = np.zeros((n_sessions, k))
+
+    for s in range(n_sessions):
+        disrupt = s >= n_baseline
+        for c in range(k):
+            act = np.zeros(n_org)            # fresh activation entering a component
+            armed = np.zeros(n_org, bool)
+            presses = np.zeros(n_org)
+            reinfs = np.zeros(n_org)
+            for _ in range(comp_steps):
+                if disrupt and disruptor == "satiation":
+                    energy = np.full(n_org, cfg.energy_capacity)  # prefed / sated
+                elif disrupt and disruptor == "extinction":
+                    # Maintain deprivation: extinction withholds the RESPONSE->food
+                    # contingency, not food-as-survival. Holding energy constant
+                    # keeps motivation fixed so we measure response extinction, not
+                    # a starvation-driven motivation surge (which would mask it).
+                    energy = np.full(n_org, cfg.energy_init)
+                deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None)
+                deficit = deficit**cfg.deficit_exponent
+                drive = cfg.approach_gain * (
+                    v[:, c] + cfg.ctx_drive_gain * ctx[:, c] + cfg.motiv_strength * deficit
+                )
+                act = np.clip((1.0 - alpha) * act + alpha * drive, -10.0, 10.0)
+                p_press = 1.0 / (1.0 + np.exp(-(act - cfg.emission_bias) / cfg.temperature))
+                press = rng.random(n_org) < p_press
+
+                armed |= rng.random(n_org) < (1.0 / vi[c])
+                withhold = disrupt and disruptor == "extinction"
+                reinforced = press & armed & (not withhold)
+                armed = armed & (~reinforced)
+
+                energy = energy - cfg.basal_metabolism - press * cfg.press_cost
+                energy = np.clip(energy + reinforced * cfg.food_energy, 0.0, cfg.energy_capacity)
+
+                # MASS: the context->reinforcer association confers inertia, dividing
+                # the rate at which the response value changes (resistance to change).
+                # Higher in the rich component -> slower decay -> resistance.
+                mass = 1.0 + cfg.momentum_mass_gain * ctx[:, c]
+                # Per-component response value. Reinforced -> grow toward asymptote.
+                # Otherwise decay toward 0 at value_extinction/mass PER STEP (time-
+                # based, NOT per press): Nevin's mass resists change per unit time,
+                # so a vigorous response is not penalised by self-extinction. The
+                # baseline equilibrium is graded by reinforcement RATE (rich higher).
+                v[:, c] = np.where(
+                    reinforced, v[:, c] + cfg.learning_rate * (cfg.reinf_asymptote - v[:, c]),
+                    v[:, c] - (cfg.value_extinction / mass) * v[:, c],
+                )
+                # Pavlovian context value: omission-RW while the component is present
+                # (grows on reinforcement, slow decay otherwise) -> rate-graded mass.
+                ctx[:, c] = np.where(
+                    reinforced,
+                    ctx[:, c] + cfg.ctx_learning_rate * (cfg.ctx_asymptote - ctx[:, c]),
+                    ctx[:, c] - cfg.ctx_omission_rate * ctx[:, c],
+                )
+                act = np.where(reinforced, 0.0, act)  # consume pause
+
+                presses += press
+                reinfs += reinforced
+            press_rate[s, c] = (presses / comp_steps).mean()
+            reinf_rate[s, c] = (reinfs / comp_steps).mean()
+            ctx_rec[s, c] = ctx[:, c].mean()
+
+    return {"press_rate": press_rate, "reinf_rate": reinf_rate, "ctx": ctx_rec,
+            "n_baseline": n_baseline, "n_disruption": n_disruption, "vi": vi}
 

@@ -84,12 +84,33 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 [ ] Fit the sensitivities: which organism params (temperature, approach_gain,
     learning/extinction rates, beta) set each a (a_rate/amount/prob/delay)?
     Map params -> sensitivities; later use JAX autodiff to fit to target a's.
-[ ] Behavioral momentum demonstration: train a response under different
-    reinforcement rates/histories, then disrupt (extinction / prefeeding /
-    distractor); measure resistance to change (persistence) vs reinforcement
-    history and atom mass. Unit inertia already tested (1/mass); this is the
-    molar phenomenon (Nevin & Grace).
-[ ] Multiple renewable food patches in the survival world (patch-leaving).
+[~] Behavioral momentum demonstration (exp022, chamber.run_multiple_schedule):
+    multiple schedule, rich (VI 5) vs lean (VI 40) components, each with a
+    Pavlovian context->reinforcer value (rate-graded "mass"). DONE under the
+    SATIATION/prefeeding disruptor: rich retains 99.6% of baseline, lean 80% --
+    rich more resistant (momentum), because its higher context value is a larger
+    non-motivational share of the drive. NOT clean under EXTINCTION (anti-momentum):
+    in this energy world extinction = starvation (raises drive, masks extinction),
+    value decay is response-based (vigorous response self-extinguishes), and both
+    components fall to a shared emission floor so proportion tracks baseline height.
+    Future work: decouple reinforcement from survival + floor-free, time-based,
+    mass-scaled decay. Unit inertia (1/mass) already tested separately.
+[x] Multiple renewable food patches in the survival world (patch-leaving / MVT).
+    forage.py adds a multi-patch food layer to the JAX SURVIVAL world (energy/
+    death, unlike matching.py): organism approaches the most SALIENT patch
+    (salience = exp(-d/range)*biomass_frac); feeding depletes the occupant while
+    the alternative regrows; the consume atom holds it until the distant patch's
+    salience wins, then it leaves. P=1 reproduces make_simulate to 0.0e+00
+    (test_forage). exp020: give-up density FALLS (0.60->0.43) and residence RISES
+    (38->62 steps) with travel distance D=3..7 -- marginal-value theorem. Clean
+    only for D <= sensor_range (set to 12); beyond that the far patch isn't sensed.
+    Give-up density = kappa*exp(-D/range), kappa~=0.79 (constant tenacity factor =
+    consummatory perseveration; consume gain 1.0 > approach 0.5 + integrator lag).
+    exp021 adds the Holling functional response (food_intake_scaling='biomass'):
+    at equal rate it lifts end-of-run survival 0.00->0.50 (depleted patch -> less
+    intake -> hunger re-engages) and makes give-up RATE (rate*density, 0.044->0.034
+    with D) a literal Charnov marginal-value signature. MVT gradient holds in both
+    regimes; only the functional response is Charnov-interpretable + viable.
 [x] Operant chamber (chamber.py): single press response, FR/VR/FI/VI; press-value
     + energy-deficit motivation, damped-Verlet w/ RESTORING force -> graded,
     reinforcement-maintained pressing (exp015).
@@ -180,7 +201,7 @@ METRICS (metrics.py)
 [x] Matching: GML fits (rate/amount/prob/delay), COD curve, allocation vs intake.
 [ ] Latency / contact-rate already in run_lives; schedule response rates (chamber).
 
-TESTS (tests/)  -- 32 tests, all passing (pytest)
+TESTS (tests/)  -- 38 tests, all passing (pytest)
 --------------
 [x] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
 [x] valence-split learning changes weights in expected direction; extinction decays;
@@ -194,9 +215,22 @@ TESTS (tests/)  -- 32 tests, all passing (pytest)
     a given force (1/mass scaling) -- inertia / resistance to change.
 [x] JAX engine matches NumPy reference (force/learning/emission/environment <=1e-6;
     skips if jax not installed).
+[x] Multi-patch forage engine: P=1 reproduces make_simulate to 0.0 (test_forage).
 [x] Matching: allocation follows richer schedule; 1:1 no side bias (odd grid);
     GML slope in (0,1) (undermatching).
 [x] CI runs the suite on push/PR (.github/workflows/ci.yml).
+
+CODE QUALITY / REPRODUCIBILITY
+------------------------------
+[x] Reproduction harness (scripts/reproduce.py): runs all experiments+demos in
+    fresh subprocesses, scrubs volatile lines, snapshots stdout to
+    outputs/repro/baseline.json; --check diffs vs baseline. Use before/after any
+    refactor to catch drift. Baseline: 26/26 run cleanly.
+[x] Refactor sweep (verified 0/26 drift): behavioral_md/experiment_utils.py
+    (compute_mean_ci, fit_matching_law, make_cue_centers, make_inert_source,
+    weak_innate_atoms, save_results_json) + behavioral_md/_kernels.py (exp_falloff,
+    safe_unit) dedupe experiment + JAX-engine copy-paste; removed _parallel.py
+    passthrough; fixed exp002/003 standalone runnability.
 
 COMPUTE / INFRA
 ---------------

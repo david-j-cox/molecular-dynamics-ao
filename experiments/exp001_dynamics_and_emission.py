@@ -17,14 +17,12 @@ Saves: outputs/logs/exp001_results.json  (raw numbers for the lab notebook)
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 
 from behavioral_md.atoms import ACTION_ATOMS, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
+from behavioral_md.experiment_utils import save_results_json
 from behavioral_md.forces import sensory_from_observation
 from behavioral_md.organism import Organism
 
@@ -180,9 +178,7 @@ def main() -> None:
         out["configs"][name] = {"params": kw, "stats": reach_stats(**kw)}
 
     # --- Save + print. -------------------------------------------------------
-    path = Path("outputs/logs/exp001_results.json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(out, indent=2))
+    path = save_results_json("exp001_results.json", out)
 
     print(f"Saved {path}\n")
     print("A. Literal-spec sample trajectory (food at (6,6), 80 steps):")

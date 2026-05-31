@@ -18,17 +18,16 @@ Saves: outputs/logs/exp003_results.json
 from __future__ import annotations
 
 import itertools
-import json
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
+from behavioral_md.experiment_utils import save_results_json
 from behavioral_md.organism import Organism
+from behavioral_md.parallel import run_sweep
 from behavioral_md.simulation import run_episode
-from experiments._parallel import run_sweep
 
 N_EPISODES = 60
 STEPS = 1000
@@ -106,9 +105,7 @@ def main() -> None:
             f"{rec['hw_early']:7.3f} {rec['hw_late']:7.3f}"
         )
 
-    path = Path("outputs/logs/exp003_results.json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(out, indent=2))
+    path = save_results_json("exp003_results.json", out)
     print(f"\nSaved {path}")
     print("(early = mean of first 5 lives, late = mean of last 5 lives)")
 

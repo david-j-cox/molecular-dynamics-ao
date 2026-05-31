@@ -23,6 +23,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md.experiment_utils import fit_matching_law
 from behavioral_md.matching import MatchConfig, make_matching_sim
 from behavioral_md.visualization import plot_matching
 
@@ -53,8 +54,7 @@ def main() -> None:
 
     x = np.concatenate(log_D)
     y = np.concatenate(log_B)
-    slope, log_b = np.polyfit(x, y, 1)
-    r2 = 1 - np.sum((y - (slope * x + log_b)) ** 2) / np.sum((y - y.mean()) ** 2)
+    slope, log_b, r2 = fit_matching_law(x, y)
     print(f"{N_ORG} organisms x {len(DELAY_PAIRS)} delay ratios x {N_STEPS} steps "
           f"(identical VI, equal amount, hyperbolic) in {time.perf_counter()-t0:.1f}s")
     print(f"Delay term:  log(B_L/B_R) = {slope:.2f} * log(D_L/D_R) + {log_b:+.2f}")

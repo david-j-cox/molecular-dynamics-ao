@@ -137,13 +137,14 @@ flowchart LR
 | Generalized matching law | softmax emission (Luce rule); `matching.py` concurrent VI-VI | implemented |
 | Concatenated matching law | rate, amount, probability, delay (separable sensitivities) | implemented |
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
+| Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
 | Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
-| Behavioral momentum | atom `mass` (unit inertia); molar resistance-to-change | partial |
+| Behavioral momentum | atom `mass` (unit inertia); `chamber.py` multiple schedule -- rich component resists satiation (molar) | partial |
 | Delay/probability discounting | concatenated-law terms (matching) | implemented |
 | Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
 
@@ -376,6 +377,14 @@ python scripts/run_demo.py                     # acquisition demo (writes a figu
 ```
 (pygame is optional — `pip install pygame` — for the live render; it has no
 prebuilt wheel on some new Python versions.)
+
+Reproduce every finding and guard against drift with the reproduction harness,
+which runs all experiments and demos and snapshots their results:
+
+```bash
+python scripts/reproduce.py                    # capture baseline -> outputs/repro/
+python scripts/reproduce.py --check            # re-run and diff vs the baseline
+```
 
 Optional — enable the local pre-commit guard (mirrors CI: ruff on commit, pytest
 on push) so local can't drift from CI. Run with the venv active:

@@ -766,3 +766,169 @@ pause then steep run). Records stacked with full-height offset (no overlap).
 Schedule-signature scorecard now: FI scallop (timing), FR break-and-run + FR>VR
 pause + VR>FR rate (count timing), demand-like consumption decline (effort/value).
 Still weak: the molar VR>>VI rate difference (needs feedback-function sensitivity).
+
+---
+
+## 2026-05-31 — Multi-patch foraging in the JAX world: patch-leaving + MVT
+
+Added a multi-patch food layer to the JAX SURVIVAL world (forage.py), distinct
+from the matching work (matching.py has VI feeders but no biomass/depletion/energy/
+death). The organism now senses P depleting/regrowing patches and approaches the
+single most SALIENT one:
+
+    salience_p = exp(-dist_p / sensor_range) * (biomass_p / K)
+
+Direction/intensity/contact for the food channel are the salience-argmax over
+patches; danger/light/cue stay single sources. Everything else (two-tier force,
+damped Verlet, RW learning, cue receptors, energy budget, death) is the SAME
+kernel as jax_engine.make_simulate. With P=1 it reproduces make_simulate to
+0.0e+00 (validate_against_single_patch; test_forage.py) -- the multi-patch path is
+a strict generalization, not a reimplementation.
+
+Mechanism (no give-up rule hand-coded): while the organism feeds, the occupied
+patch depletes (its salience falls) while the distant alternative regrows. The
+``consume`` atom (sensitivity food 1.0 + energy-deficit gain) holds it on a rich
+patch; once biomass drops enough that the alternative's distance-attenuated
+salience wins, ``approach_food`` flips direction toward it and the organism leaves.
+Predicted give-up density (leave when biomass_frac < exp(-D/range), alternative
+near full) and longer residence for longer travel -- the marginal-value theorem.
+
+exp020 (two patches, sweep travel distance D, 128 organisms x 3500 steps):
+- Give-up density FALLS monotonically with D: 0.60 -> 0.58 -> 0.54 -> 0.48 -> 0.43
+  for D = 3..7, parallel to and below the exp(-D/range) prediction. The offset is
+  expected -- the prediction assumes a FULL alternative (frac_B=1), but the
+  alternative is still regrowing at switch time, so the realized threshold
+  exp(-D/range)*frac_B sits lower.
+- Residence time RISES monotonically: 38 -> 46 -> 52 -> 57 -> 62 steps. Longer
+  travel justifies depleting a patch further before leaving. Classic MVT.
+
+Tuning notes (two failure modes fixed):
+1. First pass STARVED (E~0): metabolism too high relative to intake. Made survival
+   cheap (basal 0.005, move 0.005) + low softmax temperature (0.15) so the organism
+   COMMITS to consuming a patch instead of random-walking off it -- leaving is then
+   salience give-up, not emission noise.
+2. The D-dependence only appears when the alternative is actually SENSED. With the
+   default sensor_range=4, exp(-D/4) is negligible for D>=6, so leaving was governed
+   by a flat hunger-dependent consume floor (no D-dependence). Set sensor_range=12
+   and keep D <= sensor_range; beyond ~sensor_range the gradient breaks (few
+   organisms detect/relocate to the far patch). Residence definition is by patch
+   ALLEGIANCE (first contact until first contact with the OTHER patch), robust to
+   brief out-of-range excursions that would otherwise read as spurious leaving.
+
+---
+
+## 2026-05-31 — Patch-leaving follow-ups: tenacity factor + functional response
+
+Two improvements after noticing observed give-up density sits ~20% BELOW the naive
+exp(-D/range) salience-crossover.
+
+(1) Tenacity factor (exp020). The discrepancy is a CONSTANT multiplicative offset,
+not a shape error: observed/naive = 0.79 +/- 0.018, flat across D=3..7. So the
+shape exp(-D/range) is exactly right and one constant closes the gap:
+
+    give_up_density = kappa * exp(-D/range),   kappa ~= 0.79
+
+kappa is PATCH TENACITY / consummatory perseveration -- the organism depletes a
+patch PAST the salience-indifference point because the consume atom's food gain
+(1.0) exceeds approach_food's (0.5), amplified by leaky-integrator lag. The static
+gain ratio (g_leave+d_gain)/(g_stay+d_gain) BRACKETS kappa but doesn't pin it:
+diagnostics show the organism actually leaves when SATIATED (give-up energy ~0.85,
+so d_gain~=0 -> gain ratio ~0.5, the lower bracket) while hungry would give ~0.82;
+the realized 0.79 is set by the dynamics, so kappa is reported as a single fitted
+constant validated by its constancy across D. Plot now shows observed, the naive
+crossover, and kappa*crossover (which lands on the data within CI).
+
+(2) Functional response (exp021, config.food_intake_scaling). Constant intake has
+a flaw: the organism satiates on a rich patch, the food drive switches off, it
+wanders away and starves -- 0% survive to end of run (give-up stats still valid,
+pooled over each organism's first few visits, but the population isn't viable).
+Added the Holling response intake = food_intake_rate * biomass/K ('biomass'
+scaling; 'constant' is the default and preserves the P=1 == make_simulate check).
+At the SAME nominal rate it fixes both problems:
+  - Survival: a depleted patch yields diminishing intake -> hunger re-engages
+    foraging -> end-of-run survival 0.00 -> 0.50.
+  - Charnov reading: within-patch intake rate now genuinely diminishes (= rate *
+    biomass_frac), so the GIVE-UP RATE (rate * give-up density) falling with travel
+    distance (0.044 -> 0.034 over D=3..7) is a literal marginal-value signature,
+    not just a salience artifact. Under constant intake the within-patch rate is
+    flat, so the same give-up-density gradient is purely stimulus-control.
+The MVT give-up-density gradient holds in BOTH regimes (functional response is
+higher and shallower: 0.74 -> 0.57 vs constant 0.60 -> 0.43). Same phenomenology,
+two resource models, only the functional response is Charnov-interpretable and
+viable -- a nice dissociation of mechanism from phenomenon.
+
+---
+
+## 2026-05-31 — Behavioral momentum (multiple schedule): satiation yes, extinction no
+
+Added run_multiple_schedule to chamber.py: K components presented successively,
+each with its own VI rate and its own Pavlovian context->reinforcer value (the
+behavioral-momentum "mass", an omission-RW association settling at a level graded
+by that component's reinforcement RATE, NOT by responding). Train to baseline,
+disrupt, measure resistance = per-component rate / its own baseline. exp022.
+
+POSITIVE RESULT -- satiation/prefeeding disruptor (energy clamped to capacity ->
+deficit ~ 0). The rich component (VI 5, reinf rate 0.17, context value 1.68) keeps
+99.6% of baseline; the lean component (VI 40, rate 0.023, ctx 0.76) keeps 80%. So
+the rich component is more resistant -- behavioral momentum, and mechanistically
+clean: the rich component's higher context value is a larger NON-motivational share
+of its press drive, so removing the deficit drive takes a smaller proportional bite.
+This is Nevin's logic (resistance tracks the stimulus-reinforcer relation) falling
+out of the model. Robust across parameterizations.
+
+NEGATIVE / DIAGNOSED -- extinction is NOT clean momentum here (rich 0.57, lean 0.78
+= anti-momentum). Worked through several mechanisms; the obstacles are real and
+worth recording:
+1. Energy-survival confound: withholding food IS starvation, which raises the
+   deficit drive -> responding rises under extinction (proportions > 1), masking/
+   reversing response extinction. Fix attempted: maintain deprivation (clamp energy)
+   during the test so only the response-reinforcer contingency changes.
+2. Response-based vs time-based value decay: the chamber erodes press value on
+   unreinforced PRESSES, so a vigorous (rich) response self-extinguishes faster --
+   anti-momentum. Switched the momentum runner to TIME-based decay divided by mass
+   (Nevin: resistance per unit time, not per response; matches the Verlet mass =
+   resistance-to-change metaphor, momentum_mass_gain). This helps in absolute terms.
+3. Shared emission floor + the proportion metric: once value decays, both components
+   fall to the SAME absolute floor (logistic at zero drive / shared deficit), so
+   proportion-of-baseline is dominated by baseline HEIGHT (rich is higher -> lower
+   proportion) rather than by mass. Removing the floor trades it for a logistic
+   CEILING; a clean monotone "rich more resistant throughout" needs fragile tuning.
+Conclusion: momentum is real in the model under a motivational (satiation) disruptor;
+extinction-resistance momentum needs reinforcement decoupled from survival and a
+floor-free, time-based, mass-scaled decay -- a clean future-work target, not faked.
+Satiation/prefeeding is itself a canonical Nevin disruptor, so this counts as a
+genuine behavioral-momentum demonstration.
+
+---
+
+## 2026-05-31 — Code sweep / refactor + reproduction harness
+
+Built a reproduction harness (scripts/reproduce.py): runs every experiment + demo
+in a fresh subprocess, scrubs volatile lines (wall-clock timings, throughput, abs
+paths), and snapshots stdout to outputs/repro/baseline.json. `--check` re-runs and
+diffs against the baseline so any numeric drift is explicit. Captured a baseline
+(26/26 run cleanly), then refactored against it.
+
+Refactor (verified: harness --check shows 0/26 experiments changed, all JAX
+validators still <1e-6, forage P=1 == make_simulate exactly 0.0, 35 tests pass):
+- New behavioral_md/experiment_utils.py centralizes helpers each experiment had
+  copy-pasted: compute_mean_ci, fit_matching_law (was duplicated in 6 matching
+  exps), make_cue_centers, make_inert_source, weak_innate_atoms, save_results_json.
+  Lives in the installed package (not under experiments/) so every script imports
+  it and still runs standalone -- no PYTHONPATH needed.
+- New behavioral_md/_kernels.py: exp_falloff (exp(-d/range)) and safe_unit (0/0-safe
+  unit vector), the sensory-geometry primitives that jax_engine, forage, and
+  matching had each written inline. Wired into all three.
+- Removed the experiments/_parallel.py passthrough; exp002/exp003 now import
+  run_sweep from behavioral_md.parallel directly.
+- Found and fixed a runnability bug: exp002/exp003/exp021 could not run as
+  `python experiments/expNNN.py` (they did `from experiments... import`, which
+  needs the repo root on sys.path). exp002/003 are now standalone; exp021 still
+  builds on exp020's setup (the harness puts the root on PYTHONPATH).
+
+Deliberately NOT changed (noted for later): the NumPy reference engine vs the JAX
+twin keep their parallel implementations on purpose (the validators check
+equivalence); the unimplemented consequence-model stubs stay as documented future
+work; chamber/matching keep hardcoded activation/weight clip bounds (they use their
+own config objects, values already match the SimulationConfig defaults). No
+mechanism numerics changed -- this sweep was structural.

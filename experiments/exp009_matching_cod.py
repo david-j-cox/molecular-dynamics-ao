@@ -23,6 +23,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md.experiment_utils import compute_mean_ci
 from behavioral_md.matching import MatchConfig, make_matching_sim
 from behavioral_md.visualization import plot_matching_cod
 
@@ -75,8 +76,7 @@ def main() -> None:
     print(f"{'sep':>4} {'n_fit':>6} {'a_mean':>7} {'95% CI':>14}")
     for sep in SEPARATIONS:
         s = sensitivity_for_separation(sep, keys)
-        mean = float(np.mean(s))
-        ci = 1.96 * float(np.std(s, ddof=1)) / np.sqrt(len(s))
+        mean, ci = compute_mean_ci(s)
         means.append(mean)
         cis.append(ci)
         print(f"{sep:>4} {len(s):>6} {mean:>7.2f}  [{mean-ci:>5.2f},{mean+ci:>5.2f}]")

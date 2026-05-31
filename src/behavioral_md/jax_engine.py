@@ -24,6 +24,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md._kernels import exp_falloff, safe_unit
 from behavioral_md.atoms import ACTION_ATOMS, STIMULI, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.forces import default_coupling_matrix
@@ -183,8 +184,8 @@ def observe(
     """
     diff = sources - positions[:, None, :]                          # [O, C, 2]
     dist = jnp.linalg.norm(diff, axis=2)                            # [O, C]
-    direction = jnp.where(dist[..., None] > 1e-9, diff / jnp.clip(dist[..., None], 1e-9, None), 0.0)
-    intensity = jnp.exp(-dist / config.sensor_range)               # [O, C]
+    direction = safe_unit(diff, dist)
+    intensity = exp_falloff(dist, config.sensor_range)             # [O, C]
     biomass_frac = biomass / config.food_carrying_capacity         # [O]
     intensity = intensity.at[:, _FOOD].multiply(biomass_frac)
     in_range = dist[:, _FOOD] <= config.consume_radius

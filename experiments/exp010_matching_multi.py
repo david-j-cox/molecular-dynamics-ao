@@ -21,6 +21,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md.experiment_utils import fit_matching_law
 from behavioral_md.matching import MatchConfig, make_matching_sim
 from behavioral_md.visualization import plot_matching
 
@@ -65,8 +66,7 @@ def main() -> None:
         y_all.append(lb[m])
     x = np.concatenate(x_all)
     y = np.concatenate(y_all)
-    a, log_b = np.polyfit(x, y, 1)
-    r2 = 1 - np.sum((y - (a * x + log_b)) ** 2) / np.sum((y - y.mean()) ** 2)
+    a, log_b, r2 = fit_matching_law(x, y)
     elapsed = time.perf_counter() - t0
 
     print(f"{N_PATCHES} alternatives x {N_CONDITIONS} conditions x {N_ORG} organisms "

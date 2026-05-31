@@ -17,6 +17,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md.experiment_utils import fit_matching_law
 from behavioral_md.matching import MatchConfig, make_matching_sim
 from behavioral_md.visualization import plot_matching
 
@@ -53,9 +54,7 @@ def main() -> None:
 
     x = np.concatenate(log_R)
     y = np.concatenate(log_B)
-    a, log_b = np.polyfit(x, y, 1)
-    ss_res = np.sum((y - (a * x + log_b)) ** 2)
-    r2 = 1 - ss_res / np.sum((y - y.mean()) ** 2)
+    a, log_b, r2 = fit_matching_law(x, y)
 
     print(f"{N_ORG} organisms x {len(RATE_PAIRS)} schedules x {N_STEPS} steps in {elapsed:.1f}s")
     print(f"Generalized matching law fit:  log(B_L/B_R) = {a:.2f} * log(R_L/R_R) + {log_b:+.2f}")

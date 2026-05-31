@@ -31,6 +31,8 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
+from behavioral_md._kernels import exp_falloff, safe_unit
+
 # Action set: 4 movement directions + stay.
 _MOVES = jnp.array([[0.0, 1.0], [0.0, -1.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 0.0]])
 
@@ -100,8 +102,8 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         pos = state["pos"]
         diff = patch_pos[None, :, :] - pos[:, None, :]       # [O, P, 2]
         dist = jnp.linalg.norm(diff, axis=2)                 # [O, P]
-        unit = jnp.where(dist[..., None] > 1e-9, diff / jnp.clip(dist[..., None], 1e-9, None), 0.0)
-        intensity = jnp.exp(-dist / mcfg.sensor_range)       # [O, P]
+        unit = safe_unit(diff, dist)
+        intensity = exp_falloff(dist, mcfg.sensor_range)     # [O, P]
         value = state["w"] @ cue_act.T                       # [O, P] learned value of each cue
         # Movement force per direction: sum over patches of value*intensity*(dir.move).
         pull = (mcfg.approach_gain * value * intensity)[:, :, None]   # [O, P, 1]

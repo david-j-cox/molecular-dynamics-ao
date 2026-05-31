@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from behavioral_md.config import SimulationConfig
+from behavioral_md.experiment_utils import make_cue_centers
 from behavioral_md.jax_engine import build_spec, initial_state, make_simulate, run_lives
 from behavioral_md.visualization import plot_extinction
 
@@ -32,7 +33,7 @@ def main() -> None:
     spec = build_spec(config=cfg)
     sources_np = np.stack([LAYOUT[k] for k in ("food", "danger", "light", "cue")], dtype=float)
     sources = jnp.broadcast_to(jnp.asarray(sources_np), (N_ORG, 4, 2))
-    sim = make_simulate(spec, cfg, sources, jnp.linspace(0.0, 1.0, cfg.n_cue_receptors))
+    sim = make_simulate(spec, cfg, sources, make_cue_centers(cfg))
     state0 = initial_state(spec, cfg, N_ORG, LAYOUT["position"], cfg.n_cue_receptors)
 
     schedule = [True] * N_TRAIN + [False] * N_EXT  # reinforce, then extinguish

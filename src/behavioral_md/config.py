@@ -202,6 +202,17 @@ class SimulationConfig(BaseModel):
         ge=0.0,
         description="Uneatable remnant; floor from which the patch regrows (logistic).",
     )
+    food_intake_scaling: Literal["constant", "biomass"] = Field(
+        "constant",
+        description=(
+            "How per-step intake depends on patch biomass. 'constant' = a fixed "
+            "food_intake_rate while in contact (time-at-patch feeding; the default, "
+            "and what the single-patch engine assumes). 'biomass' = intake scales "
+            "with biomass fraction (food_intake_rate * biomass/K), a Holling/"
+            "functional-response model: depleted patches yield diminishing intake, "
+            "so within-patch returns fall and hunger re-engages foraging."
+        ),
+    )
 
     # --- Rendering ---------------------------------------------------------
     render_mode: Literal["human", "rgb_array", "none"] = Field(
