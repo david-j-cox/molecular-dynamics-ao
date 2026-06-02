@@ -1070,3 +1070,55 @@ two matching sensitivities are now independently tunable, with the new dimension
 Validation: 2 new tests (rho orthogonality in the surrogate; rho fits a low-amount
 target). reproduce baseline re-captured with exp024 (exp001-023 + demos 0 drift).
 Open: do a_prob / a_delay need their own asymmetric levers too?
+
+---
+
+## 2026-06-02 (cont.) — Probability and delay decoupling (exp025): the pattern generalizes
+
+Extended the decoupling work to the last two concatenated-matching dimensions. Probed
+the stochastic engine first (programmed-ratio regression, so absolute a_rate reads
+lower than exp008's obtained-ratio 0.56 -- structure is what matters):
+
+```
+config        a_rate   a_amt  a_prob a_delay
+baseline       0.204   0.964   0.759   0.610
+beta=9         0.332   1.118   0.807   0.686   <- beta scales ALL four
+rho=1.6        0.204   1.213   0.759   0.610   <- amount_exponent: a_amt only
+delay_k=1.0    0.204   0.964   0.759   0.642   <- delay_k: a_delay only
+delay_k=0.2    0.204   0.964   0.759   0.453
+```
+
+Clean structure: the discriminability levers (beta, COD, ~temperature) scale all four
+sensitivities (the overall-sensitivity anchor, read off a_rate), and each GRADED
+dimension has its own orthogonal curvature lever:
+  amount -> amount_exponent (rho)        value ~ amount^rho
+  delay  -> delay_k                      hyperbolic discount steepness  (already existed!)
+  prob   -> probability_exponent (sigma) reinforcement gated on prob^sigma  (NEW)
+So delay was already decouplable; only probability needed a new knob. sigma is nonlinear
+probability weighting (prospect-theory flavor): contacts reinforce with effective prob
+prob^sigma. Each lever leaves the other three sensitivities untouched because their
+sweeps hold that dimension neutral (amount=1, prob=1, delay=0 -> 1^x=1, discount(0)=1);
+sigma==1.0 / rho==1.0 are guarded so existing experiments stay bit-identical.
+
+Surrogate extended to carry prob/delay schedules + the sigma/delay_k levers
+(soft_sensitivities_all returns all four; soft_sensitivities keeps the cheaper rate+amt
+pair for exp023/024). Verified in the surrogate: sigma=0.5->1.7 moves soft a_prob
+0.15->0.52 with rate/amt/delay byte-identical; delay_k moves a_delay only.
+
+exp025 fits two CROSSING (a_prob, a_delay) targets with free = beta/sigma/delay_k
+(fit_dims, a dict-targeted Nelder-Mead over soft_sensitivities_all):
+```
+                a_prob (t/soft/stoch)    a_delay (t/soft/stoch)
+  baseline        --  0.37 0.78           --  0.37 0.61
+  A prob^/delay_v 0.50 0.50 0.93         0.22 0.22 0.45
+  B prob_v/delay^ 0.15 0.14 0.50         0.34 0.37 0.64
+```
+Surrogate hits targets; stochastic transfers and CROSSES (a_prob A>B, a_delay A<B).
+Fitted sigma = 1.44 (A) vs 0.49 (B), delay_k = 0.15 (A) vs 0.66 (B) carry the two
+dimensions independently. So all four generalized-matching-law sensitivities are now
+independently tunable -- rate as the frequency anchor, amount/probability/delay each
+with its own utility-curvature exponent.
+
+Validation: 3 new tests (sigma & delay_k orthogonality; fit_dims sigma ordering), 49
+pass; ruff clean; reproduce baseline re-captured with exp025 (exp001-024 + demos 0
+drift -- the rho==1/sigma==1 guards hold).

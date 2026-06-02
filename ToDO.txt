@@ -107,9 +107,18 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     impossible on the old coupled manifold; decoupling transfers (a_rate A>B, a_amt A<B).
 [ ] Revisit autodiff via truncated backprop (TBPTT) if a gradient method is wanted
     (the forward surrogate is fine; only the full-rollout reverse gradient explodes).
-[ ] a_prob / a_delay decoupling: do the probability/delay concatenated-law dimensions
-    also need their own asymmetric lever, or does rho-style magnitude curvature
-    generalize? (exp013/exp014 set them; not yet fit to targets.)
+[x] a_prob / a_delay decoupling (exp025). The rho pattern GENERALIZES: each graded
+    concatenated dimension has its own orthogonal curvature lever, with rate the
+    frequency anchor set by the discriminability knobs (beta etc.):
+      amount -> amount_exponent (rho)         value ~ amount^rho
+      delay  -> delay_k                        hyperbolic discount steepness (already existed)
+      prob   -> probability_exponent (sigma)   reinforcement gated on prob^sigma (NEW)
+    Probe confirmed beta scales all four; rho/delay_k/sigma each move ONLY their own
+    dimension (the other sweeps hold that dim neutral: amount=1, prob=1, delay=0).
+    sigma is nonlinear probability weighting (prospect-theory flavor). exp025 fits
+    crossing (a_prob, a_delay) targets via sigma + delay_k: A (prob^/delay_v -> stoch
+    0.93/0.45) and B (prob_v/delay^ -> 0.50/0.64); decoupling transfers (a_prob A>B,
+    a_delay A<B). All four GML sensitivities are now independently tunable.
 [~] Behavioral momentum demonstration (exp022, chamber.run_multiple_schedule):
     multiple schedule, rich (VI 5) vs lean (VI 40) components, each with a
     Pavlovian context->reinforcer value (rate-graded "mass"). DONE under the

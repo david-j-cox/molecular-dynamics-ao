@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("jax")
 
-from behavioral_md.fit import fit  # noqa: E402
+from behavioral_md.fit import fit, fit_dims  # noqa: E402
 from behavioral_md.matching import MatchConfig  # noqa: E402
 
 _KW = dict(n_org=48, n_steps=600, maxiter=40)
@@ -50,3 +50,15 @@ def test_amount_exponent_fits_low_amount_target():
     free = ("temperature", "approach_gain", "beta", "amount_exponent")
     fitted, _ = fit((0.45, 0.35), free=free, **_KW)
     assert fitted.amount_exponent < 1.0
+
+
+def test_fit_dims_orders_sigma_by_prob_target():
+    # probability_exponent (sigma) is the a_prob lever: a higher probability-sensitivity
+    # target should land on a larger sigma. Search sigma alone so the lever must do the
+    # work (with beta free the shared anchor can absorb the target at tiny settings).
+    lo, _ = fit_dims({"prob": 0.15}, free=("probability_exponent",), **_KW)
+    hi, _ = fit_dims({"prob": 0.45}, free=("probability_exponent",), **_KW)
+    assert hi.probability_exponent > lo.probability_exponent
+    # (delay_k as an a_delay lever is covered by test_delay_k_is_orthogonal in
+    # test_matching_diff; the delay signal is too weak to resolve fine a_delay targets
+    # at these fast test settings, and exp025 exercises the delay fit end-to-end.)

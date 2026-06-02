@@ -75,10 +75,14 @@ WIDTH = 0.5
 # Parameters the search can vary; the rollout reads each from the params dict if
 # present, else from MatchConfig. lr_cue is NOT here on purpose -- its rate-sensitivity
 # effect does not transfer from the relaxed surrogate to the stochastic engine (see
-# docstring). amount_exponent (rho) is the orthogonal lever on a_amt: it scales the
-# magnitude utility (amount**rho) and so moves the amount sensitivity while leaving the
-# rate sensitivity untouched (a_rate is measured at equal amounts).
-TUNABLE = ("temperature", "approach_gain", "beta", "amount_exponent")
+# docstring). The other three are the per-dimension curvature levers, each orthogonal
+# to the rate anchor (the rate/amount/prob/delay sweeps hold the other dimensions at
+# their neutral value, so a lever only moves its own sensitivity):
+#   amount_exponent (rho)      -> a_amt  (value tracks amount**rho)
+#   probability_exponent (sigma) -> a_prob (reinforcement gated on prob**sigma)
+#   delay_k                    -> a_delay (steepness of the hyperbolic delay discount)
+TUNABLE = ("temperature", "approach_gain", "beta",
+           "amount_exponent", "probability_exponent", "delay_k")
 
 # Default free set: the discriminability levers, which move both sensitivities together.
 # Add "amount_exponent" to the free set (see fit.fit(free=...)) to decouple a_amt.
@@ -107,25 +111,29 @@ def make_matching_sim_soft(mcfg: MatchConfig, patch_pos, patch_cue, start):
     move_dirs = _MOVES                                       # [M=5, 2]
     n_patch = patch_pos.shape[0]
 
-    def discount(delay):
-        if mcfg.delay_discount == "exponential":
-            return jnp.exp(-delay / mcfg.delay_tau)
-        return 1.0 / (1.0 + mcfg.delay_k * delay)            # hyperbolic (Mazur)
-
-    def rollout(params, arm, amount, n_steps, n_org=128, key=None):
+    def rollout(params, arm, amount, n_steps, n_org=128, key=None, prob=None, delay=None):
         # Each tunable comes from params if the search exposes it, else from mcfg.
         temperature = params.get("temperature", mcfg.temperature)
         approach_gain = params.get("approach_gain", mcfg.approach_gain)
         beta = params.get("beta", mcfg.beta)
         rho = params.get("amount_exponent", mcfg.amount_exponent)
+        sigma = params.get("probability_exponent", mcfg.probability_exponent)
+        delay_k = params.get("delay_k", mcfg.delay_k)
         lr_cue = mcfg.lr_cue                             # fixed (does not transfer)
         arm = jnp.asarray(arm, float)                        # [P]
         amount = jnp.asarray(amount, float)                  # [P]
-        prob = jnp.ones(n_patch)
-        # Magnitude utility curvature (a_amt lever). rho==1.0 (a Python float, when not
-        # being fit) keeps the linear-amount path; a traced rho uses amount**rho.
+        prob = jnp.ones(n_patch) if prob is None else jnp.asarray(prob, float)
+        delay = jnp.zeros(n_patch) if delay is None else jnp.asarray(delay, float)
+        # Magnitude utility curvature (a_amt lever); rho==1.0 keeps the linear path.
         mag = amount if (isinstance(rho, float) and rho == 1.0) else amount ** rho
-        eff_amount = mag * discount(jnp.zeros(n_patch))      # delay = 0 here
+        # Delay discount (a_delay lever via delay_k); hyperbolic unless config says exp.
+        if mcfg.delay_discount == "exponential":
+            disc = jnp.exp(-delay / mcfg.delay_tau)
+        else:
+            disc = 1.0 / (1.0 + delay_k * delay)
+        eff_amount = mag * disc                              # [P]
+        # Probability weighting (a_prob lever); sigma==1.0 keeps the linear gate.
+        prob_eff = prob if (isinstance(sigma, float) and sigma == 1.0) else prob ** sigma
         cue_act = _tuning(centers, beta, patch_cue)          # [P, K] (beta is free)
 
         # Fixed common-random-number noise (reparameterization): Gumbel for the action
@@ -169,8 +177,8 @@ def make_matching_sim_soft(mcfg: MatchConfig, patch_pos, patch_cue, start):
             # occupancy and soft disarm on reinforcement.
             newly = jax.nn.sigmoid((logit_arm[None, :] + lg) / TAU_B)   # [O, P]
             p_arm = state["armed_p"] + (1.0 - state["armed_p"]) * newly
-            r = soft_in * p_arm * prob[None, :]              # [O, P] expected reinforcement
-            armed_p = p_arm * (1.0 - soft_in * prob[None, :])
+            r = soft_in * p_arm * prob_eff[None, :]          # [O, P] expected reinforcement
+            armed_p = p_arm * (1.0 - soft_in * prob_eff[None, :])
 
             # Cue-receptor RW update on the expected armed contact / reinforcement.
             opp = soft_in * p_arm                            # [O, P] expected armed contact
@@ -208,6 +216,11 @@ RATE_PAIRS = [(0.02, 0.18), (0.04, 0.16), (0.06, 0.14), (0.10, 0.10),
               (0.14, 0.06), (0.16, 0.04), (0.18, 0.02)]
 AMOUNT_PAIRS = [(0.3, 1.7), (0.5, 1.5), (0.7, 1.3), (1.0, 1.0),
                 (1.3, 0.7), (1.5, 0.5), (1.7, 0.3)]
+# Probability (exp013) and delay (exp014) sweeps, run at identical VI (ARM_PD).
+PROB_PAIRS = [(0.9, 0.1), (0.75, 0.25), (0.5, 0.5), (0.25, 0.75), (0.1, 0.9)]
+DELAY_PAIRS = [(1.0, 9.0), (2.0, 6.0), (4.0, 4.0), (6.0, 2.0), (9.0, 1.0)]
+_ARM_AMT = [0.10, 0.10]    # equal VI for the amount sweep (exp011)
+_ARM_PD = [0.12, 0.12]     # equal VI for the probability/delay sweeps (exp013/14)
 _EPS = 1e-6
 
 
@@ -245,6 +258,42 @@ def soft_sensitivities(params, mcfg: MatchConfig | None = None,
     y_amt = jax.vmap(lambda a: behavior_logratio(jnp.array([0.10, 0.10]), a))(amts)
     a_amt = _slope(x_amt, y_amt)
     return a_rate, a_amt
+
+
+def soft_sensitivities_all(params, mcfg: MatchConfig | None = None,
+                           n_steps: int = 1500, n_org: int = 128, key=None) -> dict:
+    """All four soft sensitivities as a dict {rate, amt, prob, delay}.
+
+    Mirrors exp008/011/013/014: each dimension is swept while the others are held at
+    their neutral value (amount=1, prob=1, delay=0), so each curvature lever moves only
+    its own sensitivity. The rate sweep regresses on the PROGRAMMED arm ratio (the
+    surrogate's clean x); a_delay is the negated slope (delay enters the GML with a
+    negative sign). Used for the prob/delay fitting (exp025); ``soft_sensitivities``
+    keeps the cheaper rate+amt pair for exp023/exp024.
+    """
+    mcfg = MatchConfig() if mcfg is None else mcfg
+    if key is None:
+        key = jax.random.key(0)
+    rollout = make_matching_sim_soft(mcfg, _PATCH_POS, _PATCH_CUE, _START)
+    one, zero = jnp.ones(2), jnp.zeros(2)
+
+    def blr(arm, amount, prob, delay):
+        b, _c = rollout(params, arm, amount, n_steps, n_org, key, prob=prob, delay=delay)
+        return jnp.log((b[0] + _EPS) / (b[1] + _EPS))
+
+    arms = jnp.array(RATE_PAIRS)
+    a_rate = _slope(jnp.log(arms[:, 0] / arms[:, 1]),
+                    jax.vmap(lambda p: blr(p, one, one, zero))(arms))
+    amts = jnp.array(AMOUNT_PAIRS)
+    a_amt = _slope(jnp.log(amts[:, 0] / amts[:, 1]),
+                   jax.vmap(lambda a: blr(jnp.array(_ARM_AMT), a, one, zero))(amts))
+    probs = jnp.array(PROB_PAIRS)
+    a_prob = _slope(jnp.log(probs[:, 0] / probs[:, 1]),
+                    jax.vmap(lambda p: blr(jnp.array(_ARM_PD), one, p, zero))(probs))
+    dels = jnp.array(DELAY_PAIRS)
+    a_delay = -_slope(jnp.log(dels[:, 0] / dels[:, 1]),
+                      jax.vmap(lambda d: blr(jnp.array(_ARM_PD), one, one, d))(dels))
+    return {"rate": a_rate, "amt": a_amt, "prob": a_prob, "delay": a_delay}
 
 
 def validate_soft_vs_stochastic(n_steps: int = 1500, n_org: int = 128):

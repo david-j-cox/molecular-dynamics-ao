@@ -15,8 +15,10 @@ import jax  # noqa: E402
 
 from behavioral_md.matching import MatchConfig  # noqa: E402
 from behavioral_md.matching_diff import (  # noqa: E402
+    TUNABLE,
     default_params,
     soft_sensitivities,
+    soft_sensitivities_all,
 )
 
 _N_ORG, _N_STEPS = 48, 600
@@ -25,6 +27,11 @@ _N_ORG, _N_STEPS = 48, 600
 def _sens(params):
     return soft_sensitivities(params, MatchConfig(), _N_STEPS, _N_ORG,
                               jax.random.key(0))
+
+
+def _sens_all(params):
+    return soft_sensitivities_all(params, MatchConfig(), _N_STEPS, _N_ORG,
+                                  jax.random.key(0))
 
 
 def test_default_sensitivities_in_undermatching_band():
@@ -62,3 +69,25 @@ def test_amount_exponent_is_orthogonal_to_rate():
     hi = _sens({**base, "amount_exponent": 1.5})
     assert float(lo[0]) == float(hi[0])      # a_rate identical across rho
     assert float(hi[1]) > float(lo[1])       # a_amt rises with rho
+
+
+def test_probability_exponent_is_orthogonal():
+    # sigma (probability_exponent) scales a_prob only; the rate/amount/delay sweeps hold
+    # prob=1 (1**sigma=1), so those rollouts are bit-identical across sigma.
+    base = default_params(MatchConfig(), TUNABLE)
+    lo = _sens_all({**base, "probability_exponent": 0.5})
+    hi = _sens_all({**base, "probability_exponent": 1.5})
+    for dim in ("rate", "amt", "delay"):
+        assert float(lo[dim]) == float(hi[dim])
+    assert float(hi["prob"]) > float(lo["prob"])
+
+
+def test_delay_k_is_orthogonal():
+    # delay_k scales a_delay only; the rate/amount/prob sweeps hold delay=0
+    # (discount(0)=1 for any delay_k), so those rollouts are bit-identical.
+    base = default_params(MatchConfig(), TUNABLE)
+    lo = _sens_all({**base, "delay_k": 0.2})
+    hi = _sens_all({**base, "delay_k": 1.0})
+    for dim in ("rate", "amt", "prob"):
+        assert float(lo[dim]) == float(hi[dim])
+    assert float(hi["delay"]) > float(lo["delay"])

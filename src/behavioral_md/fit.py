@@ -40,7 +40,13 @@ import numpy as np
 from scipy.optimize import minimize
 
 from behavioral_md.matching import MatchConfig
-from behavioral_md.matching_diff import FREE_PARAMS, default_params, soft_sensitivities
+from behavioral_md.matching_diff import (
+    FREE_PARAMS,
+    TUNABLE,
+    default_params,
+    soft_sensitivities,
+    soft_sensitivities_all,
+)
 
 # Lower bound keeping the positive scale parameters away from 0 during the search.
 _MIN_PARAM = 1e-2
@@ -107,6 +113,47 @@ def fit(targets, mcfg: MatchConfig | None = None, free=FREE_PARAMS, n_steps: int
     if verbose:
         print(f"best loss={best['loss']:.4f} at "
               + "  ".join(f"{k}={best['params'][k]:.3f}" for k in free))
+    return fitted_config(best["params"], mcfg), history
+
+
+def fit_dims(targets: dict, mcfg: MatchConfig | None = None, free=TUNABLE,
+             n_steps: int = 1500, n_org: int = 128, key=None, maxiter: int = 160,
+             verbose: bool = False):
+    """Derivative-free fit targeting any subset of the four sensitivities.
+
+    ``targets`` is a dict over {"rate","amt","prob","delay"} giving the desired value
+    of each targeted sensitivity (surrogate units). ``free`` is the tuple of parameters
+    to search -- typically the relevant per-dimension curvature levers plus ``beta``
+    (the rate anchor); e.g. fitting prob/delay uses
+    ``("beta", "probability_exponent", "delay_k")``. Uses the four-dimension surrogate
+    (soft_sensitivities_all). Returns ``(fitted_mcfg, history)`` where each history
+    entry carries all four sensitivities and the params. See exp025.
+    """
+    mcfg = MatchConfig() if mcfg is None else mcfg
+    if key is None:
+        key = jax.random.key(0)
+    dims = list(targets)
+
+    sens = jax.jit(lambda p: soft_sensitivities_all(p, mcfg, n_steps, n_org, key))
+
+    history = []
+
+    def objective(x):
+        params = _to_params(x, free)
+        d = {k: float(v) for k, v in sens(params).items()}
+        loss = sum((d[k] - targets[k]) ** 2 for k in dims)
+        history.append({"eval": len(history), "loss": loss, **d, "params": params})
+        if verbose and len(history) % 10 == 1:
+            ds = "  ".join(f"{k}={d[k]:.3f}" for k in dims)
+            print(f"  eval {len(history):3d}  loss={loss:.4f}  {ds}")
+        return loss
+
+    x0 = np.array([default_params(mcfg, free)[k] for k in free], float)
+    bounds = [(_MIN_PARAM, None)] * len(free)
+    minimize(objective, x0, method="Nelder-Mead", bounds=bounds,
+             options={"maxiter": maxiter, "xatol": 1e-3, "fatol": 1e-5})
+
+    best = min(history, key=lambda h: h["loss"])
     return fitted_config(best["params"], mcfg), history
 
 

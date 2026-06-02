@@ -58,6 +58,7 @@ EXPERIMENTS = [
     "experiments/exp022_behavioral_momentum.py",
     "experiments/exp023_fit_sensitivity.py",
     "experiments/exp024_decoupled_fit.py",
+    "experiments/exp025_prob_delay_decoupling.py",
     "scripts/run_demo.py",
     "scripts/run_extinction_demo.py",
     "scripts/run_generalization_demo.py",

@@ -70,6 +70,17 @@ class MatchConfig(NamedTuple):
     # so this knob leaves a_rate untouched. (The physical amount obtained is unchanged;
     # only the teaching signal is curved.) Default 1.0 reproduces the linear-amount law.
     amount_exponent: float = 1.0
+    # Probability-weighting exponent (the PROBABILITY analogue of amount_exponent): a
+    # contact with an armed patch is reinforced with effective probability
+    # prob**probability_exponent, so the learned value tracks a distorted probability
+    # (nonlinear probability weighting, cf. prospect theory). sigma<1 overweights low
+    # probabilities, sigma>1 underweights them. This sets the PROBABILITY sensitivity
+    # (a_prob) independently: the rate/amount/delay sweeps all hold prob=1
+    # (1**sigma=1), so this knob leaves their sensitivities untouched. Default 1.0
+    # reproduces the linear-probability gate. (Rate is the frequency anchor set by the
+    # discriminability levers; amount/probability/delay each get their own curvature
+    # exponent -- amount_exponent, probability_exponent, delay_k.)
+    probability_exponent: float = 1.0
 
 
 def _tuning(centers, beta, value):
@@ -141,7 +152,10 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         opportunity = in_range & armed                       # [O, P] armed contact
         key, sub3 = jax.random.split(key)
         roll = jax.random.uniform(sub3, opportunity.shape)
-        reinforced = opportunity & (roll < prob[None, :])    # PROBABILITY gate
+        # Probability weighting (a_prob lever). sigma==1.0 keeps the linear gate
+        # bit-identical (no power op), so existing experiments do not drift.
+        prob_eff = prob if mcfg.probability_exponent == 1.0 else prob ** mcfg.probability_exponent
+        reinforced = opportunity & (roll < prob_eff[None, :])  # PROBABILITY gate
         armed = armed & (~reinforced)                        # disarm only on reinforcement
 
         # Train cue receptors on every armed contact (summed/elemental RW error):

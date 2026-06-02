@@ -135,7 +135,7 @@ flowchart LR
 | Law (sketch) | In the engine | Status |
 |---|---|---|
 | Generalized matching law | softmax emission (Luce rule); `matching.py` concurrent VI-VI | implemented |
-| Concatenated matching law | rate, amount, probability, delay (separable sensitivities) | implemented |
+| Concatenated matching law | rate, amount, probability, delay — separable, and each independently tunable via its own curvature lever | implemented |
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
@@ -287,7 +287,7 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
 A range of classic behavior-analytic phenomena are reproduced from the same
 mechanism. The `scripts/` demos run agent populations (use `--agents N`) and write
 figures with 95% CI bands; the `experiments/` sweeps (`exp0NN`) cover matching,
-schedules, timing, and the JAX engine.
+schedules, timing, the JAX engine, and parameter fitting.
 
 **Foraging / learning** (`scripts/`):
 
@@ -303,10 +303,11 @@ separate food channels):
 
 | Phenomenon | Experiment | Result |
 |---|---|---|
-| Generalized matching | `exp008` | undermatching (a≈0.7), classic log-log GML |
+| Generalized matching | `exp008` | undermatching (a≈0.56), classic log-log GML |
 | Changeover delay | `exp009` | sensitivity rises with travel/COD (Shull & Pliskoff) |
 | Multi-alternative matching | `exp010` | near-perfect matching across 5 alternatives |
 | Concatenated law: amount / probability / delay | `exp011`/`exp013`/`exp014` | separable sensitivities per dimension |
+| Sensitivity fitting & decoupling | `exp023`/`exp024`/`exp025` | fit emergent sensitivities to targets; rate/amount and probability/delay independently tunable (see **Parameter fitting** below) |
 
 **Operant chamber & schedules** (`chamber.py`, `timing.py`):
 
@@ -330,14 +331,25 @@ free discriminability levers (`temperature`, `approach_gain`, `beta`) move `a_ra
 `a_amt` together, so on their own the fit can only tune them in aligned directions —
 stochastic `a_rate` 0.56 → 0.66 (up) / 0.36 (down), `a_amt` 0.97 → 1.06 / 0.86.
 
-**Decoupling them** (`exp024`) needs an *asymmetric* lever, since every discriminability
-knob — including patch separation/COD — scales both sensitivities together (a finding:
-exp009 had only ever measured rate vs COD). Adding a reinforcer-magnitude sensitivity
-exponent `amount_exponent` (value tracks `amount^ρ`, utility curvature) gives one:
-because `a_rate` is measured at equal amounts (`amount^ρ = 1`), `ρ` scales `a_amt` while
-leaving `a_rate` exactly flat. With `beta` for rate and `ρ` for amount, the fit hits
-*crossing* targets impossible before — high-rate/low-amount (stoch 0.59/0.61) vs
-low-rate/high-amount (0.39/1.20). See the lab notebook (2026-06-02) for the full diagnosis.
+**Decoupling them** needs *asymmetric* levers, since every discriminability knob —
+including patch separation/COD — scales all the sensitivities together (a finding:
+exp009 had only ever measured rate vs COD). The pattern that emerges is clean: **rate is
+the frequency anchor** (set by the discriminability levers), and **each graded dimension
+gets its own orthogonal utility-curvature exponent**:
+
+| dimension | lever | mechanism |
+|---|---|---|
+| amount | `amount_exponent` (ρ) | value tracks `amount^ρ` |
+| delay | `delay_k` | steepness of the hyperbolic delay discount (pre-existing) |
+| probability | `probability_exponent` (σ) | reinforcement gated on `prob^σ` (nonlinear probability weighting) |
+
+Each leaves the other sensitivities exactly flat because the other sweeps hold that
+dimension neutral (`amount=1`, `prob=1`, `delay=0` → `1^x=1`, `discount(0)=1`). So the
+fit hits *crossing* targets impossible on the coupled manifold: `exp024` decouples
+rate/amount (high-rate/low-amount stoch 0.59/0.61 vs low-rate/high-amount 0.39/1.20),
+and `exp025` decouples probability/delay (high-prob/low-delay stoch 0.93/0.45 vs
+low-prob/high-delay 0.50/0.64). All four generalized-matching-law sensitivities are
+independently tunable. See the lab notebook (2026-06-02) for the full diagnosis.
 
 `scripts/make_figures.py` regenerates the standard foraging figure set (occupancy
 landscape, energy/biomass traces, learning curves, force-decomposition grid).
@@ -385,7 +397,7 @@ src/behavioral_md/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
                          #   run_peak_shift_demo, make_figures  (each takes --agents N)
-experiments/             # reproducible sweeps/benchmarks (exp001-024) + parallel helper
+experiments/             # reproducible sweeps/benchmarks (exp001-025) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
 outputs/                 # logs/ and figures/ (generated; gitignored)
@@ -435,9 +447,22 @@ pre-commit install --hook-type pre-push     # pytest on push
 - [x] **Operant chamber & schedules** — FI scallop, FR break-and-run, FR>VR pause
   (cumulative records); pluggable interval-timing models (SET / BeT / LeT);
   effort-based / unit-price consumption.
-- [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster (autodiff-ready).
-- [x] **Tests + CI** — 32-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster. (Autodiff is
+  exposed, but gradients through the long recurrent matching rollout explode and are
+  unusable for fitting; fitting instead searches the differentiable forward surrogate
+  derivative-free — see below.)
+- [x] **Patch-leaving / MVT** — multi-patch foraging (`forage.py`); give-up density
+  falls and residence rises with travel distance; Charnov functional response.
+- [x] **Parameter fitting & sensitivity decoupling** — search organism parameters so
+  the *emergent* generalized-matching-law sensitivities hit chosen targets (`exp023`),
+  validated by re-plugging into the stochastic engine. Each graded dimension's
+  sensitivity is independently controllable via its own utility-curvature lever
+  (`amount_exponent`, `probability_exponent`, `delay_k`), with rate the frequency
+  anchor: rate/amount (`exp024`) and probability/delay (`exp025`) are decoupled to
+  crossing targets that the shared discriminability levers could not reach.
+- [x] **Tests + CI** — 49-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; behavioral momentum (molar);
-  day/night ambient sun; multiple food patches; punishment-asymmetry consequence
-  models; using the JAX autodiff for fitting → evolution → model comparison →
-  real data (see `ToDO.txt`).
+  day/night ambient sun; punishment-asymmetry consequence models; dual
+  excitatory/inhibitory extinction (spontaneous recovery, renewal); a genuine
+  autodiff fit via truncated backprop → evolution → model comparison → real data
+  (see `ToDO.txt`).
