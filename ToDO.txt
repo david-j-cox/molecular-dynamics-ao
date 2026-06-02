@@ -169,9 +169,23 @@ DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
     non-reinforced exposure, gated to contact) + asymmetric acq/ext rates.
     Acquisition latency 152->106; trained hw_food 1.0 extinguishes to ~0 over
     a few unreinforced lives (run_extinction_demo).
-[ ] Dual excitatory/inhibitory (Konorski/Pearce-Hall/Bouton): separate w+ (grows)
-    and w- (grows on omission, decays/context-gated) -> spontaneous recovery,
-    renewal, rapid reacquisition.
+[x] Dual excitatory/inhibitory (Konorski/Bouton): learning_model="dual_exc_inhib"
+    (learning.py DualExcitatoryInhibitory). Separate w+ (excitation, preserved through
+    extinction) and w- (inhibition, grows on omission); net = w+ - gate*w- written into
+    history_weights so forces.py is unchanged. w- passively decays (spontaneous recovery)
+    and is context-gated by a Shepard kernel on a new obs "context" scalar (renewal);
+    reinforcement relaxes w- fast (rapid reacquisition). All three demonstrated and the
+    transfer is clean:
+      - run_reacquisition_demo: dual reacquires net>=0.5 in ~0.5 lives vs ~2 for original
+        acquisition and vs RW (which erases w+).
+      - run_spontaneous_recovery_demo: net 0.42 (end-ext) -> 1.00 over a rest interval
+        (SAME arena, food withheld via food_present=False; passive w- decay over TIME,
+        context constant -- distinct from renewal) -> re-extinguishes at test.
+      - run_renewal_demo (ABA vs ABB): test in the acquisition context A renews
+        (net ~0.45) while the extinction context B stays suppressed (~0.0).
+    5 unit tests; opt-in (default rescorla_wagner + all 25 exps + existing demos 0 drift).
+    NOTE: renewal/SR are clean in the NET (the learned association); raw food-contact is
+    floored by incidental proximity in this layout, so the net is the reported readout.
 [ ] Momentum-modulated decay (Nevin & Grace): extinction rate scaled by
     accumulated reinforcement / atom mass -> resistance to change, PREE.
 [ ] Pearce-Hall variable associability (learning rate ~ |prediction error|).

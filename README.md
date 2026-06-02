@@ -139,6 +139,7 @@ flowchart LR
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
+| Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
@@ -297,6 +298,9 @@ schedules, timing, the JAX engine, and parameter fitting.
 | Extinction | `run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 when food stops reinforcing |
 | Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value |
 | Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
+| Rapid reacquisition | `run_reacquisition_demo.py` | dual exc/inhib rule reacquires far faster than original acquisition (and than RW) — w+ preserved |
+| Spontaneous recovery | `run_spontaneous_recovery_demo.py` | net recovers over a rest interval (inhibition decays, excitation preserved), then re-extinguishes |
+| Renewal (ABA vs ABB) | `run_renewal_demo.py` | extinguished responding returns in the acquisition context (A), not the extinction context (B) |
 
 **Choice & matching** (`matching.py`; patches signalled by discriminative cues, not
 separate food channels):
@@ -396,7 +400,9 @@ src/behavioral_md/
   environments/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
-                         #   run_peak_shift_demo, make_figures  (each takes --agents N)
+                         #   run_peak_shift_demo, run_reacquisition_demo,
+                         #   run_spontaneous_recovery_demo, run_renewal_demo,
+                         #   make_figures  (each takes --agents N)
 experiments/             # reproducible sweeps/benchmarks (exp001-025) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
@@ -441,6 +447,9 @@ pre-commit install --hook-type pre-push     # pytest on push
   lives; two-tier valence-split learning; consummatory competition.
 - [x] **Learning phenomena** — acquisition, extinction (pluggable
   `LearningRule`), generalization, and peak shift (cue receptor population).
+- [x] **Dual excitatory/inhibitory extinction** (`dual_exc_inhib`) — extinction builds
+  a separate, context-specific inhibition (w-) on top of a preserved excitation (w+),
+  reproducing spontaneous recovery, renewal (ABA), and rapid reacquisition.
 - [x] **Choice & matching** — concurrent VI-VI via discriminative cues; the
   changeover-delay effect; multi-alternative matching; the concatenated matching
   law (rate / amount / probability / delay).
@@ -460,9 +469,8 @@ pre-commit install --hook-type pre-push     # pytest on push
   (`amount_exponent`, `probability_exponent`, `delay_k`), with rate the frequency
   anchor: rate/amount (`exp024`) and probability/delay (`exp025`) are decoupled to
   crossing targets that the shared discriminability levers could not reach.
-- [x] **Tests + CI** — 49-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Tests + CI** — 54-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; behavioral momentum (molar);
-  day/night ambient sun; punishment-asymmetry consequence models; dual
-  excitatory/inhibitory extinction (spontaneous recovery, renewal); a genuine
-  autodiff fit via truncated backprop → evolution → model comparison → real data
-  (see `ToDO.txt`).
+  day/night ambient sun; punishment-asymmetry consequence models; momentum-modulated
+  / dual-state extinction extensions (PREE, resurgence); a genuine autodiff fit via
+  truncated backprop → evolution → model comparison → real data (see `ToDO.txt`).

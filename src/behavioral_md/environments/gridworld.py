@@ -63,12 +63,21 @@ class BehavioralFieldEnv(gym.Env):
         config: SimulationConfig | None = None,
         *,
         food_reinforces: bool = True,
+        food_present: bool = True,
         cue_value: float = 0.0,
+        context: float = 0.0,
     ) -> None:
         super().__init__()
         self.config = config or SimulationConfig()
         self.food_reinforces = food_reinforces
+        # Whether food exists in the arena at all. False = food absent (no signal, no
+        # contact, no intake) -- a true food-free interval, distinct from
+        # food_reinforces=False (food present but unrewarded = extinction).
+        self.food_present = food_present
         self.cue_value = cue_value
+        # Scalar context signal (A/B environments). Surfaced in the observation and
+        # used by the dual learning rule to make inhibition context-specific (renewal).
+        self.context = context
 
         self.grid_size = self.config.grid_size
         self.sensor_range = self.config.sensor_range
@@ -93,6 +102,8 @@ class BehavioralFieldEnv(gym.Env):
                 "cue_intensity": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 # Abstract scalar cue dimension (for stimulus generalization).
                 "cue_value": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                # Scalar context (A/B environments; gates inhibition for renewal).
+                "context": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "food_contact": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "last_consequence": spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32),
             }
@@ -122,8 +133,12 @@ class BehavioralFieldEnv(gym.Env):
         # Allow per-episode overrides used by the demos.
         if "food_reinforces" in options:
             self.food_reinforces = bool(options["food_reinforces"])
+        if "food_present" in options:
+            self.food_present = bool(options["food_present"])
         if "cue_value" in options:
             self.cue_value = float(options["cue_value"])
+        if "context" in options:
+            self.context = float(options["context"])
 
         rng = self.np_random
         g = self.grid_size
@@ -175,7 +190,8 @@ class BehavioralFieldEnv(gym.Env):
         # unavailable until it regrows (interval-like / VI). The world is
         # continuous -- eating does NOT end it.
         cfg = self.config
-        in_range = self._distance(self.position, self.food_pos) <= self.consume_radius
+        in_range = (self.food_present
+                    and self._distance(self.position, self.food_pos) <= self.consume_radius)
         food_intake = 0.0
         if in_range and self.food_reinforces:
             food_intake = min(cfg.food_intake_rate, self.food_biomass - cfg.food_min_biomass)
@@ -261,6 +277,9 @@ class BehavioralFieldEnv(gym.Env):
         # visible (weaker approach) and less edible (weaker consummatory drive).
         biomass_frac = self.food_biomass / self.config.food_carrying_capacity
         in_range = self._distance(self.position, self.food_pos) <= self.consume_radius
+        # When food is absent there is no food signal/contact at all (a food-free
+        # interval), independent of the (renewable) biomass state.
+        present = 1.0 if self.food_present else 0.0
         return {
             "position": self.position.astype(np.float32),
             "food_vector": self._unit_vector(self.food_pos),
@@ -268,7 +287,7 @@ class BehavioralFieldEnv(gym.Env):
             "light_vector": self._unit_vector(self.light_pos),
             "cue_vector": self._unit_vector(self.cue_pos),
             "food_intensity": np.array(
-                [self._intensity(self.food_pos) * biomass_frac], dtype=np.float32
+                [self._intensity(self.food_pos) * biomass_frac * present], dtype=np.float32
             ),
             "danger_intensity": np.array(
                 [self._intensity(self.danger_pos)], dtype=np.float32
@@ -278,9 +297,10 @@ class BehavioralFieldEnv(gym.Env):
             ),
             "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
             "cue_value": np.array([self.cue_value], dtype=np.float32),
+            "context": np.array([self.context], dtype=np.float32),
             # Contact signal within consume_radius, scaled by remaining biomass.
             "food_contact": np.array(
-                [biomass_frac if in_range else 0.0], dtype=np.float32
+                [biomass_frac if (in_range and self.food_present) else 0.0], dtype=np.float32
             ),
             "last_consequence": np.array([self.last_consequence], dtype=np.float32),
         }

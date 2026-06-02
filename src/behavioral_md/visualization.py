@@ -381,6 +381,34 @@ def plot_extinction(summaries: pd.DataFrame, transition: int, path: str | Path) 
     return _save(fig, path)
 
 
+def plot_dual_components(summaries: pd.DataFrame, transitions, path: str | Path,
+                         title: str | None = None) -> Path:
+    """Dual excitatory/inhibitory components across lives (mean +/- 95% CI over agents).
+
+    Overlays the net association (``net``, what drives behavior), excitation
+    (``w_plus``), and inhibition (``w_minus``) for ``approach_food`` on one axis, with
+    dotted vlines at each phase ``transitions`` (a list of life indices). This is the
+    defining figure: w_plus stays flat through extinction while w_minus rises, and the
+    net falls then recovers/renews. ``summaries`` needs columns: seed, episode, net,
+    w_plus, w_minus.
+    """
+    series = [("w_plus", "Excitation w+"), ("w_minus", "Inhibition w-"), ("net", "Net (w+ - w-)")]
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for (col, label), (ls, marker) in zip(series, _BW_CYCLE, strict=False):
+        episodes, mat = _pivot(summaries, col)
+        mean, ci = _mean_ci(mat, axis=0)
+        _band(ax, episodes, mean, ci, label, ls, marker)
+    for tr in transitions:
+        ax.axvline(tr - 0.5, color="black", ls=":", lw=1.0)
+    ax.axhline(0.0, color="0.8", lw=0.5)
+    ax.set_xlabel("Life (episode)")
+    ax.set_ylabel("Association strength")
+    if title:
+        ax.set_title(title)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_generalization_gradient(
     values: np.ndarray,
     responses: np.ndarray,

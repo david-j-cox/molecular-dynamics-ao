@@ -63,6 +63,9 @@ EXPERIMENTS = [
     "scripts/run_extinction_demo.py",
     "scripts/run_generalization_demo.py",
     "scripts/run_peak_shift_demo.py",
+    "scripts/run_reacquisition_demo.py",
+    "scripts/run_spontaneous_recovery_demo.py",
+    "scripts/run_renewal_demo.py",
 ]
 
 # Volatile lines/fragments to neutralize so the snapshot tracks FINDINGS, not

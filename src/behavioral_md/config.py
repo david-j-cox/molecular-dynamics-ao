@@ -29,13 +29,17 @@ class SimulationConfig(BaseModel):
     max_steps: int = Field(200, ge=1, description="Max timesteps per episode.")
 
     # --- Learning ----------------------------------------------------------
-    learning_model: Literal["rescorla_wagner", "linear"] = Field(
+    learning_model: Literal["rescorla_wagner", "linear", "dual_exc_inhib"] = Field(
         "rescorla_wagner",
         description=(
             "Pluggable decremental-learning rule. 'rescorla_wagner' = "
             "error-correcting with omission decay (lambda=0 on non-reinforced "
             "exposure) and asymmetric acquisition/extinction rates; 'linear' = "
-            "strengthen-only w += lr*mag*eligibility*intensity (no extinction)."
+            "strengthen-only w += lr*mag*eligibility*intensity (no extinction); "
+            "'dual_exc_inhib' = Konorski/Bouton separate excitatory (w+) and "
+            "inhibitory (w-) associations (net = w+ - gate*w-): extinction grows w- "
+            "rather than erasing w+, yielding spontaneous recovery, renewal, and "
+            "rapid reacquisition (uses the inhibition_*/context_* fields below)."
         ),
     )
     credit_assignment: Literal["rw_competitive", "rw_independent", "source_only"] = Field(
@@ -71,6 +75,42 @@ class SimulationConfig(BaseModel):
         1.0,
         gt=0.0,
         description="Lambda: asymptotic associative strength per unit consequence (RW rule).",
+    )
+    # --- Dual excitatory/inhibitory rule (learning_model='dual_exc_inhib') ----
+    # All read only by DualExcitatoryInhibitory; defaults leave the other rules
+    # untouched. w- = inhibition (grows on omission, context-specific, decays slowly).
+    inhibition_rate: float = Field(
+        0.02, ge=0.0,
+        description="Growth rate of inhibition (w-) toward lambda on non-reinforced exposure.",
+    )
+    inhibition_relax_rate: float = Field(
+        0.1, ge=0.0,
+        description="Rate at which inhibition (w-) relaxes toward 0 on reinforced exposure. "
+        "Larger than the acquisition rate because inhibition is labile (Bouton): "
+        "reinforcement rapidly cancels it, so reacquisition is faster than original "
+        "acquisition (w+ was preserved through extinction).",
+    )
+    inhibition_passive_decay: float = Field(
+        0.0, ge=0.0, le=1.0,
+        description="Per-step multiplicative decay of inhibition (w- *= 1-decay) applied even "
+        "off-contact, so the net recovers over a rest interval (spontaneous recovery). "
+        "Default 0 (opt-in); keep small so foraging travel does not erode inhibition.",
+    )
+    context_gating: bool = Field(
+        False,
+        description="If true, inhibition (w-) is gated at readout by similarity between the "
+        "current context and the context in which it was learned (renewal). Excitation (w+) "
+        "is context-general.",
+    )
+    context_beta: float = Field(
+        6.0, ge=0.0,
+        description="Shepard width for the context gate "
+        "exp(-beta*|context_now - context_learned|).",
+    )
+    ctx_tag_rate: float = Field(
+        0.1, ge=0.0, le=1.0,
+        description="EMA rate at which a channel's inhibition-context tag tracks the context "
+        "while w- is growing.",
     )
 
     # --- Fatigue (within-bout response decrement) --------------------------

@@ -1122,3 +1122,59 @@ with its own utility-curvature exponent.
 Validation: 3 new tests (sigma & delay_k orthogonality; fit_dims sigma ordering), 49
 pass; ruff clean; reproduce baseline re-captured with exp025 (exp001-024 + demos 0
 drift -- the rho==1/sigma==1 guards hold).
+
+---
+
+## 2026-06-02 (cont.) — Dual excitatory/inhibitory extinction (Konorski/Bouton)
+
+Added a new opt-in learning rule, learning_model="dual_exc_inhib"
+(learning.DualExcitatoryInhibitory), to capture what single-weight Rescorla-Wagner
+cannot: post-extinction return of responding. The RW rule erases the weight on
+omission; the dual rule keeps a separate excitation w+ (preserved) and inhibition w-
+(grows on omission). The net the force reads is w+ - gate*w-, written into
+atom.history_weights each step, so forces.py is untouched. Three new state dicts on
+BehavioralAtom (w_plus, w_minus, w_minus_ctx); empty/zero by default so the other rules
+and all existing experiments are unaffected.
+
+Mechanism (per drive atom, per channel, eligibility e, intensity x):
+- Reinforced: w+ += lr_acq*e*x*(lam - w+); w- relaxes toward 0 at inhibition_relax_rate
+  (0.1 default, > acquisition rate -- inhibition is labile, Bouton).
+- Omission: w+ UNCHANGED; w- += inhibition_rate*e*x*(lam - w-); a context tag EMAs
+  toward the current context.
+- Passive: w- *= (1 - inhibition_passive_decay) every step (off-contact too).
+- Readout each step: gate = exp(-context_beta*|context_now - context_learned|) if
+  context_gating else 1; net = clip(w+ - gate*w-). Both w+ and w- clipped to bounds
+  (the same overshoot guard RW uses -- a large eligibility*intensity step diverged to
+  NaN without it; found via seed 9).
+
+A scalar "context" was threaded env -> obs -> rule (gridworld reset option + obs key +
+observation_space; organism passes obs["context"] to update via a new context= kwarg
+that RW/Linear ignore). The net is refreshed EVERY step at the current context so the
+gate tracks context changes immediately (renewal is expressed on approach, before any
+new contact), and so passive decay shows up off-contact.
+
+Three demos (population, plot_dual_components overlays w+/w-/net with phase vlines):
+- run_reacquisition_demo (dual vs RW control, slow acquisition rate for resolution):
+  dual reacquires net>=0.5 in ~0.47 lives vs ~1.98 original and vs RW's ~0.88.
+- run_spontaneous_recovery_demo (passive_decay=0.02): SAME arena throughout, food
+  withheld during the rest interval via a new env flag food_present=False (distinct from
+  food_reinforces=False = food-present-but-unrewarded extinction). Recovery is driven
+  purely by the PASSAGE OF TIME (passive w- decay), context held constant and gating off
+  -- mechanically distinct from renewal, NOT a context change (caught in review: an
+  earlier version relocated food during rest, which read as a context swap; replaced with
+  a true food-free interval in the identical arena). net 0.42 (end-ext) -> 1.00 (end-rest)
+  -> 0.48 (re-extinguishing at test); w+ flat at 1.0; w- 0.58 -> 0.00; 0 rest contacts.
+- run_renewal_demo (ABA vs ABB, context_gating): first test-life net ABA 0.45 (renewed
+  in the acquisition context) vs ABB 0.00 (stays suppressed in the extinction context).
+
+Honest caveat: renewal and SR are clean in the NET (the learned association the force
+reads). Raw food-contact counts are floored by incidental proximity (food sits near the
+start), so they don't discriminate motivation here -- the net is the reported readout.
+The defining figures show w+ flat through extinction while w- rises and the net falls,
+then the net recovering (rest decay) / renewing (context switch) -- the signature of
+inhibition-on-top-of-preserved-excitation.
+
+Validation: 5 new unit tests (extinction preserves w+/grows w-; net recovers under
+passive decay; reacquisition faster than acquisition; context gate enables renewal; RW
+path untouched), 54 tests pass; ruff clean; reproduce baseline 32/32 with exp001-025 +
+prior demos byte-identical (rule fully opt-in).
