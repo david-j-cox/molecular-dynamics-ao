@@ -62,6 +62,14 @@ class MatchConfig(NamedTuple):
     delay_discount: str = "hyperbolic"   # "hyperbolic" (Mazur) | "exponential"
     delay_k: float = 0.5        # hyperbolic: efficacy *= 1/(1 + k*D)
     delay_tau: float = 5.0      # exponential: efficacy *= exp(-D/tau)
+    # Reinforcer-magnitude sensitivity (utility curvature): the strengthening effect
+    # of a reinforcer scales as amount**amount_exponent, not amount. rho<1 = diminishing
+    # returns of magnitude (concave utility), rho>1 = expanding. This sets the AMOUNT
+    # sensitivity (a_amt) of the matching law independently of the rate sensitivity:
+    # a_rate is measured at equal amounts (amount=1), where amount**rho=1 for any rho,
+    # so this knob leaves a_rate untouched. (The physical amount obtained is unchanged;
+    # only the teaching signal is curved.) Default 1.0 reproduces the linear-amount law.
+    amount_exponent: float = 1.0
 
 
 def _tuning(centers, beta, value):
@@ -140,7 +148,11 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         # reinforced contacts -> target lambda * amount * delay-discount(D)
         # (AMOUNT and DELAY terms); non-reinforced contacts -> target 0 (extinction
         # trial -> partial reinforcement makes the value track PROBABILITY ~ p).
-        eff_amount = amount * discount(delay)                # [P] amount x delay-discount
+        # Magnitude utility curvature (a_amt lever). The rho==1.0 default keeps the
+        # original linear-amount path bit-identical (no power op), so existing
+        # experiments do not drift.
+        mag = amount if mcfg.amount_exponent == 1.0 else amount ** mcfg.amount_exponent
+        eff_amount = mag * discount(delay)                   # [P] utility x delay-discount
         opp_f = opportunity.astype(float)                    # [O, P]
         contact_cue_act = jnp.einsum("op,pk->ok", opp_f, cue_act)            # [O, K]
         target = jnp.sum(reinforced.astype(float) * (mcfg.reinf_asymptote * eff_amount)[None, :],

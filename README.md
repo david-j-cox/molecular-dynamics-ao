@@ -317,6 +317,28 @@ separate food channels):
 | Behavioral economics | `exp016` | consumption falls as response cost (unit price) rises |
 | Death patterns | `exp007` | survival curves, time-to-death, cause breakdown |
 
+**Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
+the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
+engine is non-differentiable, so we built a differentiable Gumbel-softmax surrogate of
+the rollout — but reverse-mode gradients through the long recurrent rollout explode
+(per-step sensitivities compound multiplicatively), so autodiff itself is unusable, and
+a molar closed-form (where it would work) would have to *assume* the matching-law form,
+defeating emergence. The surrogate's *forward* model is faithful and deterministic under
+common random numbers, so we search it derivative-free (Nelder-Mead) and re-plug the
+fit into the stochastic engine to confirm transfer. On the two-patch preparation the
+free discriminability levers (`temperature`, `approach_gain`, `beta`) move `a_rate` and
+`a_amt` together, so on their own the fit can only tune them in aligned directions —
+stochastic `a_rate` 0.56 → 0.66 (up) / 0.36 (down), `a_amt` 0.97 → 1.06 / 0.86.
+
+**Decoupling them** (`exp024`) needs an *asymmetric* lever, since every discriminability
+knob — including patch separation/COD — scales both sensitivities together (a finding:
+exp009 had only ever measured rate vs COD). Adding a reinforcer-magnitude sensitivity
+exponent `amount_exponent` (value tracks `amount^ρ`, utility curvature) gives one:
+because `a_rate` is measured at equal amounts (`amount^ρ = 1`), `ρ` scales `a_amt` while
+leaving `a_rate` exactly flat. With `beta` for rate and `ρ` for amount, the fit hits
+*crossing* targets impossible before — high-rate/low-amount (stoch 0.59/0.61) vs
+low-rate/high-amount (0.39/1.20). See the lab notebook (2026-06-02) for the full diagnosis.
+
 `scripts/make_figures.py` regenerates the standard foraging figure set (occupancy
 landscape, energy/biomass traces, learning curves, force-decomposition grid).
 
@@ -326,8 +348,10 @@ landscape, energy/biomass traces, learning curves, force-decomposition grid).
 population is held as arrays and one timestep is a pure, `jit`-compiled, batched
 operation run over time with `lax.scan`. It is validated component-by-component
 against the NumPy reference (force, learning, emission, environment all match to
-≤1e−7) and runs **~84× faster** on CPU (XLA), with autodiff available for
-parameter fitting. The NumPy engine remains the readable, canonical reference.
+≤1e−7) and runs **~84× faster** on CPU (XLA). The NumPy engine remains the readable,
+canonical reference. (Autodiff is exposed by the JAX engine, but note that gradients
+through the long recurrent matching rollout explode — see the parameter-fitting note
+above; the differentiable surrogate is searched derivative-free in practice.)
 
 ```bash
 python -m behavioral_md.jax_engine        # run the equivalence checks
@@ -347,6 +371,8 @@ src/behavioral_md/
   learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner / linear)
   generalization.py      # CueReceptorField (tuned receptors; generalization & peak shift)
   matching.py            # concurrent VI-VI via discriminative cues; concatenated matching law
+  matching_diff.py       # differentiable Gumbel-softmax surrogate of the matching rollout
+  fit.py                 # search organism params to target matching sensitivities (derivative-free)
   chamber.py             # operant chamber: press response, FR/VR/FI/VI, effort/unit-price
   timing.py              # pluggable interval-timing models (none/SET/BeT/LeT)
   metrics.py             # death patterns: time-to-death, cause breakdown, survival curve
@@ -359,7 +385,7 @@ src/behavioral_md/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
                          #   run_peak_shift_demo, make_figures  (each takes --agents N)
-experiments/             # reproducible sweeps/benchmarks (exp001-019) + parallel helper
+experiments/             # reproducible sweeps/benchmarks (exp001-024) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
 outputs/                 # logs/ and figures/ (generated; gitignored)

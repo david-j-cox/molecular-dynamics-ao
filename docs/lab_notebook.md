@@ -942,3 +942,131 @@ damped-Verlet integrate + eligibility + softmax emission) and learn_with_cue
 only where they should: observe (single vs multi-patch salience) and the env
 transition (single-patch env_step vs multi-patch deplete/regrow + functional
 response). The shared physics/learning lives in one place.
+
+---
+
+## 2026-06-02 — Fitting matching sensitivities (exp023): autodiff doesn't, derivative-free does
+
+Goal: search organism parameters so the emergent generalized-matching-law
+sensitivities (a_rate, a_amt) hit chosen targets -- the long-promised payoff of the
+JAX engine ("autodiff is the enabler"). It did not go as planned, and the why is the
+interesting part.
+
+**Autodiff is unusable here.** The stochastic matching engine is non-differentiable
+(categorical action sampling, Bernoulli VI arming), so I built a differentiable
+surrogate. Two dead ends first:
+- An *expected-value* (mean-field) surrogate -- expected displacement, expected
+  arming -- collapses the trajectory and parks the organism at the higher-value patch:
+  a_rate ~ 2.7-3.7 (severe overmatching), and the slope no longer tracks the
+  stochastic one. Undermatching in this engine is a *sampling-noise* phenomenon (the
+  organism keeps wandering to the poorer patch); remove the noise and you lose it.
+- A *Gumbel-softmax* surrogate (reparameterized action sampling + relaxed-Bernoulli
+  arming, common random numbers) fixes the FORWARD model beautifully: soft a_rate
+  0.463 vs stochastic 0.565, a_amt 0.649 vs 0.967, and a beta sweep gives soft-vs-
+  stochastic correlation 0.97 -- gradients should transfer. But the reverse-mode
+  GRADIENT through the ~1000-step recurrent rollout EXPLODES: d(a_rate)/d(beta) came
+  out at -310..+10 across noise seeds (mean -39, std 103) versus a clean finite-
+  difference of ~+0.03. Per-step sensitivities compound multiplicatively through the
+  fed-back state (learned weights, armed-probability, position) -- the classic
+  exploding-gradient / chaos of differentiating long recurrent rollouts. Optimization
+  with these gradients does nothing (Adam wanders; even an unreachable target fails to
+  move beta).
+
+**Why not a molar closed-form (where autodiff WOULD be clean)?** Because reproducing
+the matching law in closed form requires assuming B_k ~ v_k^a -- i.e. writing the
+sensitivity a in as a parameter. That forces the very result this engine is supposed
+to let *emerge* from the coupled dynamics. Scientifically that defeats the purpose, so
+it's out.
+
+**Resolution (exp023, fit.py).** Keep the emergent dynamics; search the smooth,
+deterministic-under-CRN Gumbel surrogate derivative-free (Nelder-Mead). Free params
+temperature, approach_gain, beta. A per-parameter transfer probe was decisive:
+- beta: strong, sign-consistent lever on a_rate (soft 0.37->0.50, stoch 0.34->0.71).
+- temperature / approach_gain: weak on a_rate, consistent on a_amt.
+- lr_cue: stochastic a_rate falls sharply with it, but the surrogate doesn't reproduce
+  that (a noise-accumulation effect) -- EXCLUDED as a free param; its gradient/effect
+  does not transfer.
+
+On this two-patch preparation the two sensitivities are positively coupled (beta moves
+both; temperature/approach_gain only trim a_amt by ~+-0.06), so the reachable joint
+region is narrow and strong decoupling isn't achievable with organism params alone
+(the strong independent lever for a_rate is the environmental changeover delay /
+patch separation, exp009). So the demonstration tunes in aligned directions:
+
+```
+                a_rate                  a_amt
+           target soft stoch   |   target soft stoch
+  baseline    --  0.46 0.56    |     --   0.65 0.97
+  tune-up   0.50  0.50 0.66    |   0.67   0.67 1.06
+  tune-down 0.38  0.38 0.36    |   0.56   0.56 0.86
+```
+
+The surrogate hits its targets almost exactly; the stochastic engine moves the same
+direction (a_rate 0.36 < 0.56 < 0.66; a_amt 0.86 < 0.97 < 1.06 -- both ordered, both
+transfers PASS). The surrogate reads systematically lower than the stochastic engine
+(the relaxation softens the choice) -- a monotone compression, not a disagreement.
+
+Honest takeaways: (1) for emergent quantities of long stochastic rollouts, the forward
+surrogate is the asset, not its gradient; (2) "autodiff is the enabler" needs revising
+-- the enabler is the differentiable *forward* model, searched derivative-free, with
+autodiff itself deferred to a truncated-backprop (TBPTT) attempt if a gradient method
+is ever wanted; (3) on this prep the matching sensitivities are only weakly tunable by
+organism parameters and are coupled -- a genuine result, not a fitting failure.
+Validation: 6 new tests (test_matching_diff, test_fit); reproduce baseline 27/27
+(exp023 added, exp001-022 + demos show 0 drift).
+
+---
+
+## 2026-06-02 (cont.) — Decoupling rate and amount sensitivity (exp024)
+
+exp023 left the two matching sensitivities positively COUPLED: the organism's
+discriminability levers (temperature, approach_gain, beta) move a_rate and a_amt
+together, so only aligned targets were reachable. Picked up the decoupling thread.
+
+**First, a falsified premise (worth recording).** The plan was to use patch separation
+(the changeover-delay lever, exp009) to control a_rate independently. A probe across
+separations D=2..14 killed that idea: in the stochastic engine COD raises BOTH
+sensitivities (a_rate 0.06->1.06 AND a_amt 0.16->~1.0 as D grows). exp009 had only ever
+measured rate vs COD, so the fact that COD also drives amount sensitivity is a NEW
+result. Mechanistically obvious in hindsight: separation is a *discriminability* knob,
+the same role beta (cue-tuning width) plays -- they are redundant, not orthogonal. (Also
+the surrogate only tracks COD up to D~6 then turns over, so it wouldn't have transferred
+at large D anyway.) Conclusion: no discriminability lever can decouple the two.
+
+**The fix: an asymmetric lever.** a_rate is driven by how reinforcement *frequency*
+maps to value; a_amt by how *magnitude* does. So a knob on the magnitude->value map
+decouples them. Added MatchConfig.amount_exponent (rho): the learned-value teaching
+signal uses amount**rho instead of amount (utility curvature of reinforcer magnitude --
+standard behavioral economics, objective). Because a_rate is measured at equal amounts
+(amount=1 -> amount**rho=1 for any rho), rho leaves a_rate EXACTLY untouched and scales
+a_amt. The probe is textbook-clean (1500-step soft / 400x4000 stochastic):
+
+```
+ rho  soft_rate soft_amt | stoch_rate stoch_amt
+ 0.4    0.463    0.292   |   0.561     0.502
+ 1.0    0.463    0.649   |   0.561     0.970
+ 2.0    0.463    0.942   |   0.561     1.311
+```
+
+a_rate is flat to 3 decimals across rho in BOTH engines; a_amt scales monotonically and
+transfers. rho=1.0 reproduces the linear-amount baseline exactly (guarded so existing
+experiments don't drift -- verified 0 drift on exp008/011/012/013/014/023).
+
+**exp024 demonstration.** With beta setting a_rate and rho setting a_amt, fit two
+CROSSING targets (free = temperature/approach_gain/beta/amount_exponent), impossible on
+the coupled manifold:
+```
+                  a_rate (t/soft/stoch)   a_amt (t/soft/stoch)
+  baseline          --  0.46 0.56          --  0.65 0.97
+  A rate^/amt_v    0.48 0.48 0.59         0.35 0.35 0.61
+  B rate_v/amt^    0.40 0.40 0.39         0.85 0.85 1.20
+```
+Surrogate hits both targets exactly; stochastic transfers and CROSSES -- A has higher
+a_rate but lower a_amt than B (decoupling checks both OK). Fitted rho = 0.49 (A) vs 1.74
+(B) carries the amount difference; beta = 6.4 (A) vs 4.6 (B) the rate difference. So the
+two matching sensitivities are now independently tunable, with the new dimension
+(magnitude utility curvature) the orthogonal lever.
+
+Validation: 2 new tests (rho orthogonality in the surrogate; rho fits a low-amount
+target). reproduce baseline re-captured with exp024 (exp001-023 + demos 0 drift).
+Open: do a_prob / a_delay need their own asymmetric levers too?
