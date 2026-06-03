@@ -31,6 +31,8 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
+from behavioral_md._kernels import exp_falloff, safe_unit
+
 # Action set: 4 movement directions + stay.
 _MOVES = jnp.array([[0.0, 1.0], [0.0, -1.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 0.0]])
 
@@ -60,6 +62,25 @@ class MatchConfig(NamedTuple):
     delay_discount: str = "hyperbolic"   # "hyperbolic" (Mazur) | "exponential"
     delay_k: float = 0.5        # hyperbolic: efficacy *= 1/(1 + k*D)
     delay_tau: float = 5.0      # exponential: efficacy *= exp(-D/tau)
+    # Reinforcer-magnitude sensitivity (utility curvature): the strengthening effect
+    # of a reinforcer scales as amount**amount_exponent, not amount. rho<1 = diminishing
+    # returns of magnitude (concave utility), rho>1 = expanding. This sets the AMOUNT
+    # sensitivity (a_amt) of the matching law independently of the rate sensitivity:
+    # a_rate is measured at equal amounts (amount=1), where amount**rho=1 for any rho,
+    # so this knob leaves a_rate untouched. (The physical amount obtained is unchanged;
+    # only the teaching signal is curved.) Default 1.0 reproduces the linear-amount law.
+    amount_exponent: float = 1.0
+    # Probability-weighting exponent (the PROBABILITY analogue of amount_exponent): a
+    # contact with an armed patch is reinforced with effective probability
+    # prob**probability_exponent, so the learned value tracks a distorted probability
+    # (nonlinear probability weighting, cf. prospect theory). sigma<1 overweights low
+    # probabilities, sigma>1 underweights them. This sets the PROBABILITY sensitivity
+    # (a_prob) independently: the rate/amount/delay sweeps all hold prob=1
+    # (1**sigma=1), so this knob leaves their sensitivities untouched. Default 1.0
+    # reproduces the linear-probability gate. (Rate is the frequency anchor set by the
+    # discriminability levers; amount/probability/delay each get their own curvature
+    # exponent -- amount_exponent, probability_exponent, delay_k.)
+    probability_exponent: float = 1.0
 
 
 def _tuning(centers, beta, value):
@@ -100,8 +121,8 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         pos = state["pos"]
         diff = patch_pos[None, :, :] - pos[:, None, :]       # [O, P, 2]
         dist = jnp.linalg.norm(diff, axis=2)                 # [O, P]
-        unit = jnp.where(dist[..., None] > 1e-9, diff / jnp.clip(dist[..., None], 1e-9, None), 0.0)
-        intensity = jnp.exp(-dist / mcfg.sensor_range)       # [O, P]
+        unit = safe_unit(diff, dist)
+        intensity = exp_falloff(dist, mcfg.sensor_range)     # [O, P]
         value = state["w"] @ cue_act.T                       # [O, P] learned value of each cue
         # Movement force per direction: sum over patches of value*intensity*(dir.move).
         pull = (mcfg.approach_gain * value * intensity)[:, :, None]   # [O, P, 1]
@@ -131,14 +152,21 @@ def make_matching_sim(mcfg: MatchConfig, patch_pos, patch_cue, start):
         opportunity = in_range & armed                       # [O, P] armed contact
         key, sub3 = jax.random.split(key)
         roll = jax.random.uniform(sub3, opportunity.shape)
-        reinforced = opportunity & (roll < prob[None, :])    # PROBABILITY gate
+        # Probability weighting (a_prob lever). sigma==1.0 keeps the linear gate
+        # bit-identical (no power op), so existing experiments do not drift.
+        prob_eff = prob if mcfg.probability_exponent == 1.0 else prob ** mcfg.probability_exponent
+        reinforced = opportunity & (roll < prob_eff[None, :])  # PROBABILITY gate
         armed = armed & (~reinforced)                        # disarm only on reinforcement
 
         # Train cue receptors on every armed contact (summed/elemental RW error):
         # reinforced contacts -> target lambda * amount * delay-discount(D)
         # (AMOUNT and DELAY terms); non-reinforced contacts -> target 0 (extinction
         # trial -> partial reinforcement makes the value track PROBABILITY ~ p).
-        eff_amount = amount * discount(delay)                # [P] amount x delay-discount
+        # Magnitude utility curvature (a_amt lever). The rho==1.0 default keeps the
+        # original linear-amount path bit-identical (no power op), so existing
+        # experiments do not drift.
+        mag = amount if mcfg.amount_exponent == 1.0 else amount ** mcfg.amount_exponent
+        eff_amount = mag * discount(delay)                   # [P] utility x delay-discount
         opp_f = opportunity.astype(float)                    # [O, P]
         contact_cue_act = jnp.einsum("op,pk->ok", opp_f, cue_act)            # [O, K]
         target = jnp.sum(reinforced.astype(float) * (mcfg.reinf_asymptote * eff_amount)[None, :],

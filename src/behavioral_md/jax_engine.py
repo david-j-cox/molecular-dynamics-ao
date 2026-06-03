@@ -24,6 +24,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md._kernels import exp_falloff, safe_unit
 from behavioral_md.atoms import ACTION_ATOMS, STIMULI, default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.forces import default_coupling_matrix
@@ -183,8 +184,8 @@ def observe(
     """
     diff = sources - positions[:, None, :]                          # [O, C, 2]
     dist = jnp.linalg.norm(diff, axis=2)                            # [O, C]
-    direction = jnp.where(dist[..., None] > 1e-9, diff / jnp.clip(dist[..., None], 1e-9, None), 0.0)
-    intensity = jnp.exp(-dist / config.sensor_range)               # [O, C]
+    direction = safe_unit(diff, dist)
+    intensity = exp_falloff(dist, config.sensor_range)             # [O, C]
     biomass_frac = biomass / config.food_carrying_capacity         # [O]
     intensity = intensity.at[:, _FOOD].multiply(biomass_frac)
     in_range = dist[:, _FOOD] <= config.consume_radius
@@ -273,6 +274,48 @@ _DANGER = STIMULI.index("danger")
 _CUE = STIMULI.index("cue")
 
 
+def drive_integrate_emit(spec, cfg, activation, previous, history, eligibility,
+                         intensity, direction, contact, energy, cue_weights,
+                         cue_value, cue_centers, key):
+    """One per-step motor pass, shared by every JAX world (single- and multi-patch).
+
+    Deficit-scaled two-tier force, plus the cue-receptor (Shepard) drive added onto
+    approach_food, then damped-Verlet integration, the eligibility-trace update, and
+    softmax action emission. Returns
+    (new_activation, new_previous, eligibility, action, cue_act, cue_drive); the last
+    two are reused by :func:`learn_with_cue`.
+    """
+    dgain = deficit_gain(energy, cfg)
+    force = compute_force(spec, activation, history, intensity, direction, contact, dgain)
+    cue_act = intensity[:, _CUE][:, None] * jnp.exp(
+        -cfg.cue_generalization_beta * jnp.abs(cue_value[:, None] - cue_centers[None, :])
+    )
+    cue_drive = jnp.sum(cue_weights * cue_act, axis=1)
+    force = force.at[:, spec.approach_food_idx].add(cue_drive)
+    new_act, new_prev = integrate(spec, activation, previous, force, cfg)
+    elig = update_eligibility(eligibility, new_act, cfg)
+    action = sample_actions(spec, emission_probs(spec, new_act, cfg), key)
+    return new_act, new_prev, elig, action, cue_act, cue_drive
+
+
+def learn_with_cue(spec, cfg, history, eligibility, cue_weights, intensity, contact,
+                   danger_contact, appetitive, aversive, cue_act, cue_drive):
+    """One per-step learning pass, shared by every JAX world.
+
+    Valence-split Rescorla-Wagner on the history weights (:func:`learn_step`) plus the
+    cue-receptor weight update (error toward lambda*reinforcement, gated on food
+    contact). Returns (new_history, new_cue_weights).
+    """
+    new_hist = learn_step(spec, history, eligibility, intensity, appetitive, aversive,
+                          contact > 0, danger_contact > 0, cfg)
+    elig_af = jnp.clip(eligibility[:, spec.approach_food_idx], 0.0, None)
+    cue_err = cfg.reinforcement_asymptote * appetitive - cue_drive
+    cue_upd = jnp.where((contact > 0)[:, None],
+                        cfg.cue_learning_rate * elig_af[:, None] * cue_act * cue_err[:, None], 0.0)
+    new_cue_w = jnp.clip(cue_weights + cue_upd, cfg.history_weight_min, cfg.history_weight_max)
+    return new_hist, new_cue_w
+
+
 class SimState(NamedTuple):
     """Per-organism simulation state (one entry per organism in every array)."""
 
@@ -315,26 +358,15 @@ def make_simulate(spec, cfg, sources, cue_centers):
     one fused, batched computation.
     """
     food_pos, danger_pos = sources[:, _FOOD], sources[:, _DANGER]
-    af = spec.approach_food_idx
-    beta, lr_cue = cfg.cue_generalization_beta, cfg.cue_learning_rate
 
     def step(carry, key_t):
         state, food_reinforces, cue_value = carry
         intensity, direction, contact = observe(state.positions, sources, state.biomass, cfg)
-        dgain = deficit_gain(state.energy, cfg)
-        force = compute_force(
-            spec, state.activation, state.history, intensity, direction, contact, dgain
+        new_act, new_prev, elig, action, cue_act, cue_drive = drive_integrate_emit(
+            spec, cfg, state.activation, state.previous, state.history, state.eligibility,
+            intensity, direction, contact, state.energy, state.cue_weights,
+            cue_value, cue_centers, key_t,
         )
-        cue_act = intensity[:, _CUE][:, None] * jnp.exp(
-            -beta * jnp.abs(cue_value[:, None] - cue_centers[None, :])
-        )
-        cue_drive = jnp.sum(state.cue_weights * cue_act, axis=1)
-        force = force.at[:, af].add(cue_drive)
-
-        new_act, new_prev = integrate(spec, state.activation, state.previous, force, cfg)
-        elig = update_eligibility(state.eligibility, new_act, cfg)
-        action = sample_actions(spec, emission_probs(spec, new_act, cfg), key_t)
-
         new_pos, intake, danger_c, new_bio = env_step(
             state.positions, action, food_pos, danger_pos, state.biomass, food_reinforces, cfg
         )
@@ -348,14 +380,10 @@ def make_simulate(spec, cfg, sources, cue_centers):
         )
         appetitive = (intake > 0).astype(jnp.float32)
         aversive = (danger_c > 0).astype(jnp.float32)
-        new_hist = learn_step(spec, state.history, elig, intensity2, appetitive, aversive,
-                              contact2 > 0, danger_c > 0, cfg)
-        elig_af = jnp.clip(elig[:, af], 0.0, None)
-        cue_err = cfg.reinforcement_asymptote * appetitive - cue_drive
-        cue_upd = jnp.where((contact2 > 0)[:, None],
-                            lr_cue * elig_af[:, None] * cue_act * cue_err[:, None], 0.0)
-        new_cue_w = jnp.clip(state.cue_weights + cue_upd,
-                             cfg.history_weight_min, cfg.history_weight_max)
+        new_hist, new_cue_w = learn_with_cue(
+            spec, cfg, state.history, elig, state.cue_weights, intensity2, contact2,
+            danger_c, appetitive, aversive, cue_act, cue_drive,
+        )
 
         a1, a2 = state.alive, state.alive[:, None]  # freeze dead organisms
         new_alive = state.alive & (new_energy > 0.0)

@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from behavioral_md.experiment_utils import fit_matching_law
 from behavioral_md.matching import MatchConfig, make_matching_sim
 from behavioral_md.visualization import plot_matching
 
@@ -50,8 +51,7 @@ def main() -> None:
 
     x = np.concatenate(log_P)
     y = np.concatenate(log_B)
-    a_p, log_b = np.polyfit(x, y, 1)
-    r2 = 1 - np.sum((y - (a_p * x + log_b)) ** 2) / np.sum((y - y.mean()) ** 2)
+    a_p, log_b, r2 = fit_matching_law(x, y)
     print(f"{N_ORG} organisms x {len(PROB_PAIRS)} probability ratios x {N_STEPS} steps "
           f"(identical VI, equal amount) in {time.perf_counter()-t0:.1f}s")
     print(f"Probability term:  log(B_L/B_R) = {a_p:.2f} * log(p_L/p_R) + {log_b:+.2f}")

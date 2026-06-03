@@ -71,6 +71,16 @@ class BehavioralAtom:
     baseline_activation: float = 0.0
     sensitivity: dict[str, float] = field(default_factory=dict)
     history_weights: dict[str, float] = field(default_factory=dict)
+    # Dual excitatory/inhibitory associations (Konorski/Bouton), used only by the
+    # DualExcitatoryInhibitory learning rule. ``history_weights`` always holds the NET
+    # the force reads; the dual rule maintains w_plus (excitation, preserved through
+    # extinction) and w_minus (inhibition, grows on omission, context-specific) and
+    # writes history_weights = w_plus - gate*w_minus each step. ``w_minus_ctx`` tags the
+    # context value in which the inhibition was learned (for context-gated renewal).
+    # Empty by default so other rules and existing atoms are unaffected.
+    w_plus: dict[str, float] = field(default_factory=dict)
+    w_minus: dict[str, float] = field(default_factory=dict)
+    w_minus_ctx: dict[str, float] = field(default_factory=dict)
     direction: np.ndarray | None = None
     # Exponent applied to stimulus intensity for this atom. 1.0 = linear distal
     # sensing (approach/locomotion). A large value makes the atom respond only
@@ -139,6 +149,9 @@ def _atom(
         baseline_activation=baseline,
         sensitivity=dict.fromkeys(STIMULI, 0.0) | (sensitivity or {}),
         history_weights=dict.fromkeys(STIMULI, 0.0) | (history or {}),
+        w_plus=dict.fromkeys(STIMULI, 0.0),
+        w_minus=dict.fromkeys(STIMULI, 0.0),
+        w_minus_ctx=dict.fromkeys(STIMULI, 0.0),
         direction=None if direction is None else np.array(direction, dtype=np.float64),
         contact_exponent=contact_exponent,
         consummatory=consummatory,

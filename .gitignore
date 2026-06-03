@@ -21,6 +21,8 @@ env/
 # Outputs (generated artifacts)
 outputs/logs/*
 outputs/figures/*
+outputs/repro/
+outputs/*.log
 !outputs/logs/.gitkeep
 !outputs/figures/.gitkeep
 

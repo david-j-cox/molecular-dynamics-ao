@@ -19,8 +19,8 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 
-from behavioral_md.atoms import default_atom_set
 from behavioral_md.config import SimulationConfig
+from behavioral_md.experiment_utils import make_cue_centers, weak_innate_atoms
 from behavioral_md.jax_engine import build_spec, initial_state, make_simulate, run_lives
 from behavioral_md.visualization import plot_acquisition_latency
 
@@ -29,20 +29,12 @@ INNATE_FOOD = 0.2
 N_ORG, N_LIVES, N_STEPS = 2000, 40, 300
 
 
-def _weak_innate_atoms():
-    atoms = default_atom_set()
-    for a in atoms:
-        if a.name == "approach_food":
-            a.sensitivity["food"] = INNATE_FOOD
-    return atoms
-
-
 def main() -> None:
     cfg = SimulationConfig(grid_size=10, sensor_range=8.0)
-    spec = build_spec(_weak_innate_atoms(), cfg)
+    spec = build_spec(weak_innate_atoms(INNATE_FOOD), cfg)
     sources_np = np.stack([LAYOUT[k] for k in ("food", "danger", "light", "cue")], dtype=float)
     sources = jnp.broadcast_to(jnp.asarray(sources_np), (N_ORG, 4, 2))
-    sim = make_simulate(spec, cfg, sources, jnp.linspace(0.0, 1.0, cfg.n_cue_receptors))
+    sim = make_simulate(spec, cfg, sources, make_cue_centers(cfg))
     state0 = initial_state(spec, cfg, N_ORG, LAYOUT["position"], cfg.n_cue_receptors)
 
     t0 = time.perf_counter()

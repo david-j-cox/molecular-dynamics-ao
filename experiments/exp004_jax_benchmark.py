@@ -19,6 +19,7 @@ import numpy as np
 
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
+from behavioral_md.experiment_utils import make_cue_centers
 from behavioral_md.jax_engine import build_spec, initial_state, make_simulate
 from behavioral_md.organism import Organism
 from behavioral_md.simulation import run_episode
@@ -32,7 +33,7 @@ def jax_run(n_org: int, n_steps: int, seed: int = 0):
     spec = build_spec(config=cfg)
     sources_np = np.stack([LAYOUT[k] for k in ("food", "danger", "light", "cue")], dtype=float)
     sources = jnp.broadcast_to(jnp.asarray(sources_np), (n_org, 4, 2))
-    cue_centers = jnp.linspace(0.0, 1.0, cfg.n_cue_receptors)
+    cue_centers = make_cue_centers(cfg)
     sim = make_simulate(spec, cfg, sources, cue_centers)
     state0 = initial_state(spec, cfg, n_org, LAYOUT["position"], cfg.n_cue_receptors)
     keys = jax.random.split(jax.random.key(seed), n_steps)

@@ -13,8 +13,6 @@ Saves: outputs/logs/exp002_results.json
 from __future__ import annotations
 
 import itertools
-import json
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -22,9 +20,10 @@ import numpy as np
 from behavioral_md.atoms import default_atom_set
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import BehavioralFieldEnv
+from behavioral_md.experiment_utils import save_results_json
 from behavioral_md.organism import Organism
+from behavioral_md.parallel import run_sweep
 from behavioral_md.simulation import run_episode
-from experiments._parallel import run_sweep
 
 LAYOUT = {
     "position": [1, 1],
@@ -103,9 +102,7 @@ def main() -> None:
     rows.sort(key=lambda r: (-r["reach_rate"], r["median_latency"] or 1e9))
 
     out = {"n_runs": len(results), "grid": grid, "aggregated": rows}
-    path = Path("outputs/logs/exp002_results.json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(out, indent=2))
+    path = save_results_json("exp002_results.json", out)
     print(f"Saved {path}\n")
 
     print("Top 12 configurations by reach rate (over 16 seeds):")

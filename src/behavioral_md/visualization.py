@@ -381,6 +381,34 @@ def plot_extinction(summaries: pd.DataFrame, transition: int, path: str | Path) 
     return _save(fig, path)
 
 
+def plot_dual_components(summaries: pd.DataFrame, transitions, path: str | Path,
+                         title: str | None = None) -> Path:
+    """Dual excitatory/inhibitory components across lives (mean +/- 95% CI over agents).
+
+    Overlays the net association (``net``, what drives behavior), excitation
+    (``w_plus``), and inhibition (``w_minus``) for ``approach_food`` on one axis, with
+    dotted vlines at each phase ``transitions`` (a list of life indices). This is the
+    defining figure: w_plus stays flat through extinction while w_minus rises, and the
+    net falls then recovers/renews. ``summaries`` needs columns: seed, episode, net,
+    w_plus, w_minus.
+    """
+    series = [("w_plus", "Excitation w+"), ("w_minus", "Inhibition w-"), ("net", "Net (w+ - w-)")]
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for (col, label), (ls, marker) in zip(series, _BW_CYCLE, strict=False):
+        episodes, mat = _pivot(summaries, col)
+        mean, ci = _mean_ci(mat, axis=0)
+        _band(ax, episodes, mean, ci, label, ls, marker)
+    for tr in transitions:
+        ax.axvline(tr - 0.5, color="black", ls=":", lw=1.0)
+    ax.axhline(0.0, color="0.8", lw=0.5)
+    ax.set_xlabel("Life (episode)")
+    ax.set_ylabel("Association strength")
+    if title:
+        ax.set_title(title)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_generalization_gradient(
     values: np.ndarray,
     responses: np.ndarray,
@@ -457,6 +485,192 @@ def plot_mortality_by_life(mortality: dict, path: str | Path) -> Path:
     ax.set_ylabel("Death Rate")
     ax.set_ylim(bottom=0)
     _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_giveup_density(dist, observed, ci, predicted, path: str | Path,
+                        corrected=None) -> Path:
+    """Marginal-value theorem: give-up density vs travel distance between patches.
+
+    Solid black = observed patch biomass at the moment of leaving (mean +/- 95%
+    CI); dashed gray = the frictionless salience crossover exp(-D / sensor_range).
+    If ``corrected`` is given, dotted black = the tenacity-scaled prediction
+    kappa * exp(-D/range) (consummatory perseveration), which accounts for the
+    organism depleting past the indifference point.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.errorbar(dist, np.asarray(observed), yerr=np.asarray(ci), fmt="o-", color="black",
+                ms=5, capsize=3, label="Observed")
+    ax.plot(dist, np.asarray(predicted), ls="--", marker="s", ms=4, color="0.5",
+            label=r"Salience crossover $e^{-D/\lambda}$")
+    if corrected is not None:
+        ax.plot(dist, np.asarray(corrected), ls=":", marker="^", ms=5, color="black",
+                label=r"Tenacity-scaled $\kappa\, e^{-D/\lambda}$")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Density\n(patch biomass at leaving)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_momentum(rate_rich, rate_lean, onset: int, path: str | Path,
+                  ylabel: str = "Press Rate (per step)") -> Path:
+    """Behavioral momentum: per-component response rate across sessions.
+
+    Solid black = rich component (high reinforcement rate), dashed gray = lean.
+    The dotted vertical line marks the disruptor onset; momentum is the rich
+    component falling proportionally LESS (greater resistance to change).
+    """
+    rich, lean = np.asarray(rate_rich), np.asarray(rate_lean)
+    s = np.arange(len(rich))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(s, rich, color="black", ls="-", marker="o", ms=4, label="Rich (high reinf. rate)")
+    ax.plot(s, lean, color="0.45", ls="--", marker="s", ms=4, label="Lean (low reinf. rate)")
+    ax.axvline(onset - 0.5, color="0.6", ls=":", lw=1.0)
+    ax.text(onset - 0.5, ax.get_ylim()[1], " disruptor", fontsize=11, va="top", ha="left")
+    ax.set_xlabel("Session")
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_pree(crf, prf, onset: int, path: str | Path,
+              ylabel: str = "Press rate (prop. of baseline)") -> Path:
+    """Partial-reinforcement extinction effect: CRF vs PRF responding across sessions.
+
+    Solid black = continuous reinforcement (CRF), dashed gray = partial (PRF). The
+    dotted vertical line marks the onset of extinction; PREE is the PRF curve
+    declining MORE SLOWLY (greater persistence) than the CRF curve.
+    """
+    crf, prf = np.asarray(crf), np.asarray(prf)
+    s = np.arange(len(crf))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(s, crf, color="black", ls="-", marker="o", ms=4, label="Continuous (CRF)")
+    ax.plot(s, prf, color="0.45", ls="--", marker="s", ms=4, label="Partial (PRF)")
+    ax.axvline(onset - 0.5, color="0.6", ls=":", lw=1.0)
+    ax.text(onset - 0.5, ax.get_ylim()[1], " extinction", fontsize=11, va="top", ha="left")
+    ax.set_xlabel("Session")
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_resurgence(r1, r2, phase_blocks: int, path: str | Path,
+                    phase_labels=("Train R1", "Reinforce R2", "Test: R2 ext")) -> Path:
+    """Three-phase resurgence: R1 (target) and R2 (alternative) allocation by block.
+
+    Solid black = R1, dashed gray = R2; dotted vlines mark the phase boundaries.
+    Resurgence is R1 RISING in the test phase (when R2's reinforcement is removed)
+    from its phase-2 suppressed level -- emergent choice reallocation, not a coded
+    effect.
+    """
+    r1, r2 = np.asarray(r1), np.asarray(r2)
+    b = np.arange(len(r1))
+    me = max(1, len(b) // 30)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(b, r1, color="black", ls="-", marker="o", ms=3, markevery=me, label="R1 (target)")
+    ax.plot(b, r2, color="0.5", ls="--", marker="s", ms=3, markevery=me, label="R2 (alternative)")
+    for i in (1, 2):
+        ax.axvline(i * phase_blocks - 0.5, color="0.6", ls=":", lw=1.0)
+    ymax = ax.get_ylim()[1]
+    for i, lab in enumerate(phase_labels):
+        ax.text((i + 0.5) * phase_blocks, ymax, lab, fontsize=10, va="top", ha="center")
+    ax.set_xlabel("Block")
+    ax.set_ylabel("Response allocation")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_punishment_suppression(rates, curves: dict, path: str | Path) -> Path:
+    """Allocation to the punished response vs scheduled punishment rate, per model.
+
+    ``curves`` maps model name -> allocation array (same length as ``rates``). All
+    models suppress the punished response (the mimicry); they differ in functional
+    form. Scheduled (not obtained) rate avoids the response-feedback artifact.
+    """
+    rates = np.asarray(rates, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for (name, y), (ls, mk) in zip(curves.items(), _BW_CYCLE, strict=False):
+        ax.plot(rates, np.asarray(y), color="black", ls=ls, marker=mk, ms=5, label=name)
+    ax.axhline(0.5, color="0.85", lw=0.6)
+    ax.set_xlabel("Scheduled punishment rate on target (1/VI)")
+    ax.set_ylabel("Allocation to punished response")
+    ax.set_ylim(0, None)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_punishment_dissociation(alt_rates, subtractive, competitive,
+                                 path: str | Path) -> Path:
+    """de Villiers vs Deluty: log-odds punishment suppression vs alternative reinforcement.
+
+    Subtractive (de Villiers) and competitive (Deluty) suppression depend on the
+    alternative's reinforcement rate with OPPOSITE slopes -- the diagnostic that
+    distinguishes direct subtraction from competitive (reallocation) suppression.
+    """
+    a = np.asarray(alt_rates, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(a, np.asarray(subtractive), color="black", ls="-", marker="o", ms=5,
+            label="Subtractive (de Villiers)")
+    ax.plot(a, np.asarray(competitive), color="0.45", ls="--", marker="s", ms=5,
+            label="Competitive (Deluty)")
+    ax.set_xlabel("Alternative reinforcement rate (1/VI)")
+    ax.set_ylabel("Punishment suppression\n(log-odds shift)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_giveup_regimes(dist, const_mean, const_ci, bio_mean, bio_ci,
+                        path: str | Path) -> Path:
+    """Give-up density vs travel distance under two resource models.
+
+    Solid = constant intake (time-at-patch); dashed = biomass-scaled intake
+    (Holling functional response). Both show the MVT decline; the comparison
+    isolates how within-patch diminishing returns reshape the gradient.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.errorbar(dist, np.asarray(const_mean), yerr=np.asarray(const_ci), fmt="o-",
+                color="black", ms=5, capsize=3, label="Constant intake")
+    ax.errorbar(dist, np.asarray(bio_mean), yerr=np.asarray(bio_ci), fmt="s--",
+                color="0.45", ms=5, capsize=3, label="Biomass-scaled intake")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Density\n(patch biomass at leaving)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_giveup_rate(dist, rate_mean, rate_ci, path: str | Path) -> Path:
+    """Charnov marginal value: give-up intake RATE vs travel distance.
+
+    Under the functional response, instantaneous intake rate = food_intake_rate *
+    biomass_frac, so the rate at the moment of leaving falls with travel distance
+    -- the marginal-value-theorem prediction that the give-up rate tracks the
+    (travel-dependent) environment-wide optimal rate.
+    """
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _band(ax, dist, np.asarray(rate_mean), np.asarray(rate_ci), "give-up rate", "-", "o")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Give-up Intake Rate\n(energy/step at leaving)")
+    ax.set_ylim(bottom=0)
+    return _save(fig, path)
+
+
+def plot_residence_time(dist, observed, ci, path: str | Path) -> Path:
+    """Marginal-value theorem: patch residence time vs travel distance."""
+    dist = np.asarray(dist, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _band(ax, dist, np.asarray(observed), np.asarray(ci), "residence", "-", "o")
+    ax.set_xlabel("Travel Distance Between Patches (D)")
+    ax.set_ylabel("Residence Time\n(steps on patch before leaving)")
+    ax.set_ylim(bottom=0)
     return _save(fig, path)
 
 

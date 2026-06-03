@@ -183,6 +183,7 @@ class Organism:
         at_food = float(np.asarray(observation.get("food_contact", 0.0)).ravel()[0]) > 0.0
         on_danger = float(info.get("danger_contact", 0.0)) > 0.0
         source = info.get("credit_source")  # demos may pair a neutral cue
+        context = float(np.asarray(observation.get("context", 0.0)).ravel()[0])
         self.learning_rule.update(
             self.atoms,
             self.eligibility,
@@ -192,6 +193,7 @@ class Organism:
             appetitive_exposure=at_food,
             aversive_exposure=on_danger,
             source=source,
+            context=context,
         )
 
         # Cue generalization: at food contact, the receptors active for the

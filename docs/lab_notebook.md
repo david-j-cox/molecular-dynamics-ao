@@ -766,3 +766,590 @@ pause then steep run). Records stacked with full-height offset (no overlap).
 Schedule-signature scorecard now: FI scallop (timing), FR break-and-run + FR>VR
 pause + VR>FR rate (count timing), demand-like consumption decline (effort/value).
 Still weak: the molar VR>>VI rate difference (needs feedback-function sensitivity).
+
+---
+
+## 2026-05-31 — Multi-patch foraging in the JAX world: patch-leaving + MVT
+
+Added a multi-patch food layer to the JAX SURVIVAL world (forage.py), distinct
+from the matching work (matching.py has VI feeders but no biomass/depletion/energy/
+death). The organism now senses P depleting/regrowing patches and approaches the
+single most SALIENT one:
+
+    salience_p = exp(-dist_p / sensor_range) * (biomass_p / K)
+
+Direction/intensity/contact for the food channel are the salience-argmax over
+patches; danger/light/cue stay single sources. Everything else (two-tier force,
+damped Verlet, RW learning, cue receptors, energy budget, death) is the SAME
+kernel as jax_engine.make_simulate. With P=1 it reproduces make_simulate to
+0.0e+00 (validate_against_single_patch; test_forage.py) -- the multi-patch path is
+a strict generalization, not a reimplementation.
+
+Mechanism (no give-up rule hand-coded): while the organism feeds, the occupied
+patch depletes (its salience falls) while the distant alternative regrows. The
+``consume`` atom (sensitivity food 1.0 + energy-deficit gain) holds it on a rich
+patch; once biomass drops enough that the alternative's distance-attenuated
+salience wins, ``approach_food`` flips direction toward it and the organism leaves.
+Predicted give-up density (leave when biomass_frac < exp(-D/range), alternative
+near full) and longer residence for longer travel -- the marginal-value theorem.
+
+exp020 (two patches, sweep travel distance D, 128 organisms x 3500 steps):
+- Give-up density FALLS monotonically with D: 0.60 -> 0.58 -> 0.54 -> 0.48 -> 0.43
+  for D = 3..7, parallel to and below the exp(-D/range) prediction. The offset is
+  expected -- the prediction assumes a FULL alternative (frac_B=1), but the
+  alternative is still regrowing at switch time, so the realized threshold
+  exp(-D/range)*frac_B sits lower.
+- Residence time RISES monotonically: 38 -> 46 -> 52 -> 57 -> 62 steps. Longer
+  travel justifies depleting a patch further before leaving. Classic MVT.
+
+Tuning notes (two failure modes fixed):
+1. First pass STARVED (E~0): metabolism too high relative to intake. Made survival
+   cheap (basal 0.005, move 0.005) + low softmax temperature (0.15) so the organism
+   COMMITS to consuming a patch instead of random-walking off it -- leaving is then
+   salience give-up, not emission noise.
+2. The D-dependence only appears when the alternative is actually SENSED. With the
+   default sensor_range=4, exp(-D/4) is negligible for D>=6, so leaving was governed
+   by a flat hunger-dependent consume floor (no D-dependence). Set sensor_range=12
+   and keep D <= sensor_range; beyond ~sensor_range the gradient breaks (few
+   organisms detect/relocate to the far patch). Residence definition is by patch
+   ALLEGIANCE (first contact until first contact with the OTHER patch), robust to
+   brief out-of-range excursions that would otherwise read as spurious leaving.
+
+---
+
+## 2026-05-31 — Patch-leaving follow-ups: tenacity factor + functional response
+
+Two improvements after noticing observed give-up density sits ~20% BELOW the naive
+exp(-D/range) salience-crossover.
+
+(1) Tenacity factor (exp020). The discrepancy is a CONSTANT multiplicative offset,
+not a shape error: observed/naive = 0.79 +/- 0.018, flat across D=3..7. So the
+shape exp(-D/range) is exactly right and one constant closes the gap:
+
+    give_up_density = kappa * exp(-D/range),   kappa ~= 0.79
+
+kappa is PATCH TENACITY / consummatory perseveration -- the organism depletes a
+patch PAST the salience-indifference point because the consume atom's food gain
+(1.0) exceeds approach_food's (0.5), amplified by leaky-integrator lag. The static
+gain ratio (g_leave+d_gain)/(g_stay+d_gain) BRACKETS kappa but doesn't pin it:
+diagnostics show the organism actually leaves when SATIATED (give-up energy ~0.85,
+so d_gain~=0 -> gain ratio ~0.5, the lower bracket) while hungry would give ~0.82;
+the realized 0.79 is set by the dynamics, so kappa is reported as a single fitted
+constant validated by its constancy across D. Plot now shows observed, the naive
+crossover, and kappa*crossover (which lands on the data within CI).
+
+(2) Functional response (exp021, config.food_intake_scaling). Constant intake has
+a flaw: the organism satiates on a rich patch, the food drive switches off, it
+wanders away and starves -- 0% survive to end of run (give-up stats still valid,
+pooled over each organism's first few visits, but the population isn't viable).
+Added the Holling response intake = food_intake_rate * biomass/K ('biomass'
+scaling; 'constant' is the default and preserves the P=1 == make_simulate check).
+At the SAME nominal rate it fixes both problems:
+  - Survival: a depleted patch yields diminishing intake -> hunger re-engages
+    foraging -> end-of-run survival 0.00 -> 0.50.
+  - Charnov reading: within-patch intake rate now genuinely diminishes (= rate *
+    biomass_frac), so the GIVE-UP RATE (rate * give-up density) falling with travel
+    distance (0.044 -> 0.034 over D=3..7) is a literal marginal-value signature,
+    not just a salience artifact. Under constant intake the within-patch rate is
+    flat, so the same give-up-density gradient is purely stimulus-control.
+The MVT give-up-density gradient holds in BOTH regimes (functional response is
+higher and shallower: 0.74 -> 0.57 vs constant 0.60 -> 0.43). Same phenomenology,
+two resource models, only the functional response is Charnov-interpretable and
+viable -- a nice dissociation of mechanism from phenomenon.
+
+---
+
+## 2026-05-31 — Behavioral momentum (multiple schedule): satiation yes, extinction no
+
+Added run_multiple_schedule to chamber.py: K components presented successively,
+each with its own VI rate and its own Pavlovian context->reinforcer value (the
+behavioral-momentum "mass", an omission-RW association settling at a level graded
+by that component's reinforcement RATE, NOT by responding). Train to baseline,
+disrupt, measure resistance = per-component rate / its own baseline. exp022.
+
+POSITIVE RESULT -- satiation/prefeeding disruptor (energy clamped to capacity ->
+deficit ~ 0). The rich component (VI 5, reinf rate 0.17, context value 1.68) keeps
+99.6% of baseline; the lean component (VI 40, rate 0.023, ctx 0.76) keeps 80%. So
+the rich component is more resistant -- behavioral momentum, and mechanistically
+clean: the rich component's higher context value is a larger NON-motivational share
+of its press drive, so removing the deficit drive takes a smaller proportional bite.
+This is Nevin's logic (resistance tracks the stimulus-reinforcer relation) falling
+out of the model. Robust across parameterizations.
+
+NEGATIVE / DIAGNOSED -- extinction is NOT clean momentum here (rich 0.57, lean 0.78
+= anti-momentum). Worked through several mechanisms; the obstacles are real and
+worth recording:
+1. Energy-survival confound: withholding food IS starvation, which raises the
+   deficit drive -> responding rises under extinction (proportions > 1), masking/
+   reversing response extinction. Fix attempted: maintain deprivation (clamp energy)
+   during the test so only the response-reinforcer contingency changes.
+2. Response-based vs time-based value decay: the chamber erodes press value on
+   unreinforced PRESSES, so a vigorous (rich) response self-extinguishes faster --
+   anti-momentum. Switched the momentum runner to TIME-based decay divided by mass
+   (Nevin: resistance per unit time, not per response; matches the Verlet mass =
+   resistance-to-change metaphor, momentum_mass_gain). This helps in absolute terms.
+3. Shared emission floor + the proportion metric: once value decays, both components
+   fall to the SAME absolute floor (logistic at zero drive / shared deficit), so
+   proportion-of-baseline is dominated by baseline HEIGHT (rich is higher -> lower
+   proportion) rather than by mass. Removing the floor trades it for a logistic
+   CEILING; a clean monotone "rich more resistant throughout" needs fragile tuning.
+Conclusion: momentum is real in the model under a motivational (satiation) disruptor;
+extinction-resistance momentum needs reinforcement decoupled from survival and a
+floor-free, time-based, mass-scaled decay -- a clean future-work target, not faked.
+Satiation/prefeeding is itself a canonical Nevin disruptor, so this counts as a
+genuine behavioral-momentum demonstration.
+
+---
+
+## 2026-05-31 — Code sweep / refactor + reproduction harness
+
+Built a reproduction harness (scripts/reproduce.py): runs every experiment + demo
+in a fresh subprocess, scrubs volatile lines (wall-clock timings, throughput, abs
+paths), and snapshots stdout to outputs/repro/baseline.json. `--check` re-runs and
+diffs against the baseline so any numeric drift is explicit. Captured a baseline
+(26/26 run cleanly), then refactored against it.
+
+Refactor (verified: harness --check shows 0/26 experiments changed, all JAX
+validators still <1e-6, forage P=1 == make_simulate exactly 0.0, 35 tests pass):
+- New behavioral_md/experiment_utils.py centralizes helpers each experiment had
+  copy-pasted: compute_mean_ci, fit_matching_law (was duplicated in 6 matching
+  exps), make_cue_centers, make_inert_source, weak_innate_atoms, save_results_json.
+  Lives in the installed package (not under experiments/) so every script imports
+  it and still runs standalone -- no PYTHONPATH needed.
+- New behavioral_md/_kernels.py: exp_falloff (exp(-d/range)) and safe_unit (0/0-safe
+  unit vector), the sensory-geometry primitives that jax_engine, forage, and
+  matching had each written inline. Wired into all three.
+- Removed the experiments/_parallel.py passthrough; exp002/exp003 now import
+  run_sweep from behavioral_md.parallel directly.
+- Found and fixed a runnability bug: exp002/exp003/exp021 could not run as
+  `python experiments/expNNN.py` (they did `from experiments... import`, which
+  needs the repo root on sys.path). exp002/003 are now standalone; exp021 still
+  builds on exp020's setup (the harness puts the root on PYTHONPATH).
+
+Deliberately NOT changed (noted for later): the NumPy reference engine vs the JAX
+twin keep their parallel implementations on purpose (the validators check
+equivalence); the unimplemented consequence-model stubs stay as documented future
+work; chamber/matching keep hardcoded activation/weight clip bounds (they use their
+own config objects, values already match the SimulationConfig defaults). No
+mechanism numerics changed -- this sweep was structural.
+
+Follow-up structural change (same verification: 0/26 drift, validators <1e-6, P=1
+== make_simulate 0.0, 38 tests): the near-duplicate per-step loops in
+jax_engine.make_simulate and forage.make_forage_sim were factored into two shared
+functions in jax_engine -- drive_integrate_emit (deficit-scaled force + cue drive +
+damped-Verlet integrate + eligibility + softmax emission) and learn_with_cue
+(valence-split RW + cue-receptor update). Both engines' step functions now differ
+only where they should: observe (single vs multi-patch salience) and the env
+transition (single-patch env_step vs multi-patch deplete/regrow + functional
+response). The shared physics/learning lives in one place.
+
+---
+
+## 2026-06-02 — Fitting matching sensitivities (exp023): autodiff doesn't, derivative-free does
+
+Goal: search organism parameters so the emergent generalized-matching-law
+sensitivities (a_rate, a_amt) hit chosen targets -- the long-promised payoff of the
+JAX engine ("autodiff is the enabler"). It did not go as planned, and the why is the
+interesting part.
+
+**Autodiff is unusable here.** The stochastic matching engine is non-differentiable
+(categorical action sampling, Bernoulli VI arming), so I built a differentiable
+surrogate. Two dead ends first:
+- An *expected-value* (mean-field) surrogate -- expected displacement, expected
+  arming -- collapses the trajectory and parks the organism at the higher-value patch:
+  a_rate ~ 2.7-3.7 (severe overmatching), and the slope no longer tracks the
+  stochastic one. Undermatching in this engine is a *sampling-noise* phenomenon (the
+  organism keeps wandering to the poorer patch); remove the noise and you lose it.
+- A *Gumbel-softmax* surrogate (reparameterized action sampling + relaxed-Bernoulli
+  arming, common random numbers) fixes the FORWARD model beautifully: soft a_rate
+  0.463 vs stochastic 0.565, a_amt 0.649 vs 0.967, and a beta sweep gives soft-vs-
+  stochastic correlation 0.97 -- gradients should transfer. But the reverse-mode
+  GRADIENT through the ~1000-step recurrent rollout EXPLODES: d(a_rate)/d(beta) came
+  out at -310..+10 across noise seeds (mean -39, std 103) versus a clean finite-
+  difference of ~+0.03. Per-step sensitivities compound multiplicatively through the
+  fed-back state (learned weights, armed-probability, position) -- the classic
+  exploding-gradient / chaos of differentiating long recurrent rollouts. Optimization
+  with these gradients does nothing (Adam wanders; even an unreachable target fails to
+  move beta).
+
+**Why not a molar closed-form (where autodiff WOULD be clean)?** Because reproducing
+the matching law in closed form requires assuming B_k ~ v_k^a -- i.e. writing the
+sensitivity a in as a parameter. That forces the very result this engine is supposed
+to let *emerge* from the coupled dynamics. Scientifically that defeats the purpose, so
+it's out.
+
+**Resolution (exp023, fit.py).** Keep the emergent dynamics; search the smooth,
+deterministic-under-CRN Gumbel surrogate derivative-free (Nelder-Mead). Free params
+temperature, approach_gain, beta. A per-parameter transfer probe was decisive:
+- beta: strong, sign-consistent lever on a_rate (soft 0.37->0.50, stoch 0.34->0.71).
+- temperature / approach_gain: weak on a_rate, consistent on a_amt.
+- lr_cue: stochastic a_rate falls sharply with it, but the surrogate doesn't reproduce
+  that (a noise-accumulation effect) -- EXCLUDED as a free param; its gradient/effect
+  does not transfer.
+
+On this two-patch preparation the two sensitivities are positively coupled (beta moves
+both; temperature/approach_gain only trim a_amt by ~+-0.06), so the reachable joint
+region is narrow and strong decoupling isn't achievable with organism params alone
+(the strong independent lever for a_rate is the environmental changeover delay /
+patch separation, exp009). So the demonstration tunes in aligned directions:
+
+```
+                a_rate                  a_amt
+           target soft stoch   |   target soft stoch
+  baseline    --  0.46 0.56    |     --   0.65 0.97
+  tune-up   0.50  0.50 0.66    |   0.67   0.67 1.06
+  tune-down 0.38  0.38 0.36    |   0.56   0.56 0.86
+```
+
+The surrogate hits its targets almost exactly; the stochastic engine moves the same
+direction (a_rate 0.36 < 0.56 < 0.66; a_amt 0.86 < 0.97 < 1.06 -- both ordered, both
+transfers PASS). The surrogate reads systematically lower than the stochastic engine
+(the relaxation softens the choice) -- a monotone compression, not a disagreement.
+
+Honest takeaways: (1) for emergent quantities of long stochastic rollouts, the forward
+surrogate is the asset, not its gradient; (2) "autodiff is the enabler" needs revising
+-- the enabler is the differentiable *forward* model, searched derivative-free, with
+autodiff itself deferred to a truncated-backprop (TBPTT) attempt if a gradient method
+is ever wanted; (3) on this prep the matching sensitivities are only weakly tunable by
+organism parameters and are coupled -- a genuine result, not a fitting failure.
+Validation: 6 new tests (test_matching_diff, test_fit); reproduce baseline 27/27
+(exp023 added, exp001-022 + demos show 0 drift).
+
+---
+
+## 2026-06-02 (cont.) — Decoupling rate and amount sensitivity (exp024)
+
+exp023 left the two matching sensitivities positively COUPLED: the organism's
+discriminability levers (temperature, approach_gain, beta) move a_rate and a_amt
+together, so only aligned targets were reachable. Picked up the decoupling thread.
+
+**First, a falsified premise (worth recording).** The plan was to use patch separation
+(the changeover-delay lever, exp009) to control a_rate independently. A probe across
+separations D=2..14 killed that idea: in the stochastic engine COD raises BOTH
+sensitivities (a_rate 0.06->1.06 AND a_amt 0.16->~1.0 as D grows). exp009 had only ever
+measured rate vs COD, so the fact that COD also drives amount sensitivity is a NEW
+result. Mechanistically obvious in hindsight: separation is a *discriminability* knob,
+the same role beta (cue-tuning width) plays -- they are redundant, not orthogonal. (Also
+the surrogate only tracks COD up to D~6 then turns over, so it wouldn't have transferred
+at large D anyway.) Conclusion: no discriminability lever can decouple the two.
+
+**The fix: an asymmetric lever.** a_rate is driven by how reinforcement *frequency*
+maps to value; a_amt by how *magnitude* does. So a knob on the magnitude->value map
+decouples them. Added MatchConfig.amount_exponent (rho): the learned-value teaching
+signal uses amount**rho instead of amount (utility curvature of reinforcer magnitude --
+standard behavioral economics, objective). Because a_rate is measured at equal amounts
+(amount=1 -> amount**rho=1 for any rho), rho leaves a_rate EXACTLY untouched and scales
+a_amt. The probe is textbook-clean (1500-step soft / 400x4000 stochastic):
+
+```
+ rho  soft_rate soft_amt | stoch_rate stoch_amt
+ 0.4    0.463    0.292   |   0.561     0.502
+ 1.0    0.463    0.649   |   0.561     0.970
+ 2.0    0.463    0.942   |   0.561     1.311
+```
+
+a_rate is flat to 3 decimals across rho in BOTH engines; a_amt scales monotonically and
+transfers. rho=1.0 reproduces the linear-amount baseline exactly (guarded so existing
+experiments don't drift -- verified 0 drift on exp008/011/012/013/014/023).
+
+**exp024 demonstration.** With beta setting a_rate and rho setting a_amt, fit two
+CROSSING targets (free = temperature/approach_gain/beta/amount_exponent), impossible on
+the coupled manifold:
+```
+                  a_rate (t/soft/stoch)   a_amt (t/soft/stoch)
+  baseline          --  0.46 0.56          --  0.65 0.97
+  A rate^/amt_v    0.48 0.48 0.59         0.35 0.35 0.61
+  B rate_v/amt^    0.40 0.40 0.39         0.85 0.85 1.20
+```
+Surrogate hits both targets exactly; stochastic transfers and CROSSES -- A has higher
+a_rate but lower a_amt than B (decoupling checks both OK). Fitted rho = 0.49 (A) vs 1.74
+(B) carries the amount difference; beta = 6.4 (A) vs 4.6 (B) the rate difference. So the
+two matching sensitivities are now independently tunable, with the new dimension
+(magnitude utility curvature) the orthogonal lever.
+
+Validation: 2 new tests (rho orthogonality in the surrogate; rho fits a low-amount
+target). reproduce baseline re-captured with exp024 (exp001-023 + demos 0 drift).
+Open: do a_prob / a_delay need their own asymmetric levers too?
+
+---
+
+## 2026-06-02 (cont.) — Probability and delay decoupling (exp025): the pattern generalizes
+
+Extended the decoupling work to the last two concatenated-matching dimensions. Probed
+the stochastic engine first (programmed-ratio regression, so absolute a_rate reads
+lower than exp008's obtained-ratio 0.56 -- structure is what matters):
+
+```
+config        a_rate   a_amt  a_prob a_delay
+baseline       0.204   0.964   0.759   0.610
+beta=9         0.332   1.118   0.807   0.686   <- beta scales ALL four
+rho=1.6        0.204   1.213   0.759   0.610   <- amount_exponent: a_amt only
+delay_k=1.0    0.204   0.964   0.759   0.642   <- delay_k: a_delay only
+delay_k=0.2    0.204   0.964   0.759   0.453
+```
+
+Clean structure: the discriminability levers (beta, COD, ~temperature) scale all four
+sensitivities (the overall-sensitivity anchor, read off a_rate), and each GRADED
+dimension has its own orthogonal curvature lever:
+  amount -> amount_exponent (rho)        value ~ amount^rho
+  delay  -> delay_k                      hyperbolic discount steepness  (already existed!)
+  prob   -> probability_exponent (sigma) reinforcement gated on prob^sigma  (NEW)
+So delay was already decouplable; only probability needed a new knob. sigma is nonlinear
+probability weighting (prospect-theory flavor): contacts reinforce with effective prob
+prob^sigma. Each lever leaves the other three sensitivities untouched because their
+sweeps hold that dimension neutral (amount=1, prob=1, delay=0 -> 1^x=1, discount(0)=1);
+sigma==1.0 / rho==1.0 are guarded so existing experiments stay bit-identical.
+
+Surrogate extended to carry prob/delay schedules + the sigma/delay_k levers
+(soft_sensitivities_all returns all four; soft_sensitivities keeps the cheaper rate+amt
+pair for exp023/024). Verified in the surrogate: sigma=0.5->1.7 moves soft a_prob
+0.15->0.52 with rate/amt/delay byte-identical; delay_k moves a_delay only.
+
+exp025 fits two CROSSING (a_prob, a_delay) targets with free = beta/sigma/delay_k
+(fit_dims, a dict-targeted Nelder-Mead over soft_sensitivities_all):
+```
+                a_prob (t/soft/stoch)    a_delay (t/soft/stoch)
+  baseline        --  0.37 0.78           --  0.37 0.61
+  A prob^/delay_v 0.50 0.50 0.93         0.22 0.22 0.45
+  B prob_v/delay^ 0.15 0.14 0.50         0.34 0.37 0.64
+```
+Surrogate hits targets; stochastic transfers and CROSSES (a_prob A>B, a_delay A<B).
+Fitted sigma = 1.44 (A) vs 0.49 (B), delay_k = 0.15 (A) vs 0.66 (B) carry the two
+dimensions independently. So all four generalized-matching-law sensitivities are now
+independently tunable -- rate as the frequency anchor, amount/probability/delay each
+with its own utility-curvature exponent.
+
+Validation: 3 new tests (sigma & delay_k orthogonality; fit_dims sigma ordering), 49
+pass; ruff clean; reproduce baseline re-captured with exp025 (exp001-024 + demos 0
+drift -- the rho==1/sigma==1 guards hold).
+
+---
+
+## 2026-06-02 (cont.) — Dual excitatory/inhibitory extinction (Konorski/Bouton)
+
+Added a new opt-in learning rule, learning_model="dual_exc_inhib"
+(learning.DualExcitatoryInhibitory), to capture what single-weight Rescorla-Wagner
+cannot: post-extinction return of responding. The RW rule erases the weight on
+omission; the dual rule keeps a separate excitation w+ (preserved) and inhibition w-
+(grows on omission). The net the force reads is w+ - gate*w-, written into
+atom.history_weights each step, so forces.py is untouched. Three new state dicts on
+BehavioralAtom (w_plus, w_minus, w_minus_ctx); empty/zero by default so the other rules
+and all existing experiments are unaffected.
+
+Mechanism (per drive atom, per channel, eligibility e, intensity x):
+- Reinforced: w+ += lr_acq*e*x*(lam - w+); w- relaxes toward 0 at inhibition_relax_rate
+  (0.1 default, > acquisition rate -- inhibition is labile, Bouton).
+- Omission: w+ UNCHANGED; w- += inhibition_rate*e*x*(lam - w-); a context tag EMAs
+  toward the current context.
+- Passive: w- *= (1 - inhibition_passive_decay) every step (off-contact too).
+- Readout each step: gate = exp(-context_beta*|context_now - context_learned|) if
+  context_gating else 1; net = clip(w+ - gate*w-). Both w+ and w- clipped to bounds
+  (the same overshoot guard RW uses -- a large eligibility*intensity step diverged to
+  NaN without it; found via seed 9).
+
+A scalar "context" was threaded env -> obs -> rule (gridworld reset option + obs key +
+observation_space; organism passes obs["context"] to update via a new context= kwarg
+that RW/Linear ignore). The net is refreshed EVERY step at the current context so the
+gate tracks context changes immediately (renewal is expressed on approach, before any
+new contact), and so passive decay shows up off-contact.
+
+Three demos (population, plot_dual_components overlays w+/w-/net with phase vlines):
+- run_reacquisition_demo (dual vs RW control, slow acquisition rate for resolution):
+  dual reacquires net>=0.5 in ~0.47 lives vs ~1.98 original and vs RW's ~0.88.
+- run_spontaneous_recovery_demo (passive_decay=0.02): SAME arena throughout, food
+  withheld during the rest interval via a new env flag food_present=False (distinct from
+  food_reinforces=False = food-present-but-unrewarded extinction). Recovery is driven
+  purely by the PASSAGE OF TIME (passive w- decay), context held constant and gating off
+  -- mechanically distinct from renewal, NOT a context change (caught in review: an
+  earlier version relocated food during rest, which read as a context swap; replaced with
+  a true food-free interval in the identical arena). net 0.42 (end-ext) -> 1.00 (end-rest)
+  -> 0.48 (re-extinguishing at test); w+ flat at 1.0; w- 0.58 -> 0.00; 0 rest contacts.
+- run_renewal_demo (ABA vs ABB, context_gating): first test-life net ABA 0.45 (renewed
+  in the acquisition context) vs ABB 0.00 (stays suppressed in the extinction context).
+
+Honest caveat: renewal and SR are clean in the NET (the learned association the force
+reads). Raw food-contact counts are floored by incidental proximity (food sits near the
+start), so they don't discriminate motivation here -- the net is the reported readout.
+The defining figures show w+ flat through extinction while w- rises and the net falls,
+then the net recovering (rest decay) / renewing (context switch) -- the signature of
+inhibition-on-top-of-preserved-excitation.
+
+Validation: 5 new unit tests (extinction preserves w+/grows w-; net recovers under
+passive decay; reacquisition faster than acquisition; context gate enables renewal; RW
+path untouched), 54 tests pass; ruff clean; reproduce baseline 32/32 with exp001-025 +
+prior demos byte-identical (rule fully opt-in).
+
+---
+
+## 2026-06-03 — Resistance to change, PREE, and emergent resurgence (operant chamber)
+
+Three decremental-learning phenomena, all built in the vectorized operant chamber
+(`chamber.py`) rather than the gridworld/`learning.py` rule, because all three are
+operant response-rate effects and resurgence in particular needs concurrent two-response
+CHOICE, which only the chamber has (`run_concurrent_chamber` precedent). They share one
+idea: matching/softmax choice over response values plus the extinction dynamics. New
+`ChamberConfig` fields (all opt-in, defaults leave existing runs untouched):
+`associability_rule`/`ph_eta`/`ph_init`/`ph_floor` (Pearce-Hall), `value_rule`/
+`inhib_rate`/`inhib_relax`/`inhib_passive_decay` (dual). exp026-028; +4 chamber tests
+(58 total); reproduce baseline recaptured 35/35 (exp001-025 + prior demos byte-identical;
+the only library change is an ADDITIVE `value` key on `run_multiple_schedule`'s return).
+
+### Item 1 — behavioral momentum as mass-modulated decay (exp026)
+
+`run_multiple_schedule` already had the mechanism: a Pavlovian context->reinforcer value
+(rate-graded "mass") that divides the per-step, TIME-BASED value decay, `dv = -(value_
+extinction/mass)*v`. exp022 could only show momentum under SATIATION, not extinction,
+because it read resistance from the press RATE, where a saturating emission function +
+shared energy-deficit floor confound proportion-of-baseline with baseline height (the
+rich component, higher on the logistic, falls more in proportion -> spurious ANTI-momentum;
+reproduced here: rich 0.428 vs lean 0.558 retained). 
+
+Fix: read resistance from the VALUE the mass actually protects, with small motivation so
+the value (not the deficit floor) carries responding. Because the decay is multiplicative,
+sessions-for-value-to-reach-25%-of-baseline is SCALE-FREE -> a clean control: at
+`momentum_mass_gain=0` rich and lean reach criterion in the SAME number of sessions (2=2,
+no momentum); at gain=3 rich resists more (6 vs 5 sessions). Added an additive `value`
+key to `run_multiple_schedule`'s return for this readout. Effect is real but modest
+(ctx-mass ratio ~2:1, and the mass itself decays slowly during extinction).
+
+### Item 2 — partial-reinforcement extinction effect from Pearce-Hall (exp027, `run_pree`)
+
+Single response, CRF (p=1) vs PRF (p=0.25) training then extinction. Pearce-Hall
+associability: effective rate scaled by a per-organism alpha that EMAs toward recent
+|prediction error|. After PRF an omission is partly expected (alpha low) -> slow
+extinction; after CRF the first omission is maximally surprising (alpha spikes) -> fast.
+
+The crucial design choice for a CLEAN control: extinction decay is TIME-BASED (per step),
+not press-contingent. A first attempt with press-contingent decay showed PREE even under
+the 'fixed' control — an artifact, because (a) vigorous responding self-extinguishes
+faster and (b) PRF's lower baseline + emission floor inflate its proportion-retained.
+With time-based decay the value's extinction rate constant is response-rate- and
+baseline-independent, so 'fixed' gives CRF and PRF the IDENTICAL sessions-to-criterion
+(7=7) — no PREE — and any PREE under 'pearce_hall' is associability alone: CRF 16 vs PRF
+23 sessions, with the diagnostic alpha-at-extinction-onset CRF 0.81 (surprised) vs PRF
+0.48 (expected). Readout is on value (baseline-free); the rate figure is illustrative.
+
+### Item 3 — resurgence WITHOUT coding resurgence-as-choice (exp028, `run_resurgence`)
+
+Per the steer: get resurgence to EMERGE, not implement Shahan & Craig's model. Three-phase
+concurrent chamber, one of {R1, R2, background "other" (fixed value = Herrnstein R_e)}
+emitted per step by softmax (= matching). Phase 1 reinforce R1; phase 2 extinguish R1 +
+reinforce R2; phase 3 extinguish both. Resurgence (R1 recovering in phase 3 from its
+phase-2 suppressed level) is computed NOWHERE — it falls out of softmax reallocation when
+R2's reinforcement is removed. Key realization: the procedure is SYMMETRIC (R2 gets phase-2
+training as R1 got phase-1), so R1 and R2 correctly converge to PARITY at test; resurgence
+is the RISE of R1, not R1 exceeding R2 (an earlier "R1>R2@test" criterion was wrong-headed).
+
+The control nails causation: with `control_reinforce_r2=True` (R2 stays reinforced in
+phase 3), R1 does NOT recover (+0.13 -> -0.00) — it is REMOVAL of the alternative's
+reinforcement (choice reallocation), not time or disinhibition, that drives recovery.
+
+How much latent R1 strength survives phase 2 is set by the SAME mechanisms from items 1-2
+(nothing resurgence-specific):
+- single value (RW), gain 0: R1 -> background floor in phase 2 (endP2 0.02); bare choice
+  reallocation, resurgence +0.13 to parity.
+- + momentum mass (gain 8): training-history mass (slow-decaying reinforcement trace,
+  `mass_grow`/`mass_decay`, mirroring the slow `ctx` in `run_multiple_schedule`) slows R1's
+  phase-2 decay -> LARGER resurgence (+0.19). (Required making the mass trace persistent;
+  an EMA-toward-current-reinforcement washed out within the long phase.)
+- dual exc/inhib (vectorized port of `learning.DualExcitatoryInhibitory`): omission grows a
+  separate inhibition and PRESERVES R1's excitation -> R1 stays far less suppressed in
+  phase 2 (endP2 0.20 vs 0.02) and resurges from a higher floor (0.20 -> 0.33).
+
+The single-rule figure is textbook: R1 high / R2 floor (P1), crossover (P2), R1 climbs back
+as R2 collapses (P3). Resurgence-as-choice, emergent.
+
+### Open / honest scope
+- Momentum-under-extinction effect size is modest (mass ratio bound); a dedicated prep
+  training rich/lean to EQUAL baseline value (mass the only difference) would sharpen it.
+- Pearce-Hall lives only in the chamber value world; porting it to the foraging
+  `LearningRule` (gridworld) is straightforward future work but not done.
+- Resurgence uses the one-response-per-step allocation measure (+ background option), the
+  natural matching framing; a free-operant rate version is a possible refinement.
+
+---
+
+## 2026-06-03 (cont.) — Resurgence model-mimicry study (4th mechanism: Resurgence as Choice)
+
+Context: behavioral momentum's account of resurgence (the augmented BMT model, Shahan &
+Sweeney 2011) was rebuked by Craig & Shahan (2016) for mispredicting reinforcement-rate
+effects; Shahan & Craig (2017) replaced it with Resurgence as Choice. The interesting
+meta-point: MANY mechanisms produce resurgence, so the phenomenon underdetermines the
+process. New side study spun out under studies/resurgence_mechanisms/.
+
+Added a 4th, FORMAL mechanism to chamber.run_resurgence: value_rule="rac" (Resurgence as
+Choice). Distinct from the other three on BOTH axes -- value is a temporally-weighted
+(leaky-integrated) reinforcement tally (vr <- (1-1/rac_tau)*vr + rac_bump*reinforced), and
+allocation is power-law MATCHING over relative value (not softmax over a local delta-rule
+value). Resurgence needs NO preserved target strength: when the alternative's reinforcement
+stops, its integrated value decays and the target's RELATIVE value recovers. The recovery
+is transient and its visibility depends on rac_tau vs phase length (had to set tau ~ phase/5,
+i.e. 500 vs 2500, so the rise completes within phase 3; tau too long -> R2 decays too slowly,
+target never recovers within the phase -- itself a genuine RaC time-scale signature). Tuned:
+tau=500, bump=0.04, sensitivity=1.0, floor=0.1 -> endP2 0.03, P3 peak 0.24, resurgence +0.20,
+control +0.00. +1 unit test (59 total). exp028 untouched (rac is a new branch; single/dual
+paths byte-identical, baseline still valid).
+
+studies/resurgence_mechanisms/compare_mechanisms.py runs all four through the IDENTICAL
+preparation:
+- mimicry_four_mechanisms.png: all four reproduce the canonical curve (resurgence +0.14 to
+  +0.26), differing only in SHAPE (momentum overshoots; dual suppressed only to a high floor;
+  RaC smooth/transient). The basic result cannot discriminate them.
+- dissociation_reinforcement_rate.png: TWO parametric sweeps.
+  * ALTERNATIVE rate (phase 2): all four rise -> NOT diagnostic (and matches the data).
+  * TARGET rate (phase 1): ONLY momentum rises (0.24->0.27); local/dual/RaC flat. This is
+    the Craig & Shahan (2016) dissociation -- the simulated version of why momentum was
+    rejected (it makes resurgence depend on target reinforcement history; the others don't).
+
+README.md is the full writeup: model-mimicry thesis, each mechanism's process/benefits/
+drawbacks, the diagnostic-experiment catalog (target-rate isolates momentum; context/renewal
+and retention-interval/spontaneous-recovery isolate the dual/inhibition account; multi-
+alternative matching and time-scale isolate RaC; local choice is the parsimonious null), the
+methodological moral (the canonical curve is not evidence for any one process; the decisive
+tests are about WHAT IS RETAINED, not how much), limitations, and references. The study is a
+studies/ artifact -- deterministic and runnable but deliberately NOT in the reproduce baseline.
+
+---
+
+## 2026-06-03 (cont.) — Reinforcement/punishment asymmetry (both preparations)
+
+Next ToDo thread (user-picked): the punishment/reinforcement-asymmetry consequence models +
+a model-selection study, shown in BOTH the concurrent chamber (choice allocation) and the
+open foraging world (survival), per the user's "need to see results in both preparations".
+
+Chamber (chamber.run_punishment_choice): concurrent M-alternative choice, each response on
+its own reinforcement VI AND punishment VI; reinforcement and punishment each train a leaky-
+integrated value (vr, vp). Three accounts of how a punisher maps to choice:
+  subtractive  (de Villiers 1980):  score = vr - pun_c*vp  (cancels own reinforcement)
+  competitive  (Deluty 1976):       score_i = vr_i + pun_c*sum_{j!=i} vp_j  (boosts competitors)
+  concatenated (Critchfield/Klapes): B_i ~ vr_i^a_r * vp_i^(-a_p)  (separate sensitivities)
+All three SUPPRESS the punished response (mimicry). The discriminating result is the de
+Villiers vs Deluty DISSOCIATION: punishing the target at a fixed rate and varying the
+ALTERNATIVE's reinforcement, the log-odds suppression rises with alternative richness for
+subtractive (+0.91 -> +2.58) but FALLS for competitive (+1.59 -> +0.68) -- opposite slopes,
+their historic debate, and the punishment analogue of the resurgence target-rate dissociation.
+Concatenated recovers a_p log-linearly (set 0.5/1.0/1.5 -> ~0.74/1.52/2.35, R^2~=1.0),
+separable from reinforcement. exp029 + study figures.
+
+METHOD CAVEAT (reported): fitting the GML on OBTAINED punishment is confounded by response
+feedback -- a heavily suppressed response is rarely emitted, so it collects FEWER punishers
+and the obtained-rate axis can invert (a spurious NEGATIVE a_p appeared for the subtractive
+model). Suppression curves use SCHEDULED rate / log-odds.
+
+Foraging (consequence.py ConsequenceModel): danger = punisher. Subtractive scales the aversive
+teaching signal by c=punishment_weight (avoidance trained c times more than approach);
+ConcatenatedAsymmetric exposes reinf_/punish_sensitivity. Demo (studies/.../compare_models.py):
+food up column 5, danger off to the side as an avoidable obstacle; sweeping c traces a clean
+approach-avoidance gradient -- learned avoidance 0.55 -> 3.57, food 5.7 -> 0.3/life -- and at high
+c the organism OVER-AVOIDS the danger guarding the food and starves (asymmetry maladaptive when
+overtuned). Layout matters: danger directly ON the single path floors food intake (degenerate);
+off-path + local sensor range (5) gives the graded tradeoff.
+
+NOTE on architecture: only the SUBTRACTIVE account fits both worlds. CompetitiveSuppression and
+the concatenated law are between-response CHOICE accounts; the event->energy ConsequenceModel
+interface cannot express them, so they live only in the chamber. InjuryHealing (the one genuine
+embodied ConsequenceModel) deferred.
+
+Validation: +6 tests (run_punishment_choice suppression/dissociation/a_p; Subtractive/
+Concatenated/dispatch) -> 65 pass; ruff clean; reproduce baseline recaptured 36/36 (exp029
+added; exp001-028 + demos byte-identical -- all changes additive/opt-in).

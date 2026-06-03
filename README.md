@@ -135,15 +135,20 @@ flowchart LR
 | Law (sketch) | In the engine | Status |
 |---|---|---|
 | Generalized matching law | softmax emission (Luce rule); `matching.py` concurrent VI-VI | implemented |
-| Concatenated matching law | rate, amount, probability, delay (separable sensitivities) | implemented |
+| Concatenated matching law | rate, amount, probability, delay — separable, and each independently tunable via its own curvature lever | implemented |
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
+| Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
+| Punishment / reinforcement asymmetry | three concurrent-choice accounts (subtractive/de Villiers, competitive/Deluty, concatenated/Klapes) in `chamber.run_punishment_choice`; foraging `consequence.Subtractive`/`ConcatenatedAsymmetric`; exp029 + `studies/punishment_asymmetry/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
+| Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
 | Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
-| Behavioral momentum | atom `mass` (unit inertia); molar resistance-to-change | partial |
+| Behavioral momentum | atom `mass` (unit inertia); `chamber.py` multiple schedule -- rich component resists satiation (molar) and, via mass-modulated value decay, extinction (`run_multiple_schedule`, exp026) | implemented |
+| Partial-reinforcement extinction effect (PREE) | Pearce-Hall associability (rate ~ recent \|prediction error\|); `chamber.run_pree`, exp027 -- PRF persists longer in extinction | implemented |
+| Resurgence | emergent from choice reallocation; four distinct mechanisms (local choice, momentum, dual exc/inhib, Resurgence-as-Choice) in `chamber.run_resurgence`, exp028; model-mimicry study in `studies/resurgence_mechanisms/` | implemented |
 | Delay/probability discounting | concatenated-law terms (matching) | implemented |
 | Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
 
@@ -286,7 +291,7 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
 A range of classic behavior-analytic phenomena are reproduced from the same
 mechanism. The `scripts/` demos run agent populations (use `--agents N`) and write
 figures with 95% CI bands; the `experiments/` sweeps (`exp0NN`) cover matching,
-schedules, timing, and the JAX engine.
+schedules, timing, the JAX engine, and parameter fitting.
 
 **Foraging / learning** (`scripts/`):
 
@@ -296,16 +301,20 @@ schedules, timing, and the JAX engine.
 | Extinction | `run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 when food stops reinforcing |
 | Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value |
 | Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
+| Rapid reacquisition | `run_reacquisition_demo.py` | dual exc/inhib rule reacquires far faster than original acquisition (and than RW) — w+ preserved |
+| Spontaneous recovery | `run_spontaneous_recovery_demo.py` | net recovers over a rest interval (inhibition decays, excitation preserved), then re-extinguishes |
+| Renewal (ABA vs ABB) | `run_renewal_demo.py` | extinguished responding returns in the acquisition context (A), not the extinction context (B) |
 
 **Choice & matching** (`matching.py`; patches signalled by discriminative cues, not
 separate food channels):
 
 | Phenomenon | Experiment | Result |
 |---|---|---|
-| Generalized matching | `exp008` | undermatching (a≈0.7), classic log-log GML |
+| Generalized matching | `exp008` | undermatching (a≈0.56), classic log-log GML |
 | Changeover delay | `exp009` | sensitivity rises with travel/COD (Shull & Pliskoff) |
 | Multi-alternative matching | `exp010` | near-perfect matching across 5 alternatives |
 | Concatenated law: amount / probability / delay | `exp011`/`exp013`/`exp014` | separable sensitivities per dimension |
+| Sensitivity fitting & decoupling | `exp023`/`exp024`/`exp025` | fit emergent sensitivities to targets; rate/amount and probability/delay independently tunable (see **Parameter fitting** below) |
 
 **Operant chamber & schedules** (`chamber.py`, `timing.py`):
 
@@ -315,6 +324,43 @@ separate food channels):
 | FR break-and-run, FR>VR pause | `exp018`/`exp019` | post-reinforcement pause larger on FR; cumulative records |
 | Behavioral economics | `exp016` | consumption falls as response cost (unit price) rises |
 | Death patterns | `exp007` | survival curves, time-to-death, cause breakdown |
+| Behavioral momentum (extinction) | `exp026` | mass-modulated value decay → richly-reinforced response resists extinction; gain=0 control shows none |
+| Partial-reinforcement extinction effect | `exp027` | Pearce-Hall associability → PRF persists longer in extinction than CRF; fixed-associability control shows none |
+| Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
+| Punishment asymmetry | `exp029` | three accounts all suppress the punished response, but subtractive (de Villiers) and competitive (Deluty) suppression depend on the alternative's reinforcement with opposite slopes; concatenated `a_p` recovered log-linearly |
+
+**Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
+the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
+engine is non-differentiable, so we built a differentiable Gumbel-softmax surrogate of
+the rollout — but reverse-mode gradients through the long recurrent rollout explode
+(per-step sensitivities compound multiplicatively), so autodiff itself is unusable, and
+a molar closed-form (where it would work) would have to *assume* the matching-law form,
+defeating emergence. The surrogate's *forward* model is faithful and deterministic under
+common random numbers, so we search it derivative-free (Nelder-Mead) and re-plug the
+fit into the stochastic engine to confirm transfer. On the two-patch preparation the
+free discriminability levers (`temperature`, `approach_gain`, `beta`) move `a_rate` and
+`a_amt` together, so on their own the fit can only tune them in aligned directions —
+stochastic `a_rate` 0.56 → 0.66 (up) / 0.36 (down), `a_amt` 0.97 → 1.06 / 0.86.
+
+**Decoupling them** needs *asymmetric* levers, since every discriminability knob —
+including patch separation/COD — scales all the sensitivities together (a finding:
+exp009 had only ever measured rate vs COD). The pattern that emerges is clean: **rate is
+the frequency anchor** (set by the discriminability levers), and **each graded dimension
+gets its own orthogonal utility-curvature exponent**:
+
+| dimension | lever | mechanism |
+|---|---|---|
+| amount | `amount_exponent` (ρ) | value tracks `amount^ρ` |
+| delay | `delay_k` | steepness of the hyperbolic delay discount (pre-existing) |
+| probability | `probability_exponent` (σ) | reinforcement gated on `prob^σ` (nonlinear probability weighting) |
+
+Each leaves the other sensitivities exactly flat because the other sweeps hold that
+dimension neutral (`amount=1`, `prob=1`, `delay=0` → `1^x=1`, `discount(0)=1`). So the
+fit hits *crossing* targets impossible on the coupled manifold: `exp024` decouples
+rate/amount (high-rate/low-amount stoch 0.59/0.61 vs low-rate/high-amount 0.39/1.20),
+and `exp025` decouples probability/delay (high-prob/low-delay stoch 0.93/0.45 vs
+low-prob/high-delay 0.50/0.64). All four generalized-matching-law sensitivities are
+independently tunable. See the lab notebook (2026-06-02) for the full diagnosis.
 
 `scripts/make_figures.py` regenerates the standard foraging figure set (occupancy
 landscape, energy/biomass traces, learning curves, force-decomposition grid).
@@ -325,8 +371,10 @@ landscape, energy/biomass traces, learning curves, force-decomposition grid).
 population is held as arrays and one timestep is a pure, `jit`-compiled, batched
 operation run over time with `lax.scan`. It is validated component-by-component
 against the NumPy reference (force, learning, emission, environment all match to
-≤1e−7) and runs **~84× faster** on CPU (XLA), with autodiff available for
-parameter fitting. The NumPy engine remains the readable, canonical reference.
+≤1e−7) and runs **~84× faster** on CPU (XLA). The NumPy engine remains the readable,
+canonical reference. (Autodiff is exposed by the JAX engine, but note that gradients
+through the long recurrent matching rollout explode — see the parameter-fitting note
+above; the differentiable surrogate is searched derivative-free in practice.)
 
 ```bash
 python -m behavioral_md.jax_engine        # run the equivalence checks
@@ -346,6 +394,8 @@ src/behavioral_md/
   learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner / linear)
   generalization.py      # CueReceptorField (tuned receptors; generalization & peak shift)
   matching.py            # concurrent VI-VI via discriminative cues; concatenated matching law
+  matching_diff.py       # differentiable Gumbel-softmax surrogate of the matching rollout
+  fit.py                 # search organism params to target matching sensitivities (derivative-free)
   chamber.py             # operant chamber: press response, FR/VR/FI/VI, effort/unit-price
   timing.py              # pluggable interval-timing models (none/SET/BeT/LeT)
   metrics.py             # death patterns: time-to-death, cause breakdown, survival curve
@@ -357,8 +407,10 @@ src/behavioral_md/
   environments/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
-                         #   run_peak_shift_demo, make_figures  (each takes --agents N)
-experiments/             # reproducible sweeps/benchmarks (exp001-019) + parallel helper
+                         #   run_peak_shift_demo, run_reacquisition_demo,
+                         #   run_spontaneous_recovery_demo, run_renewal_demo,
+                         #   make_figures  (each takes --agents N)
+experiments/             # reproducible sweeps/benchmarks (exp001-025) + parallel helper
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
 outputs/                 # logs/ and figures/ (generated; gitignored)
@@ -377,6 +429,14 @@ python scripts/run_demo.py                     # acquisition demo (writes a figu
 (pygame is optional — `pip install pygame` — for the live render; it has no
 prebuilt wheel on some new Python versions.)
 
+Reproduce every finding and guard against drift with the reproduction harness,
+which runs all experiments and demos and snapshots their results:
+
+```bash
+python scripts/reproduce.py                    # capture baseline -> outputs/repro/
+python scripts/reproduce.py --check            # re-run and diff vs the baseline
+```
+
 Optional — enable the local pre-commit guard (mirrors CI: ruff on commit, pytest
 on push) so local can't drift from CI. Run with the venv active:
 
@@ -394,15 +454,55 @@ pre-commit install --hook-type pre-push     # pytest on push
   lives; two-tier valence-split learning; consummatory competition.
 - [x] **Learning phenomena** — acquisition, extinction (pluggable
   `LearningRule`), generalization, and peak shift (cue receptor population).
+- [x] **Dual excitatory/inhibitory extinction** (`dual_exc_inhib`) — extinction builds
+  a separate, context-specific inhibition (w-) on top of a preserved excitation (w+),
+  reproducing spontaneous recovery, renewal (ABA), and rapid reacquisition.
 - [x] **Choice & matching** — concurrent VI-VI via discriminative cues; the
   changeover-delay effect; multi-alternative matching; the concatenated matching
   law (rate / amount / probability / delay).
 - [x] **Operant chamber & schedules** — FI scallop, FR break-and-run, FR>VR pause
   (cumulative records); pluggable interval-timing models (SET / BeT / LeT);
   effort-based / unit-price consumption.
-- [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster (autodiff-ready).
-- [x] **Tests + CI** — 32-test pytest suite, GitHub Actions (ruff + pytest).
-- [ ] **Next** — molar VR≫VI rate difference; behavioral momentum (molar);
-  day/night ambient sun; multiple food patches; punishment-asymmetry consequence
-  models; using the JAX autodiff for fitting → evolution → model comparison →
-  real data (see `ToDO.txt`).
+- [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster. (Autodiff is
+  exposed, but gradients through the long recurrent matching rollout explode and are
+  unusable for fitting; fitting instead searches the differentiable forward surrogate
+  derivative-free — see below.)
+- [x] **Patch-leaving / MVT** — multi-patch foraging (`forage.py`); give-up density
+  falls and residence rises with travel distance; Charnov functional response.
+- [x] **Parameter fitting & sensitivity decoupling** — search organism parameters so
+  the *emergent* generalized-matching-law sensitivities hit chosen targets (`exp023`),
+  validated by re-plugging into the stochastic engine. Each graded dimension's
+  sensitivity is independently controllable via its own utility-curvature lever
+  (`amount_exponent`, `probability_exponent`, `delay_k`), with rate the frequency
+  anchor: rate/amount (`exp024`) and probability/delay (`exp025`) are decoupled to
+  crossing targets that the shared discriminability levers could not reach.
+- [x] **Resistance to change, PREE & resurgence** — mass-modulated value decay gives
+  behavioral momentum under *extinction* (`exp026`, with a gain=0 control that shows
+  none); Pearce-Hall associability (rate ~ recent |prediction error|) produces the
+  partial-reinforcement extinction effect (`exp027`, with a fixed-associability control);
+  and resurgence emerges from choice reallocation — no resurgence-specific code — with a
+  control (alternative kept reinforced) that abolishes it (`exp028`).
+- [x] **Resurgence model-mimicry study** (`studies/resurgence_mechanisms/`) — four
+  mechanistically distinct processes (local choice, behavioral momentum, dual
+  excitatory/inhibitory, and Resurgence-as-Choice; Shahan & Craig, 2017) all reproduce
+  resurgence under the *identical* preparation, so the phenomenon underdetermines the
+  process. Two reinforcement-rate dissociations reproduce Craig & Shahan (2016): only
+  momentum makes resurgence depend on *target* reinforcement history. The writeup
+  catalogs each mechanism's benefits/drawbacks and the experiments needed to distinguish
+  them.
+- [x] **Reinforcement/punishment asymmetry** (`exp029`, `studies/punishment_asymmetry/`) —
+  three accounts of punishment in concurrent choice (subtractive/de Villiers,
+  competitive/Deluty, concatenated/Klapes) all suppress the punished response but
+  dissociate on its dependence on the alternative's reinforcement (opposite slopes); the
+  same asymmetry, via the foraging `ConsequenceModel`, traces an approach-avoidance
+  gradient that tips into maladaptive over-avoidance.
+- [x] **Obtained-rate confound** (`studies/obtained_rate_confound/`) — a methodological
+  finding: because a punisher is collected only when the punished response is emitted, the
+  *obtained* punishment rate is inverted-U in the *scheduled* rate, so fitting the matching
+  law on obtained rates can recover a punishment sensitivity of the **wrong sign** (+2.04
+  on scheduled vs −2.24 on obtained). Use scheduled/programmed rates.
+- [x] **Tests + CI** — 65-test pytest suite, GitHub Actions (ruff + pytest).
+- [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
+  `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
+  `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
+  comparison → real data (see `ToDO.txt`).
