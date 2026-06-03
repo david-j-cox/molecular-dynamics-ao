@@ -147,7 +147,7 @@ flowchart LR
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
 | Behavioral momentum | atom `mass` (unit inertia); `chamber.py` multiple schedule -- rich component resists satiation (molar) and, via mass-modulated value decay, extinction (`run_multiple_schedule`, exp026) | implemented |
 | Partial-reinforcement extinction effect (PREE) | Pearce-Hall associability (rate ~ recent \|prediction error\|); `chamber.run_pree`, exp027 -- PRF persists longer in extinction | implemented |
-| Resurgence | emergent from softmax choice reallocation + preserved/mass-protected value; `chamber.run_resurgence`, exp028 (no resurgence-specific code) | implemented |
+| Resurgence | emergent from choice reallocation; four distinct mechanisms (local choice, momentum, dual exc/inhib, Resurgence-as-Choice) in `chamber.run_resurgence`, exp028; model-mimicry study in `studies/resurgence_mechanisms/` | implemented |
 | Delay/probability discounting | concatenated-law terms (matching) | implemented |
 | Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
 
@@ -478,10 +478,17 @@ pre-commit install --hook-type pre-push     # pytest on push
   behavioral momentum under *extinction* (`exp026`, with a gain=0 control that shows
   none); Pearce-Hall associability (rate ~ recent |prediction error|) produces the
   partial-reinforcement extinction effect (`exp027`, with a fixed-associability control);
-  and resurgence emerges from softmax choice reallocation plus preserved/mass-protected
-  value — no resurgence-specific code — with a control (alternative kept reinforced) that
-  abolishes it (`exp028`).
-- [x] **Tests + CI** — 58-test pytest suite, GitHub Actions (ruff + pytest).
+  and resurgence emerges from choice reallocation — no resurgence-specific code — with a
+  control (alternative kept reinforced) that abolishes it (`exp028`).
+- [x] **Resurgence model-mimicry study** (`studies/resurgence_mechanisms/`) — four
+  mechanistically distinct processes (local choice, behavioral momentum, dual
+  excitatory/inhibitory, and Resurgence-as-Choice; Shahan & Craig, 2017) all reproduce
+  resurgence under the *identical* preparation, so the phenomenon underdetermines the
+  process. Two reinforcement-rate dissociations reproduce Craig & Shahan (2016): only
+  momentum makes resurgence depend on *target* reinforcement history. The writeup
+  catalogs each mechanism's benefits/drawbacks and the experiments needed to distinguish
+  them.
+- [x] **Tests + CI** — 59-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   punishment-asymmetry consequence models; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

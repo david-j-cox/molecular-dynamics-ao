@@ -40,8 +40,10 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
     curve, full concatenated GML rate/amount/prob/delay). See PHASE 6 below.
 [ ] Generalization + peak shift on JAX (still only NumPy demos; cue field is in
     the JAX engine, so this is mostly wiring a probe).
-[ ] Resistance-to-change (momentum); PREE; behavioral contrast; blocking;
-    overshadowing; demand curves; FR/VR/FI/VI signatures.
+[x] Resistance-to-change (momentum, exp026); PREE (exp027); demand curves (exp016);
+    FR/VR/FI/VI signatures (exp017-019). Resurgence + 4-mechanism mimicry study
+    (exp028 + studies/resurgence_mechanisms/).
+[ ] Still open: behavioral contrast; blocking; overshadowing.
 [ ] Run the battery across parameter ranges as standing model-validity evidence.
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)
