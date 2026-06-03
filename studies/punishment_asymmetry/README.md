@@ -74,6 +74,10 @@ recovers a punishment sensitivity that tracks the set `a_p` (set 0.5/1.0/1.5 →
 response feedback: a heavily suppressed response is rarely emitted, so it collects fewer
 punishers and the obtained-punishment axis can invert (we observed a spurious *negative*
 `a_p` for the subtractive model). Suppression functions therefore use **scheduled** rate.
+This artifact is formalized as its own finding in
+[`studies/obtained_rate_confound/`](../obtained_rate_confound/) (the obtained punishment
+rate is inverted-U in the scheduled rate, which flips the sign of the fitted sensitivity:
++2.04 on scheduled vs −2.24 on obtained).
 
 ---
 
