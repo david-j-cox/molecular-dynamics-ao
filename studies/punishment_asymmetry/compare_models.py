@@ -125,7 +125,6 @@ def figure(diss: dict, forage: dict) -> Path:
              label="subtractive (de Villiers)")
     axL.plot(a, diss["competitive"], color="0.45", ls="--", marker="s", ms=5,
              label="competitive (Deluty)")
-    axL.set_title("Concurrent choice (chamber):\npunishment suppression vs. alternative")
     axL.set_xlabel("alternative reinforcement rate (1/VI)")
     axL.set_ylabel("punishment suppression (log-odds)")
     axL.set_ylim(bottom=0)
@@ -139,14 +138,12 @@ def figure(diss: dict, forage: dict) -> Path:
     ax2.plot(c, forage["avoid_weight"], color="0.0", ls=":", marker="^", ms=5,
              label="learned avoidance")
     ax2.set_ylabel("learned avoidance weight")
-    axR.set_title("Open foraging (survival):\napproach-avoidance vs. punishment sensitivity")
     axR.set_xlabel("punishment sensitivity c (subtractive)")
     axR.set_ylabel("per-life count")
     lines = axR.get_lines() + ax2.get_lines()
     axR.legend(lines, [ln.get_label() for ln in lines], frameon=False, loc="upper center")
 
-    fig.suptitle("Reinforcement/punishment asymmetry in two preparations", fontsize=14)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.tight_layout()
     path = FIG / "asymmetry_both_preparations.png"
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)

@@ -72,22 +72,16 @@ def main() -> None:
     # Figure 1: the feedback function -- obtained vs scheduled punisher rate (inverted-U).
     fig, ax = plt.subplots(figsize=(6.5, 4.6))
     ax.plot(sched, obt, color="black", marker="o", ms=5)
-    ax.scatter([sched[peak]], [obt[peak]], s=80, facecolors="none", edgecolors="black", zorder=5)
-    ax.annotate("collection peaks,\nthen collapses", (sched[peak], obt[peak]),
-                textcoords="offset points", xytext=(12, -4), fontsize=10)
     ax.set_xlabel("scheduled punishment rate on target (1/VI)")
     ax.set_ylabel("obtained punisher rate")
-    ax.set_title("Obtained punishment is endogenous (inverted-U)")
     ax.set_ylim(bottom=0)
     f1 = FIG / "feedback_function.png"
     fig.savefig(f1, dpi=130, bbox_inches="tight")
     plt.close(fig)
 
-    # Figure 2: the fit -- log allocation vs scheduled (monotonic, correct sign) vs
-    # obtained (folded, wrong sign).
+    # Figure 2: the fit -- log allocation vs scheduled (monotonic) vs obtained (folded).
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.6))
     axL.plot(np.log(sched), logbr, color="black", marker="o", ms=5)
-    axL.set_title(f"vs SCHEDULED rate (exogenous)\nrecovered a_p = {a_sched:+.2f}  (correct sign)")
     axL.set_xlabel("log scheduled punishment rate")
     axL.set_ylabel("log(B_target / B_alt)")
     axR.plot(np.log(obt), logbr, color="0.4", marker="s", ms=5)
@@ -95,11 +89,9 @@ def main() -> None:
         axR.annotate("", xy=(np.log(obt[i + 1]), logbr[i + 1]),
                      xytext=(np.log(obt[i]), logbr[i]),
                      arrowprops=dict(arrowstyle="->", color="0.6", lw=0.8))
-    axR.set_title(f"vs OBTAINED rate (endogenous)\nrecovered a_p = {a_obt:+.2f}  (WRONG SIGN)")
     axR.set_xlabel("log obtained punisher rate")
     axR.set_ylabel("log(B_target / B_alt)")
-    fig.suptitle("Fitting punishment sensitivity: scheduled vs obtained rate", fontsize=13)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.tight_layout()
     f2 = FIG / "fit_scheduled_vs_obtained.png"
     fig.savefig(f2, dpi=130, bbox_inches="tight")
     plt.close(fig)
