@@ -125,7 +125,7 @@ renewal, and rapid reacquisition in the main package (`learning.DualExcitatoryIn
 
 **Benefits.** Unifies resurgence with the *other* relapse phenomena — **renewal,
 spontaneous recovery, reinstatement, rapid reacquisition** — all of which argue that
-extinction is new learning, not unlearning (Bouton, Winterbauer, & Todd, 2012). Uniquely
+extinction is new learning, not unlearning (Bouton, 2004; Bouton, Winterbauer, & Todd, 2012). Uniquely
 among the four it predicts **context-specificity** (renewal-type effects) and
 **time-driven** recovery (spontaneous recovery of the target without any alternative
 extinction).
@@ -280,7 +280,7 @@ phenomena it cannot.
 - Bouton, M. E. (2004). Context and behavioral processes in extinction. *Learning &
   Memory*, 11, 485–494.
 - Bouton, M. E., Winterbauer, N. E., & Todd, T. P. (2012). Relapse processes after the
-  extinction of instrumental learning: Renewal, resurgence, and reinstatement.
+  extinction of instrumental learning: Renewal, resurgence, and reacquisition.
   *Behavioural Processes*, 90, 130–141.
 - Craig, A. R., & Shahan, T. A. (2016). Behavioral momentum theory fails to account for
   the effects of reinforcement rate on resurgence. *Journal of the Experimental Analysis
@@ -301,5 +301,5 @@ phenomena it cannot.
   alternative reinforcement on response elimination and resurgence. *Journal of the
   Experimental Analysis of Behavior*, 100, 102–116.
 - Winterbauer, N. E., & Bouton, M. E. (2010). Mechanisms of resurgence of an extinguished
-  instrumental response. *Journal of Experimental Psychology: Animal Behavior Processes*,
+  instrumental behavior. *Journal of Experimental Psychology: Animal Behavior Processes*,
   36, 343–353.

@@ -59,7 +59,10 @@ MECHANISMS = {
 
 plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False,
                      "axes.labelsize": 13, "xtick.labelsize": 10,
-                     "ytick.labelsize": 10, "legend.fontsize": 10})
+                     "ytick.labelsize": 10, "legend.fontsize": 10,
+                     "font.family": "serif",
+                     "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+                     "mathtext.fontset": "stix"})
 _STYLES = [("-", "o", "black"), ("--", "s", "0.35"), ("-.", "^", "0.5"), (":", "D", "0.0")]
 
 
