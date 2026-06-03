@@ -36,7 +36,10 @@ N_ORG, N_STEPS, SEED = 800, 6000, 0
 PUN_VIS = [40.0, 25.0, 15.0, 10.0, 7.0, 5.0, 4.0]   # scheduled punishment VIs on the target
 plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False,
                      "axes.labelsize": 12, "xtick.labelsize": 10,
-                     "ytick.labelsize": 10, "legend.fontsize": 10})
+                     "ytick.labelsize": 10, "legend.fontsize": 10,
+                     "font.family": "serif",
+                     "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+                     "mathtext.fontset": "stix"})
 
 
 def sweep() -> dict:
