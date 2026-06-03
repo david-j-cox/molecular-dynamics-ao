@@ -37,6 +37,15 @@ _MOVES: dict[int, np.ndarray] = {
 }
 
 
+def ambient_light(t: int, steps_per_day: int) -> float:
+    """Global day/night light L(t) in [0, 1]: 0 at midnight (t=0), 1 at noon.
+
+    A raised cosine, L(t) = 0.5*(1 - cos(2*pi*(t mod steps_per_day)/steps_per_day)).
+    """
+    phase = (t % steps_per_day) / steps_per_day
+    return float(0.5 * (1.0 - np.cos(2.0 * np.pi * phase)))
+
+
 class BehavioralFieldEnv(gym.Env):
     """Grid arena presenting food/danger/light/cue stimulus fields.
 
@@ -104,6 +113,8 @@ class BehavioralFieldEnv(gym.Env):
                 "cue_value": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 # Scalar context (A/B environments; gates inhibition for renewal).
                 "context": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
+                # Global ambient light L(t) in [0,1] (day/night sun; 0 = midnight).
+                "ambient_light": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "food_contact": spaces.Box(0.0, 1.0, shape=(1,), dtype=np.float32),
                 "last_consequence": spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32),
             }
@@ -197,9 +208,11 @@ class BehavioralFieldEnv(gym.Env):
             food_intake = min(cfg.food_intake_rate, self.food_biomass - cfg.food_min_biomass)
             food_intake = max(0.0, food_intake)
             self.food_biomass -= food_intake
-        # Logistic regrowth toward carrying capacity.
+        # Logistic regrowth toward carrying capacity, scaled by daylight (food grows
+        # faster by day; the factor is 1.0 when day/night is off).
+        _light, _danger_f, food_f = self._light_factors()
         k = cfg.food_carrying_capacity
-        self.food_biomass += cfg.food_regrowth_rate * self.food_biomass * (
+        self.food_biomass += food_f * cfg.food_regrowth_rate * self.food_biomass * (
             1.0 - self.food_biomass / k
         )
         self.food_biomass = float(np.clip(self.food_biomass, cfg.food_min_biomass, k))
@@ -272,6 +285,22 @@ class BehavioralFieldEnv(gym.Env):
         dist = self._distance(self.position, target)
         return float(np.exp(-dist / self.sensor_range))
 
+    def _light_factors(self) -> tuple[float, float, float]:
+        """(ambient light L, danger-detectability factor, food visibility/growth factor).
+
+        With ``day_night`` off, returns (1.0, 1.0, 1.0): L is full and there is no
+        perceptual modulation, so behavior is unchanged. With it on, danger and food
+        signals are scaled by ``floor + (1-floor)*L`` (each with its own floor), so both
+        are weakest at night (L -> 0) and full by day (L = 1).
+        """
+        cfg = self.config
+        if not cfg.day_night:
+            return 1.0, 1.0, 1.0
+        light = ambient_light(self.t, cfg.steps_per_day)
+        danger_factor = cfg.danger_detect_floor + (1.0 - cfg.danger_detect_floor) * light
+        food_factor = cfg.food_light_floor + (1.0 - cfg.food_light_floor) * light
+        return light, danger_factor, food_factor
+
     def _build_observation(self) -> dict[str, np.ndarray]:
         # Food intensity and contact scale with biomass: a depleted patch is less
         # visible (weaker approach) and less edible (weaker consummatory drive).
@@ -280,6 +309,9 @@ class BehavioralFieldEnv(gym.Env):
         # When food is absent there is no food signal/contact at all (a food-free
         # interval), independent of the (renewable) biomass state.
         present = 1.0 if self.food_present else 0.0
+        # Day/night perceptual gating: danger is harder to detect and food harder to see
+        # at night (factors are 1.0 when day/night is off).
+        light, danger_f, food_f = self._light_factors()
         return {
             "position": self.position.astype(np.float32),
             "food_vector": self._unit_vector(self.food_pos),
@@ -287,10 +319,11 @@ class BehavioralFieldEnv(gym.Env):
             "light_vector": self._unit_vector(self.light_pos),
             "cue_vector": self._unit_vector(self.cue_pos),
             "food_intensity": np.array(
-                [self._intensity(self.food_pos) * biomass_frac * present], dtype=np.float32
+                [self._intensity(self.food_pos) * biomass_frac * present * food_f],
+                dtype=np.float32,
             ),
             "danger_intensity": np.array(
-                [self._intensity(self.danger_pos)], dtype=np.float32
+                [self._intensity(self.danger_pos) * danger_f], dtype=np.float32
             ),
             "light_intensity": np.array(
                 [self._intensity(self.light_pos)], dtype=np.float32
@@ -298,6 +331,7 @@ class BehavioralFieldEnv(gym.Env):
             "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
             "cue_value": np.array([self.cue_value], dtype=np.float32),
             "context": np.array([self.context], dtype=np.float32),
+            "ambient_light": np.array([light], dtype=np.float32),
             # Contact signal within consume_radius, scaled by remaining biomass.
             "food_contact": np.array(
                 [biomass_frac if (in_range and self.food_present) else 0.0], dtype=np.float32
@@ -316,6 +350,7 @@ class BehavioralFieldEnv(gym.Env):
             "cue_value": self.cue_value,
             "distance_to_food": self._distance(self.position, self.food_pos),
             "food_reinforces": self.food_reinforces,
+            "ambient_light": self._light_factors()[0],
         }
 
     def _render_pygame(self) -> np.ndarray | None:

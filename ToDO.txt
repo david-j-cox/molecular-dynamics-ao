@@ -48,12 +48,25 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)
 -----------------------------------------
-[ ] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod 96)/96)); 96 steps/day.
-[ ] Danger detectability graded with light (low floor): danger_sensed =
-    danger_true*(floor + (1-floor)*L).
-[ ] Food growth and visibility scale with L (food easier to see / grows in day).
-[ ] Verify risk-sensitive foraging emerges (starving organism accepts night risk).
-[ ] Log light level; add day/night activity + mortality metrics.
+[x] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod steps_per_day)/steps_per_day))
+    (gridworld.ambient_light); config.day_night opt-in (default off -> byte-identical).
+[x] Danger detectability graded with light: sensed = danger_true*(floor + (1-floor)*L)
+    (danger_detect_floor); food visibility AND regrowth scale by (food_light_floor +
+    (1-floor)*L). PERCEPTION is graded; actual danger contact + food intake use TRUE
+    proximity. New obs key "ambient_light" + logged in info. 4 env tests.
+[~] Verify risk-sensitive foraging -- DOES NOT EMERGE, for two reasons (lab_notebook
+    2026-06-03): (1) danger_detect_floor is behaviorally INERT (byte-identical foraging
+    across floors 0.1/0.5/1.0) -- deficit-scaled approach dwarfs avoidance + consummatory
+    hold; and the harm magnitude was under-set (0.05 = 1 feeding-step). (2) DEEPER: our
+    "risk" is STATIONARY + DETERMINISTIC (fixed location, constant magnitude, contact
+    1.0/0.0, no variance); risk-sensitive foraging (Caraco; energy-budget rule) is about
+    OUTCOME VARIANCE, which is not in the model.
+[ ] PATH: genuine risk-sensitivity needs PROBABILISTIC/variance risk -- a risky patch
+    (predation w.p. p, large energy loss = high variance) vs a safe patch (low steady
+    return, matched mean); test the energy-budget rule (risk-prone when starving). A
+    patch-CHOICE prep, not the single fixed-danger gridworld. Day/night can then modulate
+    predation probability or its detectability. The env sun feature is reusable as-is.
+[ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 -------------------------------------------

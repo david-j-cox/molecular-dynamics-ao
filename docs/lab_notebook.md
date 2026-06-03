@@ -1353,3 +1353,50 @@ embodied ConsequenceModel) deferred.
 Validation: +6 tests (run_punishment_choice suppression/dissociation/a_p; Subtractive/
 Concatenated/dispatch) -> 65 pass; ruff clean; reproduce baseline recaptured 36/36 (exp029
 added; exp001-028 + demos byte-identical -- all changes additive/opt-in).
+
+---
+
+## 2026-06-03 (cont.) — Phase 5 day/night ambient sun: feature done, risk-sensitivity does NOT emerge (and why)
+
+Added a global ambient sun to the gridworld env: L(t) = 0.5*(1 - cos(2*pi*(t mod
+steps_per_day)/steps_per_day)) in [0,1] (0 = midnight, 1 = noon),
+gridworld.ambient_light. Opt-in (config.day_night, default False -> byte-identical;
+run_demo --check clean). When on, light GRADES PERCEPTION, not the physical consequences:
+sensed danger = danger_true*(danger_detect_floor + (1-floor)*L) and food
+visibility/regrowth scale by (food_light_floor + (1-floor)*L), while actual danger
+contact and food intake still use TRUE proximity. New obs key "ambient_light"; logged in
+info. 4 env tests; ruff clean.
+
+GOAL was "risk-sensitive foraging: a starving organism accepts night risk." It does NOT
+emerge, and the reason is instructive (two parts):
+
+1. TUNING / mechanism. danger_detect_floor is behaviorally INERT -- foraging is
+   byte-identical across floors 0.1/0.5/1.0 (day 200, night 160, to the integer). The
+   deficit-scaled approach drive (motiv_strength*deficit^2, up to ~2.0) dwarfs the innate
+   avoidance (sensitivity*intensity ~= 1.0*small), and the consummatory atom holds the
+   organism at the patch, so gating how well it PERCEIVES the danger changes nothing. I
+   also under-set the harm: danger_energy_loss=0.05 in the Phase 5 runs = 1 feeding-step =
+   trivial (default 0.15 = 3 feeding-steps = 15% of reserve). An earlier 1.93-vs-1.17
+   night/day reading was sampling noise across different agent counts; with matched seeds
+   the floors are identical.
+
+2. CONCEPTUAL (the deeper reason). Our "risk" is STATIONARY and DETERMINISTIC: a fixed
+   location, constant magnitude, contact = 1.0/0.0 (no probability, no variance). Only the
+   DETECTABILITY varies with light. But risk-sensitive foraging (Caraco 1980; Stephens &
+   Krebs) is about sensitivity to the VARIANCE of outcomes, governed by the energy-budget
+   rule (risk-prone below the requirement, risk-averse above). We never had "risk" in that
+   sense -- we had a deterministic hazard whose perceptibility changes (an information
+   manipulation, not a variance one). The phenomenon cannot emerge because outcome variance
+   is not in the model.
+
+What DOES emerge from the feature is a food-visibility foraging tendency (food dim at night
+-> less night foraging), but it is extreme (night ~ 0 when the floor is low) and trivial,
+so it is not committed as a demo.
+
+PATH FORWARD (for genuine risk-sensitivity): introduce PROBABILISTIC / variance risk -- a
+risky patch where predation strikes with probability p and removes a large chunk of energy
+(high variance) vs a safe patch with a low steady return (matched mean), and test the
+energy-budget rule (risk-prone when starving). This is a patch-CHOICE prep (cf. the
+matching/chamber machinery), not the single fixed-danger gridworld. Day/night could then
+modulate either the predation probability or its detectability. The env sun feature is
+committed and reusable; the risk model is what needs redesigning.
