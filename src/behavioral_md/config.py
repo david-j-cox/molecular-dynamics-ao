@@ -207,9 +207,40 @@ class SimulationConfig(BaseModel):
             "generalization gradient (large rates saturate and flatten it)."
         ),
     )
-    consequence_model: Literal["delta_energy"] = Field(
-        "delta_energy",
-        description="Pluggable consequence model (only delta_energy implemented).",
+    consequence_model: Literal["delta_energy", "subtractive", "concatenated_asymmetric"] = (
+        Field(
+            "delta_energy",
+            description=(
+                "Pluggable consequence model (reinforcement/punishment asymmetry). "
+                "'delta_energy' = symmetric (consequence == change in energy); "
+                "'subtractive' = de Villiers (1980): a punisher cancels punishment_weight "
+                "reinforcers -- aversive learning is scaled by that weight so avoidance is "
+                "trained more strongly than approach; 'concatenated_asymmetric' = "
+                "Critchfield/Klapes: separate reinforcement vs punishment sensitivities "
+                "(reinf_sensitivity, punish_sensitivity) on the appetitive/aversive "
+                "teaching signals, so the two are independently tunable."
+            ),
+        )
+    )
+    punishment_weight: float = Field(
+        2.0,
+        ge=0.0,
+        description=(
+            "de Villiers c (subtractive model): reinforcers cancelled per punisher. "
+            "Scales the aversive teaching signal so avoidance is trained punishment_weight "
+            "times more strongly than approach (the reinforcement/punishment asymmetry)."
+        ),
+    )
+    reinf_sensitivity: float = Field(
+        1.0,
+        ge=0.0,
+        description="Concatenated model: scale on the appetitive (reinforcement) teaching signal.",
+    )
+    punish_sensitivity: float = Field(
+        1.0,
+        ge=0.0,
+        description="Concatenated model: scale on the aversive (punishment) teaching signal. "
+        "punish_sensitivity/reinf_sensitivity is the asymmetry; >1 = punishment dominates.",
     )
 
     # --- Environment geometry ----------------------------------------------

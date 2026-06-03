@@ -585,6 +585,46 @@ def plot_resurgence(r1, r2, phase_blocks: int, path: str | Path,
     return _save(fig, path)
 
 
+def plot_punishment_suppression(rates, curves: dict, path: str | Path) -> Path:
+    """Allocation to the punished response vs scheduled punishment rate, per model.
+
+    ``curves`` maps model name -> allocation array (same length as ``rates``). All
+    models suppress the punished response (the mimicry); they differ in functional
+    form. Scheduled (not obtained) rate avoids the response-feedback artifact.
+    """
+    rates = np.asarray(rates, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for (name, y), (ls, mk) in zip(curves.items(), _BW_CYCLE, strict=False):
+        ax.plot(rates, np.asarray(y), color="black", ls=ls, marker=mk, ms=5, label=name)
+    ax.axhline(0.5, color="0.85", lw=0.6)
+    ax.set_xlabel("Scheduled punishment rate on target (1/VI)")
+    ax.set_ylabel("Allocation to punished response")
+    ax.set_ylim(0, None)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_punishment_dissociation(alt_rates, subtractive, competitive,
+                                 path: str | Path) -> Path:
+    """de Villiers vs Deluty: log-odds punishment suppression vs alternative reinforcement.
+
+    Subtractive (de Villiers) and competitive (Deluty) suppression depend on the
+    alternative's reinforcement rate with OPPOSITE slopes -- the diagnostic that
+    distinguishes direct subtraction from competitive (reallocation) suppression.
+    """
+    a = np.asarray(alt_rates, float)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(a, np.asarray(subtractive), color="black", ls="-", marker="o", ms=5,
+            label="Subtractive (de Villiers)")
+    ax.plot(a, np.asarray(competitive), color="0.45", ls="--", marker="s", ms=5,
+            label="Competitive (Deluty)")
+    ax.set_xlabel("Alternative reinforcement rate (1/VI)")
+    ax.set_ylabel("Punishment suppression\n(log-odds shift)")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_giveup_regimes(dist, const_mean, const_ci, bio_mean, bio_ci,
                         path: str | Path) -> Path:
     """Give-up density vs travel distance under two resource models.

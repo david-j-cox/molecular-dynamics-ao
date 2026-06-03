@@ -1308,3 +1308,48 @@ alternative matching and time-scale isolate RaC; local choice is the parsimoniou
 methodological moral (the canonical curve is not evidence for any one process; the decisive
 tests are about WHAT IS RETAINED, not how much), limitations, and references. The study is a
 studies/ artifact -- deterministic and runnable but deliberately NOT in the reproduce baseline.
+
+---
+
+## 2026-06-03 (cont.) — Reinforcement/punishment asymmetry (both preparations)
+
+Next ToDo thread (user-picked): the punishment/reinforcement-asymmetry consequence models +
+a model-selection study, shown in BOTH the concurrent chamber (choice allocation) and the
+open foraging world (survival), per the user's "need to see results in both preparations".
+
+Chamber (chamber.run_punishment_choice): concurrent M-alternative choice, each response on
+its own reinforcement VI AND punishment VI; reinforcement and punishment each train a leaky-
+integrated value (vr, vp). Three accounts of how a punisher maps to choice:
+  subtractive  (de Villiers 1980):  score = vr - pun_c*vp  (cancels own reinforcement)
+  competitive  (Deluty 1976):       score_i = vr_i + pun_c*sum_{j!=i} vp_j  (boosts competitors)
+  concatenated (Critchfield/Klapes): B_i ~ vr_i^a_r * vp_i^(-a_p)  (separate sensitivities)
+All three SUPPRESS the punished response (mimicry). The discriminating result is the de
+Villiers vs Deluty DISSOCIATION: punishing the target at a fixed rate and varying the
+ALTERNATIVE's reinforcement, the log-odds suppression rises with alternative richness for
+subtractive (+0.91 -> +2.58) but FALLS for competitive (+1.59 -> +0.68) -- opposite slopes,
+their historic debate, and the punishment analogue of the resurgence target-rate dissociation.
+Concatenated recovers a_p log-linearly (set 0.5/1.0/1.5 -> ~0.74/1.52/2.35, R^2~=1.0),
+separable from reinforcement. exp029 + study figures.
+
+METHOD CAVEAT (reported): fitting the GML on OBTAINED punishment is confounded by response
+feedback -- a heavily suppressed response is rarely emitted, so it collects FEWER punishers
+and the obtained-rate axis can invert (a spurious NEGATIVE a_p appeared for the subtractive
+model). Suppression curves use SCHEDULED rate / log-odds.
+
+Foraging (consequence.py ConsequenceModel): danger = punisher. Subtractive scales the aversive
+teaching signal by c=punishment_weight (avoidance trained c times more than approach);
+ConcatenatedAsymmetric exposes reinf_/punish_sensitivity. Demo (studies/.../compare_models.py):
+food up column 5, danger off to the side as an avoidable obstacle; sweeping c traces a clean
+approach-avoidance gradient -- learned avoidance 0.55 -> 3.57, food 5.7 -> 0.3/life -- and at high
+c the organism OVER-AVOIDS the danger guarding the food and starves (asymmetry maladaptive when
+overtuned). Layout matters: danger directly ON the single path floors food intake (degenerate);
+off-path + local sensor range (5) gives the graded tradeoff.
+
+NOTE on architecture: only the SUBTRACTIVE account fits both worlds. CompetitiveSuppression and
+the concatenated law are between-response CHOICE accounts; the event->energy ConsequenceModel
+interface cannot express them, so they live only in the chamber. InjuryHealing (the one genuine
+embodied ConsequenceModel) deferred.
+
+Validation: +6 tests (run_punishment_choice suppression/dissociation/a_p; Subtractive/
+Concatenated/dispatch) -> 65 pass; ruff clean; reproduce baseline recaptured 36/36 (exp029
+added; exp001-028 + demos byte-identical -- all changes additive/opt-in).

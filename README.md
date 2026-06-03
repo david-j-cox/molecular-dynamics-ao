@@ -138,6 +138,7 @@ flowchart LR
 | Concatenated matching law | rate, amount, probability, delay — separable, and each independently tunable via its own curvature lever | implemented |
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
+| Punishment / reinforcement asymmetry | three concurrent-choice accounts (subtractive/de Villiers, competitive/Deluty, concatenated/Klapes) in `chamber.run_punishment_choice`; foraging `consequence.Subtractive`/`ConcatenatedAsymmetric`; exp029 + `studies/punishment_asymmetry/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
@@ -326,6 +327,7 @@ separate food channels):
 | Behavioral momentum (extinction) | `exp026` | mass-modulated value decay → richly-reinforced response resists extinction; gain=0 control shows none |
 | Partial-reinforcement extinction effect | `exp027` | Pearce-Hall associability → PRF persists longer in extinction than CRF; fixed-associability control shows none |
 | Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
+| Punishment asymmetry | `exp029` | three accounts all suppress the punished response, but subtractive (de Villiers) and competitive (Deluty) suppression depend on the alternative's reinforcement with opposite slopes; concatenated `a_p` recovered log-linearly |
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -488,7 +490,13 @@ pre-commit install --hook-type pre-push     # pytest on push
   momentum makes resurgence depend on *target* reinforcement history. The writeup
   catalogs each mechanism's benefits/drawbacks and the experiments needed to distinguish
   them.
-- [x] **Tests + CI** — 59-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Reinforcement/punishment asymmetry** (`exp029`, `studies/punishment_asymmetry/`) —
+  three accounts of punishment in concurrent choice (subtractive/de Villiers,
+  competitive/Deluty, concatenated/Klapes) all suppress the punished response but
+  dissociate on its dependence on the alternative's reinforcement (opposite slopes); the
+  same asymmetry, via the foraging `ConsequenceModel`, traces an approach-avoidance
+  gradient that tips into maladaptive over-avoidance.
+- [x] **Tests + CI** — 65-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   punishment-asymmetry consequence models; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

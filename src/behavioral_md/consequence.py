@@ -74,21 +74,57 @@ class DeltaEnergy(ConsequenceModel):
         return appetitive, aversive
 
 
-# --- Planned models (asymmetry / competitive suppression / injury) ----------
-# These are intentionally not implemented yet; they are the swappable hooks for
-# later experiments. Keeping them as named stubs documents the intended design.
-
-
+@dataclass
 class Subtractive(ConsequenceModel):
-    """de Villiers (1980) direct/subtractive suppression. TODO."""
+    """de Villiers (1980) subtractive suppression: a punisher cancels ``c`` reinforcers.
+
+    In the two-tier foraging organism, approach (valence +1) and avoidance (valence -1)
+    are separate drive atoms that compete at the movement layer, so "subtraction" is
+    expressed by training avoidance ``c`` times more strongly than approach: the aversive
+    teaching signal is scaled by ``c`` (= ``punishment_weight``). The energy reserve also
+    takes an asymmetric hit (a punisher costs more than a reinforcer yields).
+    """
+
+    danger_loss: float = 0.15
+    c: float = 2.0   # reinforcers cancelled per punisher (punishment_weight)
+
+    def energy_delta(self, event: ConsequenceEvent) -> float:
+        return event.food_intake - self.danger_loss * event.danger_contact
+
+    def learning_signals(self, event: ConsequenceEvent) -> tuple[float, float]:
+        appetitive = 1.0 if event.food_intake > 0.0 else 0.0
+        aversive = self.c if event.danger_contact > 0.0 else 0.0
+        return appetitive, aversive
 
 
-class CompetitiveSuppression(ConsequenceModel):
-    """Deluty (1976): punishment strengthens competing responses. TODO."""
-
-
+@dataclass
 class ConcatenatedAsymmetric(ConsequenceModel):
-    """Concatenated GML with separate reinforcement/punishment sensitivities. TODO."""
+    """Separate reinforcement vs punishment sensitivities (Critchfield/Klapes).
+
+    The appetitive and aversive teaching signals carry independent gains
+    (``reinf_sensitivity`` and ``punish_sensitivity``), so the strength of approach
+    training and avoidance training -- and thus the behavioral reinforcement/punishment
+    asymmetry -- are tuned separately rather than tied to one ``c``.
+    """
+
+    danger_loss: float = 0.15
+    reinf_sensitivity: float = 1.0
+    punish_sensitivity: float = 1.0
+
+    def energy_delta(self, event: ConsequenceEvent) -> float:
+        return event.food_intake - self.danger_loss * event.danger_contact
+
+    def learning_signals(self, event: ConsequenceEvent) -> tuple[float, float]:
+        appetitive = self.reinf_sensitivity if event.food_intake > 0.0 else 0.0
+        aversive = self.punish_sensitivity if event.danger_contact > 0.0 else 0.0
+        return appetitive, aversive
+
+
+# --- Planned models (not yet implemented) -----------------------------------
+# CompetitiveSuppression (Deluty) and concatenated matching are CHOICE/ALLOCATION
+# accounts (about the relation BETWEEN responses), not event->energy maps, so they
+# live in the concurrent chamber (chamber.run_punishment_choice), not here. InjuryHealing
+# is a genuine ConsequenceModel (a delayed, embodied cost) left for a follow-up.
 
 
 class InjuryHealing(ConsequenceModel):
@@ -100,4 +136,11 @@ def make_consequence_model(config) -> ConsequenceModel:
     name = getattr(config, "consequence_model", "delta_energy")
     if name == "delta_energy":
         return DeltaEnergy(danger_loss=config.danger_energy_loss)
+    if name == "subtractive":
+        return Subtractive(danger_loss=config.danger_energy_loss,
+                           c=config.punishment_weight)
+    if name == "concatenated_asymmetric":
+        return ConcatenatedAsymmetric(danger_loss=config.danger_energy_loss,
+                                      reinf_sensitivity=config.reinf_sensitivity,
+                                      punish_sensitivity=config.punish_sensitivity)
     raise NotImplementedError(f"consequence_model '{name}' is not implemented yet")

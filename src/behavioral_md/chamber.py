@@ -126,6 +126,26 @@ class ChamberConfig:
     rac_bump: float = 0.01               # value increment per reinforcer
     rac_floor: float = 0.1               # baseline value of an explicit response (exploration)
     rac_sensitivity: float = 1.0         # matching-law exponent on relative value
+    # --- Punishment of concurrent choice (run_punishment_choice) ----------------
+    # Each response is on its own reinforcement VI and (independently) punishment VI.
+    # Reinforcement and punishment each train a leaky-integrated value (vr, vp) with
+    # the same temporal weighting. The three accounts of how punishment maps to choice:
+    #   'subtractive'  (de Villiers, 1980): score = vr - pun_c*vp; punishment directly
+    #                  cancels a response's own reinforcement value (pun_c = reinforcers
+    #                  cancelled per punisher). Matched with exponent pun_sensitivity.
+    #   'competitive'  (Deluty, 1976): punishment STRENGTHENS competitors --
+    #                  score_i = vr_i + pun_c*sum_{j!=i} vp_j; the punished response is
+    #                  suppressed only relatively (its alternatives gain value).
+    #   'concatenated' (Critchfield/Klapes): power-law matching with SEPARATE
+    #                  sensitivities -- B_i proportional to vr_i^a_r * vp_i^(-a_p) --
+    #                  so log(B1/B2) = a_r*log(vr1/vr2) - a_p*log(vp1/vp2) + bias.
+    pun_tau: float = 800.0               # temporal weighting of vr and vp (steps)
+    pun_bump: float = 0.04               # value increment per reinforcer / punisher
+    pun_floor: float = 0.1               # baseline reinforcement value (exploration)
+    pun_c: float = 1.0                   # de Villiers c / Deluty competition weight
+    pun_sensitivity: float = 1.0         # matching exponent (subtractive/competitive)
+    pun_a_r: float = 1.0                 # concatenated: reinforcement sensitivity
+    pun_a_p: float = 1.0                 # concatenated: punishment sensitivity
 
 
 def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
@@ -598,4 +618,80 @@ def run_resurgence(cfg: ChamberConfig, n_org: int, phase_steps: int, seed: int =
     phase_blocks = phase_steps // block
     return {"r1": r1b, "r2": r2b, "phase_blocks": phase_blocks, "block": block,
             "n_phases": len(phases)}
+
+
+def run_punishment_choice(model: str, cfg: ChamberConfig, n_org: int, n_steps: int,
+                          vi_reinf, vi_punish, seed: int = 0, warmup_frac: float = 0.5):
+    """Concurrent M-alternative choice with reinforcement AND punishment schedules.
+
+    Each response is on its own reinforcement VI (``vi_reinf[i]``) and, independently,
+    its own punishment VI (``vi_punish[i]``; use ``inf`` or ``0`` for no punishment).
+    A VI arms Bernoulli (mean interval = VI); the armed reinforcer/punisher is collected
+    when that response is emitted. Reinforcement and punishment each train a leaky-
+    integrated value (vr, vp, temporal weighting ``pun_tau``). One response is emitted
+    per step by matching over a model-specific score:
+
+      'subtractive'  (de Villiers, 1980):  score_i = (vr_i + floor) - pun_c*vp_i
+                     -- punishment cancels a response's OWN reinforcement value.
+      'competitive'  (Deluty, 1976):       score_i = (vr_i + floor) + pun_c*sum_{j!=i} vp_j
+                     -- punishment strengthens COMPETITORS (relative suppression).
+      'concatenated' (Critchfield/Klapes): B_i ~ (vr_i+floor)^a_r * (vp_i+floor)^(-a_p)
+                     -- separate sensitivities; log(B1/B2)=a_r log(vr1/vr2)-a_p log(vp1/vp2).
+
+    Returns steady-state (second ``1-warmup_frac`` of the run) per-organism counts:
+    emit [O,M] (allocation), reinforced [O,M], punished [O,M], and the step count.
+    """
+    rng = np.random.default_rng(seed)
+    m = len(vi_reinf)
+    vir = np.asarray(vi_reinf, float)
+    vip = np.asarray(vi_punish, float)
+    arm_r = np.where(np.isfinite(vir) & (vir > 0), 1.0 / np.where(vir > 0, vir, 1.0), 0.0)
+    arm_p = np.where(np.isfinite(vip) & (vip > 0), 1.0 / np.where(vip > 0, vip, 1.0), 0.0)
+
+    vr = np.zeros((n_org, m))
+    vp = np.zeros((n_org, m))
+    armed_r = np.zeros((n_org, m), bool)
+    armed_p = np.zeros((n_org, m), bool)
+    decay = 1.0 - 1.0 / cfg.pun_tau
+    eps = 1e-9
+    warm = int(n_steps * warmup_frac)
+    emit_count = np.zeros((n_org, m))
+    reinf_count = np.zeros((n_org, m))
+    punish_count = np.zeros((n_org, m))
+
+    for t in range(n_steps):
+        base_r = vr + cfg.pun_floor
+        if model == "subtractive":
+            score = np.clip(base_r - cfg.pun_c * vp, eps, None)
+            pw = score ** cfg.pun_sensitivity
+        elif model == "competitive":
+            others_p = vp.sum(axis=1, keepdims=True) - vp
+            score = np.clip(base_r + cfg.pun_c * others_p, eps, None)
+            pw = score ** cfg.pun_sensitivity
+        elif model == "concatenated":
+            pw = base_r ** cfg.pun_a_r * (vp + cfg.pun_floor) ** (-cfg.pun_a_p)
+        else:
+            raise ValueError(f"unknown punishment model {model}")
+        p = pw / pw.sum(axis=1, keepdims=True)
+        emitted = (rng.random((n_org, 1)) < np.cumsum(p, axis=1)).argmax(axis=1)
+        onehot = np.zeros((n_org, m), bool)
+        onehot[np.arange(n_org), emitted] = True
+
+        armed_r |= rng.random((n_org, m)) < arm_r[None, :]
+        armed_p |= rng.random((n_org, m)) < arm_p[None, :]
+        got_r = onehot & armed_r
+        got_p = onehot & armed_p
+        armed_r &= ~got_r
+        armed_p &= ~got_p
+
+        vr = decay * vr + cfg.pun_bump * got_r
+        vp = decay * vp + cfg.pun_bump * got_p
+
+        if t >= warm:
+            emit_count += onehot
+            reinf_count += got_r
+            punish_count += got_p
+
+    return {"emit": emit_count, "reinforced": reinf_count, "punished": punish_count,
+            "steps": n_steps - warm}
 

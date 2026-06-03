@@ -240,12 +240,32 @@ DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
 
 CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
 -------------------------------------------------------
-[ ] Subtractive (de Villiers) direct-suppression model.
-[ ] CompetitiveSuppression (Deluty): punishment strengthens competing responses.
-[ ] ConcatenatedAsymmetric (Klapes): separate reinforcement/punishment sensitivities.
+[x] Subtractive (de Villiers, 1980): score = vr - c*vp (a punisher cancels c reinforcers).
+    BOTH preps -- chamber (chamber.run_punishment_choice, allocation) AND foraging
+    (consequence.Subtractive: aversive teaching signal scaled by c=punishment_weight so
+    avoidance is trained c times more strongly than approach). exp029 + study.
+[x] CompetitiveSuppression (Deluty, 1976): score_i = vr_i + c*sum_{j!=i} vp_j (punishment
+    STRENGTHENS competitors -> relative suppression). Chamber only (it's a between-response
+    CHOICE account; the event->energy ConsequenceModel interface cannot express it).
+[x] ConcatenatedAsymmetric (Critchfield/Klapes): separate a_r/a_p. Chamber power-law
+    matching B_i ~ vr_i^a_r * vp_i^(-a_p) (recovers a_p, log-linear, separable) +
+    foraging consequence.ConcatenatedAsymmetric (separate reinf_/punish_sensitivity).
+[x] Compare models on choice/allocation data (exp029 + studies/punishment_asymmetry/).
+    KEY: all three suppress the punished response (mimicry), but the de Villiers vs Deluty
+    DISSOCIATION is clean -- punishment suppression (log-odds) depends on the ALTERNATIVE'S
+    reinforcement rate with OPPOSITE slopes (subtractive rises, competitive falls; the
+    historic debate, analogue of the resurgence target-rate dissociation). Concatenated a_p
+    recovered log-linearly. Foraging: punishment sensitivity c traces an approach-avoidance
+    gradient (avoidance weight up, food down) -> over-avoidance/starvation is maladaptive.
+    CAVEAT: GML-on-OBTAINED-punishment is confounded by response feedback (heavy suppression
+    -> rarely emitted -> few punishers collected -> obtained-rate axis inverts); use
+    scheduled rate / log-odds.
 [ ] InjuryHealing: danger -> delayed healing energy cost + temporary repertoire
     impairment (disable/weaken specific atoms while healing), not an instant debit.
-[ ] Compare models on choice/allocation data (model selection).
+    (Deferred; the one genuine ConsequenceModel of the four, an embodied delayed punisher.)
+[ ] (Future) Proposed punishment diagnostics: remove-the-alternative (kills competitive
+    suppression, not subtractive); punisher-magnitude scaling of c (Rasmussen & Newland
+    2008); reinforcer/punisher devaluation. See lab_notebook + study README.
 
 DISCRIMINATIVE STIMULI (separate from ambient sun)
 --------------------------------------------------

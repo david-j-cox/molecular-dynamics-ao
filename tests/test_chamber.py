@@ -6,8 +6,11 @@ from behavioral_md.chamber import (
     ChamberConfig,
     run_multiple_schedule,
     run_pree,
+    run_punishment_choice,
     run_resurgence,
 )
+
+INF = float("inf")
 
 
 def _sessions_to_crit(value, nt, frac=0.25):
@@ -150,3 +153,54 @@ def test_resurgence_as_choice_rac():
                           control_reinforce_r2=True)
     cr1 = np.asarray(ctrl["r1"])
     assert cr1[2 * pb:].max() < end_p2 + 0.05            # control abolishes it
+
+
+def _pun_alloc(model, alt_vi, punish, **kw):
+    cfg = ChamberConfig(pun_tau=800.0, pun_bump=0.04, pun_floor=0.1, **kw)
+    res = run_punishment_choice(model, cfg, 400, 3000, vi_reinf=[5.0, alt_vi],
+                                vi_punish=[punish, INF], seed=0)
+    e = res["emit"].sum(0)
+    return e[0] / e.sum(), float(np.log(e[0] / e[1]))
+
+
+def test_punishment_suppresses_target():
+    """Adding punishment to one of two equally-reinforced responses suppresses it,
+    in all three accounts."""
+    for model, kw in (("subtractive", dict(pun_c=1.0)), ("competitive", dict(pun_c=1.5)),
+                      ("concatenated", dict(pun_a_p=1.0))):
+        base, _ = _pun_alloc(model, 5.0, INF, **kw)
+        pun, _ = _pun_alloc(model, 5.0, 8.0, **kw)
+        assert base > 0.45                       # ~equal allocation with no punishment
+        assert pun < base - 0.05                 # punishment suppresses
+
+
+def test_de_villiers_vs_deluty_dissociation():
+    """Punishment suppression depends on the alternative's reinforcement rate with
+    OPPOSITE slopes: subtractive rises with alternative richness, competitive falls."""
+    def suppression(model, alt_vi, **kw):
+        _, lo_base = _pun_alloc(model, alt_vi, INF, **kw)
+        _, lo_pun = _pun_alloc(model, alt_vi, 10.0, **kw)
+        return lo_base - lo_pun
+    sub_lean = suppression("subtractive", 20.0, pun_c=1.0)
+    sub_rich = suppression("subtractive", 4.0, pun_c=1.0)
+    comp_lean = suppression("competitive", 20.0, pun_c=1.5)
+    comp_rich = suppression("competitive", 4.0, pun_c=1.5)
+    assert sub_rich > sub_lean                   # subtractive rises with alt richness
+    assert comp_rich < comp_lean                 # competitive falls with alt richness
+
+
+def test_concatenated_recovers_monotonic_ap():
+    """A larger set punishment sensitivity yields a larger recovered a_p (separable,
+    monotonic) from a both-punished ratio sweep."""
+    def recover(set_ap):
+        cfg = ChamberConfig(pun_tau=800.0, pun_bump=0.04, pun_floor=0.1,
+                            pun_a_r=1.0, pun_a_p=set_ap)
+        logB, logP = [], []
+        for pv0 in (15.0, 8.0, 5.0):
+            res = run_punishment_choice("concatenated", cfg, 400, 3000,
+                                        vi_reinf=[5.0, 5.0], vi_punish=[pv0, 15.0], seed=0)
+            e, pc = res["emit"].sum(0), res["punished"].sum(0)
+            logB.append(np.log(e[0] / e[1]))
+            logP.append(np.log(pc[0] / pc[1]))
+        return -np.polyfit(logP, logB, 1)[0]
+    assert recover(1.5) > recover(0.5)
