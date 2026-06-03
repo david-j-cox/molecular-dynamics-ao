@@ -496,8 +496,13 @@ pre-commit install --hook-type pre-push     # pytest on push
   dissociate on its dependence on the alternative's reinforcement (opposite slopes); the
   same asymmetry, via the foraging `ConsequenceModel`, traces an approach-avoidance
   gradient that tips into maladaptive over-avoidance.
+- [x] **Obtained-rate confound** (`studies/obtained_rate_confound/`) — a methodological
+  finding: because a punisher is collected only when the punished response is emitted, the
+  *obtained* punishment rate is inverted-U in the *scheduled* rate, so fitting the matching
+  law on obtained rates can recover a punishment sensitivity of the **wrong sign** (+2.04
+  on scheduled vs −2.24 on obtained). Use scheduled/programmed rates.
 - [x] **Tests + CI** — 65-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
-  punishment-asymmetry consequence models; Pearce-Hall as a pluggable foraging
+  `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
   comparison → real data (see `ToDO.txt`).
