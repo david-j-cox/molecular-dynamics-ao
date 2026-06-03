@@ -130,6 +130,7 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     components fall to a shared emission floor so proportion tracks baseline height.
     Future work: decouple reinforcement from survival + floor-free, time-based,
     mass-scaled decay. Unit inertia (1/mass) already tested separately.
+    DONE under extinction in exp026 (see DECREMENTAL LEARNING below).
 [x] Multiple renewable food patches in the survival world (patch-leaving / MVT).
     forage.py adds a multi-patch food layer to the JAX SURVIVAL world (energy/
     death, unlike matching.py): organism approaches the most SALIENT patch
@@ -186,11 +187,54 @@ DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
     5 unit tests; opt-in (default rescorla_wagner + all 25 exps + existing demos 0 drift).
     NOTE: renewal/SR are clean in the NET (the learned association); raw food-contact is
     floored by incidental proximity in this layout, so the net is the reported readout.
-[ ] Momentum-modulated decay (Nevin & Grace): extinction rate scaled by
-    accumulated reinforcement / atom mass -> resistance to change, PREE.
-[ ] Pearce-Hall variable associability (learning rate ~ |prediction error|).
-[ ] Resurgence as Choice (Shahan & Craig, 2017, JEAB): resurgence via the
-    matching/behavioral-momentum framework.
+[x] Momentum-modulated decay (Nevin & Grace), exp026 (chamber.run_multiple_schedule):
+    the rate-graded Pavlovian context value (mass) divides the TIME-BASED value decay
+    dv=-(value_extinction/mass)*v. Read resistance from the VALUE (which the mass
+    protects) not the press RATE -- the rate is confounded by the saturating emission +
+    deficit floor (exp022's anti-momentum, reproduced). Sessions-for-value-to-reach-25%
+    is scale-free: gain=0 -> rich==lean (2=2, NO momentum, the control); gain=3 -> rich
+    resists more (6 vs 5). Added an additive `value` key to run_multiple_schedule's
+    return. Effect modest (mass ratio ~2:1). PREE handled separately via Pearce-Hall.
+[x] Pearce-Hall variable associability (rate ~ |prediction error|), exp027
+    (chamber.run_pree, config associability_rule/ph_*). PREE: CRF vs PRF then extinction.
+    CRUCIAL for a clean control -- extinction decay is TIME-BASED (a press-contingent
+    version showed PREE even under 'fixed', an artifact of self-extinction + baseline/
+    floor). With time-based decay 'fixed' gives CRF==PRF sessions-to-criterion (7=7, no
+    PREE); 'pearce_hall' gives PRF 23 > CRF 16 (PREE), with alpha-at-onset CRF 0.81
+    (surprised) vs PRF 0.48 (expected). Readout on value (baseline-free).
+[x] Resurgence -- EMERGENT, not coded as resurgence-as-choice (exp028,
+    chamber.run_resurgence, value_rule single/dual). 3-phase concurrent {R1,R2,other}
+    with softmax (matching) emission. R1 recovers in phase 3 purely from choice
+    reallocation when R2's reinforcement is removed (computed nowhere). Procedure is
+    symmetric -> R1/R2 converge to parity; resurgence is R1's RISE. Control
+    (control_reinforce_r2=True) abolishes it (+0.13 -> -0.00): removal of the alternative,
+    not time/disinhibition. Latent R1 strength surviving phase 2 is set by the SAME
+    items-1/2 mechanisms: single RW erodes R1 (bare choice, endP2 0.02, resurg +0.13);
+    momentum mass (slow-decaying trace) slows R1 decay (+0.19); dual (vectorized port of
+    DualExcitatoryInhibitory) preserves R1 excitation (endP2 0.20 -> 0.33). Textbook
+    crossover figure.
+[x] Resurgence as Choice (Shahan & Craig 2017) as a 4th, FORMAL mechanism
+    (value_rule="rac"): temporally-weighted (leaky-integrated) reinforcement value +
+    power-law MATCHING allocation. Target resurges purely because the alternative's
+    integrated value DECAYS in phase 3 (no preserved/protected target strength); the
+    resurgence is transient and depends on the temporal-weighting time constant rac_tau.
+    Control abolishes it. +1 test. See the model-mimicry STUDY below.
+[x] MODEL-MIMICRY STUDY (studies/resurgence_mechanisms/): all four mechanisms (local
+    choice, momentum, dual, RaC) produce resurgence under the IDENTICAL preparation ->
+    the basic curve underdetermines the process. compare_mechanisms.py runs the mimicry
+    figure + two reinforcement-rate dissociations. KEY RESULT reproducing the empirical
+    rebuttal of momentum: resurgence rises with ALTERNATIVE rate for ALL four (not
+    diagnostic; matches data), but rises with TARGET (phase-1) rate ONLY for momentum
+    (flat for the other three) -- the Craig & Shahan (2016) dissociation. README.md is a
+    full writeup: each mechanism's process/benefits/drawbacks + a diagnostic-experiment
+    catalog (target-rate -> momentum; context/renewal + time/spontaneous-recovery -> dual;
+    multi-alternative matching + time-scale -> RaC). NOT in the reproduce baseline
+    (studies/ artifact); deterministic + runnable.
+[ ] (Future) Port Pearce-Hall to the foraging LearningRule (gridworld); sharper
+    momentum prep (rich/lean trained to EQUAL baseline value); free-operant-rate
+    resurgence measure; implement the proposed diagnostics (context/renewal of resurgence,
+    retention-interval SR, devaluation, multi-alternative matching) to actually run the
+    model comparison. See lab_notebook 2026-06-03.
 
 CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
 -------------------------------------------------------
@@ -250,7 +294,7 @@ METRICS (metrics.py)
 [x] Matching: GML fits (rate/amount/prob/delay), COD curve, allocation vs intake.
 [ ] Latency / contact-rate already in run_lives; schedule response rates (chamber).
 
-TESTS (tests/)  -- 38 tests, all passing (pytest)
+TESTS (tests/)  -- 58 tests, all passing (pytest)
 --------------
 [x] verlet_update value; atom integrate + clip; force shapes; two-tier expression.
 [x] valence-split learning changes weights in expected direction; extinction decays;
@@ -274,7 +318,7 @@ CODE QUALITY / REPRODUCIBILITY
 [x] Reproduction harness (scripts/reproduce.py): runs all experiments+demos in
     fresh subprocesses, scrubs volatile lines, snapshots stdout to
     outputs/repro/baseline.json; --check diffs vs baseline. Use before/after any
-    refactor to catch drift. Baseline: 26/26 run cleanly.
+    refactor to catch drift. Baseline: 35/35 run cleanly (exp001-028 + 7 demos).
 [x] Refactor sweep (verified 0/26 drift): behavioral_md/experiment_utils.py
     (compute_mean_ci, fit_matching_law, make_cue_centers, make_inert_source,
     weak_innate_atoms, save_results_json) + behavioral_md/_kernels.py (exp_falloff,

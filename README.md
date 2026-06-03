@@ -145,7 +145,9 @@ flowchart LR
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
 | Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
-| Behavioral momentum | atom `mass` (unit inertia); `chamber.py` multiple schedule -- rich component resists satiation (molar) | partial |
+| Behavioral momentum | atom `mass` (unit inertia); `chamber.py` multiple schedule -- rich component resists satiation (molar) and, via mass-modulated value decay, extinction (`run_multiple_schedule`, exp026) | implemented |
+| Partial-reinforcement extinction effect (PREE) | Pearce-Hall associability (rate ~ recent \|prediction error\|); `chamber.run_pree`, exp027 -- PRF persists longer in extinction | implemented |
+| Resurgence | emergent from softmax choice reallocation + preserved/mass-protected value; `chamber.run_resurgence`, exp028 (no resurgence-specific code) | implemented |
 | Delay/probability discounting | concatenated-law terms (matching) | implemented |
 | Dynamic energy budget | `config` energy terms + `organism` bookkeeping | implemented |
 
@@ -321,6 +323,9 @@ separate food channels):
 | FR break-and-run, FR>VR pause | `exp018`/`exp019` | post-reinforcement pause larger on FR; cumulative records |
 | Behavioral economics | `exp016` | consumption falls as response cost (unit price) rises |
 | Death patterns | `exp007` | survival curves, time-to-death, cause breakdown |
+| Behavioral momentum (extinction) | `exp026` | mass-modulated value decay → richly-reinforced response resists extinction; gain=0 control shows none |
+| Partial-reinforcement extinction effect | `exp027` | Pearce-Hall associability → PRF persists longer in extinction than CRF; fixed-associability control shows none |
+| Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -469,8 +474,15 @@ pre-commit install --hook-type pre-push     # pytest on push
   (`amount_exponent`, `probability_exponent`, `delay_k`), with rate the frequency
   anchor: rate/amount (`exp024`) and probability/delay (`exp025`) are decoupled to
   crossing targets that the shared discriminability levers could not reach.
-- [x] **Tests + CI** — 54-test pytest suite, GitHub Actions (ruff + pytest).
-- [ ] **Next** — molar VR≫VI rate difference; behavioral momentum (molar);
-  day/night ambient sun; punishment-asymmetry consequence models; momentum-modulated
-  / dual-state extinction extensions (PREE, resurgence); a genuine autodiff fit via
-  truncated backprop → evolution → model comparison → real data (see `ToDO.txt`).
+- [x] **Resistance to change, PREE & resurgence** — mass-modulated value decay gives
+  behavioral momentum under *extinction* (`exp026`, with a gain=0 control that shows
+  none); Pearce-Hall associability (rate ~ recent |prediction error|) produces the
+  partial-reinforcement extinction effect (`exp027`, with a fixed-associability control);
+  and resurgence emerges from softmax choice reallocation plus preserved/mass-protected
+  value — no resurgence-specific code — with a control (alternative kept reinforced) that
+  abolishes it (`exp028`).
+- [x] **Tests + CI** — 58-test pytest suite, GitHub Actions (ruff + pytest).
+- [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
+  punishment-asymmetry consequence models; Pearce-Hall as a pluggable foraging
+  `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
+  comparison → real data (see `ToDO.txt`).

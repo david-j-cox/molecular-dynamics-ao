@@ -89,6 +89,43 @@ class ChamberConfig:
     # component resists extinction too (Nevin & Grace). Opt-in (default 0) so the
     # mechanism can be shown to be necessary rather than assumed.
     momentum_mass_gain: float = 0.0
+    # --- Pearce-Hall associability (PREE) ---------------------------------------
+    # 'fixed' = constant acquisition/extinction rates (the Rescorla-Wagner default).
+    # 'pearce_hall' = the effective rate is scaled by a per-response associability
+    # alpha that EMAs toward the recent ABSOLUTE prediction error |PE|, so a
+    # surprising outcome learns fast and a well-predicted one learns slowly. After
+    # PARTIAL reinforcement an omission is already partly expected (|PE| small), so
+    # alpha is low and extinction is slow; after CONTINUOUS reinforcement the first
+    # omission is maximally surprising (|PE| large), so alpha spikes and extinction
+    # is fast. The partial-reinforcement extinction effect (PREE) thus emerges.
+    associability_rule: str = "fixed"     # 'fixed' | 'pearce_hall'
+    ph_eta: float = 0.3                   # EMA rate of alpha toward |PE|
+    ph_init: float = 0.5                  # initial associability
+    ph_floor: float = 0.05                # associability floor (never fully stops learning)
+    # --- Dual excitatory/inhibitory value rule (resurgence) ---------------------
+    # 'single' = one response value updated RW-style (extinction erodes it).
+    # 'dual' = a preserved excitation w+ and a separate inhibition w- (Konorski/
+    # Bouton); the value the drive reads is net = w+ - w-. Omission grows w- and
+    # leaves w+ intact, so an extinguished response keeps a LATENT excitatory
+    # strength -- which re-emerges (resurges) when a competing response is removed.
+    # Mirrors learning.DualExcitatoryInhibitory, vectorized for the chamber.
+    value_rule: str = "single"            # 'single' | 'dual' | 'rac'
+    inhib_rate: float = 0.05              # w- growth toward asymptote on omission
+    inhib_relax: float = 0.1              # w- relax toward 0 on reinforcement
+    inhib_passive_decay: float = 0.0      # per-step multiplicative w- decay (recovery)
+    # --- Resurgence as Choice (Shahan & Craig, 2017): value_rule='rac' ----------
+    # A molar choice account, NOT a local response-strength account. Each response's
+    # value is a TEMPORALLY-WEIGHTED (leaky-integrated) tally of the reinforcers it has
+    # produced: v <- (1 - 1/rac_tau)*v + rac_bump*reinforced. Allocation MATCHES relative
+    # value (power law with exponent rac_sensitivity), over R1, R2, and a fixed
+    # extraneous source (r_other). Resurgence needs no preserved/protected target
+    # strength: when the alternative's reinforcement stops, its integrated value DECAYS,
+    # so the target's RELATIVE value (v_T / sum v) recovers -- a pure choice effect whose
+    # size depends on the time scale rac_tau relative to the phase durations.
+    rac_tau: float = 2000.0              # temporal-weighting time constant (steps)
+    rac_bump: float = 0.01               # value increment per reinforcer
+    rac_floor: float = 0.1               # baseline value of an explicit response (exploration)
+    rac_sensitivity: float = 1.0         # matching-law exponent on relative value
 
 
 def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
@@ -285,6 +322,7 @@ def run_multiple_schedule(vi_params, cfg: ChamberConfig, n_org: int,
     press_rate = np.zeros((n_sessions, k))   # mean over organisms + component steps
     reinf_rate = np.zeros((n_sessions, k))
     ctx_rec = np.zeros((n_sessions, k))
+    value_rec = np.zeros((n_sessions, k))    # end-of-session response value (mass acts here)
 
     for s in range(n_sessions):
         disrupt = s >= n_baseline
@@ -346,7 +384,218 @@ def run_multiple_schedule(vi_params, cfg: ChamberConfig, n_org: int,
             press_rate[s, c] = (presses / comp_steps).mean()
             reinf_rate[s, c] = (reinfs / comp_steps).mean()
             ctx_rec[s, c] = ctx[:, c].mean()
+            value_rec[s, c] = v[:, c].mean()
 
     return {"press_rate": press_rate, "reinf_rate": reinf_rate, "ctx": ctx_rec,
-            "n_baseline": n_baseline, "n_disruption": n_disruption, "vi": vi}
+            "value": value_rec, "n_baseline": n_baseline,
+            "n_disruption": n_disruption, "vi": vi}
+
+
+def run_pree(reinf_prob: float, cfg: ChamberConfig, n_org: int, n_train: int,
+             n_ext: int, sess_steps: int, seed: int = 0):
+    """Single response: acquire under reinforcement probability ``reinf_prob`` then
+    extinguish. ``reinf_prob == 1.0`` is continuous reinforcement (CRF); a smaller
+    value is partial reinforcement (PRF). Used to demonstrate the partial-
+    reinforcement extinction effect (PREE) with Pearce-Hall associability.
+
+    Energy is decoupled (no metabolic budget): responding is driven purely by the
+    learned press value, so we measure RESPONSE extinction rather than a starvation-
+    driven motivation surge. The value update is acquisition-on-reinforcement (press-
+    contingent, toward lambda) plus a TIME-BASED decay every step (toward 0) scaled
+    by associability. Time-based (not press-contingent) decay is what makes the
+    'fixed' control clean: with a constant associability the value's extinction rate
+    constant is identical for CRF and PRF (no PREE) regardless of their different
+    response rates -- so any PREE under 'pearce_hall' is attributable to
+    associability alone. Under Pearce-Hall, after PRF an omission is less surprising
+    (|PE| small -> low alpha), so the decay constant is smaller -> slower extinction
+    -> PREE; after CRF the first omission is maximally surprising (alpha spikes).
+
+    Returns per-session arrays (length n_train+n_ext): mean press ``rate``, mean
+    press ``value``, mean ``assoc`` (associability), and ``n_train``. The PREE
+    readout is the extinction-phase decay constant of ``value`` (computed by the
+    experiment), which is baseline-free.
+    """
+    rng = np.random.default_rng(seed)
+    ph = cfg.associability_rule == "pearce_hall"
+    w = np.zeros(n_org)                        # learned value of pressing
+    alpha = np.full(n_org, cfg.ph_init)        # Pearce-Hall associability
+    act = np.zeros(n_org)
+    a_int = 1.0 / cfg.act_tau
+    n_sess = n_train + n_ext
+
+    rate = np.zeros(n_sess)
+    value = np.zeros(n_sess)
+    assoc = np.zeros(n_sess)
+    for s in range(n_sess):
+        train = s < n_train
+        presses = np.zeros(n_org)
+        for _ in range(sess_steps):
+            drive = cfg.approach_gain * w
+            act = np.clip((1.0 - a_int) * act + a_int * drive, -10.0, 10.0)
+            p_press = 1.0 / (1.0 + np.exp(-(act - cfg.emission_bias) / cfg.temperature))
+            press = rng.random(n_org) < p_press
+            reinforced = press & train & (rng.random(n_org) < reinf_prob)
+
+            a_old = alpha if ph else 1.0
+            # Acquisition: reinforced press moves value toward lambda (press-
+            # contingent). Decay: value forgets toward 0 every step (time-based),
+            # so under 'fixed' the extinction rate constant is response-rate- and
+            # baseline-independent -- a clean control for PREE.
+            w = np.where(reinforced, w + cfg.learning_rate * a_old * (cfg.reinf_asymptote - w), w)
+            w = w - cfg.value_extinction * a_old * w
+            # Associability tracks |prediction error| sampled when the organism
+            # presses (it experiences the outcome): reinforced -> PE = lambda - w;
+            # unreinforced press -> PE = 0 - w.
+            if ph:
+                target = np.where(reinforced, cfg.reinf_asymptote, 0.0)
+                pe = np.abs(target - w)
+                alpha = np.where(
+                    press,
+                    np.clip((1.0 - cfg.ph_eta) * alpha + cfg.ph_eta * pe, cfg.ph_floor, 1.0),
+                    alpha,
+                )
+            presses += press
+        rate[s] = (presses / sess_steps).mean()
+        value[s] = w.mean()
+        assoc[s] = alpha.mean()
+
+    return {"rate": rate, "value": value, "assoc": assoc, "n_train": n_train}
+
+
+def run_resurgence(cfg: ChamberConfig, n_org: int, phase_steps: int, seed: int = 0,
+                   vi_r1: float = 5.0, vi_r2: float = 5.0, r_other: float = 0.15,
+                   block: int = 50, control_reinforce_r2: bool = False):
+    """Three-phase concurrent resurgence (R1 = target, R2 = alternative).
+
+    Phase 1 (train):  R1 reinforced on VI ``vi_r1``; R2 never.
+    Phase 2 (alt):    R1 on extinction; R2 reinforced on VI ``vi_r2``.
+    Phase 3 (test):   both on extinction (or, with ``control_reinforce_r2=True``,
+                      R2 stays reinforced -- the control that should ABOLISH
+                      resurgence, isolating removal-of-alternative-reinforcement
+                      as the cause).
+
+    Each step the organism emits exactly ONE option -- R1, R2, or a background
+    "other" behavior with a fixed extraneous value ``r_other`` (Herrnstein's R_e) --
+    by a softmax (matching/choice) over the three option activations. Energy is
+    decoupled, so "extinction" withholds only the response->reinforcer contingency.
+
+    Resurgence (R1 responding RECOVERING in phase 3 from its phase-2 suppressed
+    level) is NOT computed anywhere; it emerges from choice reallocation -- when R2's
+    reinforcement is removed, allocation flows back toward R1. The procedure is
+    symmetric (R2 is trained in phase 2 as R1 was in phase 1), so R1 and R2 converge
+    to parity at test; resurgence is the RISE of R1, not R1 exceeding R2. The value
+    rule sets how much latent R1 strength survives phase 2: ``value_rule='single'``
+    with ``momentum_mass_gain=0`` erodes R1 toward the background floor (bare choice);
+    ``momentum_mass_gain>0`` slows R1's phase-2 decay (mass persists from training);
+    ``value_rule='dual'`` preserves R1's excitation (w+) so it stays less suppressed.
+
+    Returns per-block R1/R2 response rate (fraction of organisms), phase boundaries
+    (in blocks), and the block size.
+    """
+    rng = np.random.default_rng(seed)
+    dual = cfg.value_rule == "dual"
+    rac = cfg.value_rule == "rac"
+    ph = cfg.associability_rule == "pearce_hall"
+    a_int = 1.0 / cfg.act_tau
+    lam = cfg.reinf_asymptote
+    lo, hi = -10.0, 10.0
+
+    w = np.zeros((n_org, 2))                   # single-value rule
+    wp = np.zeros((n_org, 2))                  # dual: excitation
+    wm = np.zeros((n_org, 2))                  # dual: inhibition
+    vr = np.zeros((n_org, 2))                  # RaC: temporally-weighted reinforcement value
+    alpha = np.full((n_org, 2), cfg.ph_init)   # Pearce-Hall associability
+    mtr = np.zeros((n_org, 2))                 # reinforcement-history trace -> mass
+    act = np.zeros((n_org, 2))
+    armed = np.zeros((n_org, 2), bool)
+    # The mass trace grows with delivered reinforcement and decays SLOWLY, so the
+    # training-history "mass" persists across the (long) extinction phase rather than
+    # washing out within it -- the durable resistance-to-change Nevin's momentum
+    # requires (cf. the slow-decaying Pavlovian context value in run_multiple_schedule).
+    mass_grow = 0.05
+    mass_decay = 0.0003
+
+    # Phase schedule: which response is reinforced (-1 = none) and on what VI.
+    phase3 = (1, vi_r2) if control_reinforce_r2 else (-1, 0.0)
+    phases = [(0, vi_r1), (1, vi_r2), phase3]
+    n_steps = phase_steps * len(phases)
+    r1 = np.zeros(n_steps)
+    r2 = np.zeros(n_steps)
+
+    other_z = cfg.approach_gain * r_other / cfg.temperature
+    t = 0
+    for reinf_target, vi in phases:
+        for _ in range(phase_steps):
+            if rac:
+                # Molar choice: allocation MATCHES relative temporally-weighted value
+                # (power law) over [R1, R2, extraneous]. No leaky-integrator activation.
+                base = np.concatenate([vr + cfg.rac_floor,
+                                       np.full((n_org, 1), r_other)], axis=1)
+                pw = base ** cfg.rac_sensitivity
+                p = pw / pw.sum(axis=1, keepdims=True)
+            else:
+                net = (wp - wm) if dual else w
+                net = np.clip(net, lo, hi)
+                act = np.clip((1.0 - a_int) * act + a_int * cfg.approach_gain * net, lo, hi)
+                # Softmax (local matching) over [R1, R2, other]; emit one option.
+                z = np.concatenate([act / cfg.temperature,
+                                    np.full((n_org, 1), other_z)], axis=1)
+                z = z - z.max(axis=1, keepdims=True)
+                p = np.exp(z)
+                p /= p.sum(axis=1, keepdims=True)
+            emitted = (rng.random((n_org, 1)) < np.cumsum(p, axis=1)).argmax(axis=1)
+            emit01 = np.zeros((n_org, 2), bool)
+            hit = emitted < 2
+            emit01[np.arange(n_org)[hit], emitted[hit]] = True
+
+            # Reinforcement: only the phase's target response, when emitted + armed.
+            reinf01 = np.zeros((n_org, 2), bool)
+            if reinf_target >= 0:
+                armed[:, reinf_target] |= rng.random(n_org) < (1.0 / vi)
+                got = emit01[:, reinf_target] & armed[:, reinf_target]
+                reinf01[:, reinf_target] = got
+                armed[:, reinf_target] &= ~got
+            omit01 = emit01 & ~reinf01
+
+            mtr = mtr + mass_grow * reinf01 * (1.0 - mtr) - mass_decay * mtr
+            mass = 1.0 + cfg.momentum_mass_gain * mtr
+            a_old = alpha if ph else np.ones((n_org, 2))
+
+            if rac:
+                # Temporally-weighted reinforcement value: decay every step, increment
+                # on reinforcement. Resurgence falls out of the matching above as the
+                # alternative's value decays in phase 3 (no preserved target strength).
+                vr = (1.0 - 1.0 / cfg.rac_tau) * vr + cfg.rac_bump * reinf01
+                pre = vr
+            elif dual:
+                if cfg.inhib_passive_decay > 0.0:
+                    wm *= (1.0 - cfg.inhib_passive_decay)
+                wp += reinf01 * (cfg.learning_rate * a_old * (lam - wp))
+                wm += reinf01 * (cfg.inhib_relax * (0.0 - wm))
+                wm += omit01 * (cfg.inhib_rate * a_old * (lam - wm))
+                wm = np.clip(wm, 0.0, hi)
+                pre = wp - wm
+            else:
+                pre = w.copy()
+                w += reinf01 * (cfg.learning_rate * a_old * (lam - w))
+                w += omit01 * (-(cfg.value_extinction * a_old / mass) * w)
+
+            if ph:
+                target = np.where(reinf01, lam, 0.0)
+                pe = np.abs(target - pre)
+                alpha = np.where(emit01,
+                                 np.clip((1.0 - cfg.ph_eta) * alpha + cfg.ph_eta * pe,
+                                         cfg.ph_floor, 1.0),
+                                 alpha)
+
+            r1[t] = emit01[:, 0].mean()
+            r2[t] = emit01[:, 1].mean()
+            t += 1
+
+    nb = n_steps // block
+    r1b = r1[:nb * block].reshape(nb, block).mean(1)
+    r2b = r2[:nb * block].reshape(nb, block).mean(1)
+    phase_blocks = phase_steps // block
+    return {"r1": r1b, "r2": r2b, "phase_blocks": phase_blocks, "block": block,
+            "n_phases": len(phases)}
 

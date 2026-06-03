@@ -1178,3 +1178,133 @@ Validation: 5 new unit tests (extinction preserves w+/grows w-; net recovers und
 passive decay; reacquisition faster than acquisition; context gate enables renewal; RW
 path untouched), 54 tests pass; ruff clean; reproduce baseline 32/32 with exp001-025 +
 prior demos byte-identical (rule fully opt-in).
+
+---
+
+## 2026-06-03 — Resistance to change, PREE, and emergent resurgence (operant chamber)
+
+Three decremental-learning phenomena, all built in the vectorized operant chamber
+(`chamber.py`) rather than the gridworld/`learning.py` rule, because all three are
+operant response-rate effects and resurgence in particular needs concurrent two-response
+CHOICE, which only the chamber has (`run_concurrent_chamber` precedent). They share one
+idea: matching/softmax choice over response values plus the extinction dynamics. New
+`ChamberConfig` fields (all opt-in, defaults leave existing runs untouched):
+`associability_rule`/`ph_eta`/`ph_init`/`ph_floor` (Pearce-Hall), `value_rule`/
+`inhib_rate`/`inhib_relax`/`inhib_passive_decay` (dual). exp026-028; +4 chamber tests
+(58 total); reproduce baseline recaptured 35/35 (exp001-025 + prior demos byte-identical;
+the only library change is an ADDITIVE `value` key on `run_multiple_schedule`'s return).
+
+### Item 1 — behavioral momentum as mass-modulated decay (exp026)
+
+`run_multiple_schedule` already had the mechanism: a Pavlovian context->reinforcer value
+(rate-graded "mass") that divides the per-step, TIME-BASED value decay, `dv = -(value_
+extinction/mass)*v`. exp022 could only show momentum under SATIATION, not extinction,
+because it read resistance from the press RATE, where a saturating emission function +
+shared energy-deficit floor confound proportion-of-baseline with baseline height (the
+rich component, higher on the logistic, falls more in proportion -> spurious ANTI-momentum;
+reproduced here: rich 0.428 vs lean 0.558 retained). 
+
+Fix: read resistance from the VALUE the mass actually protects, with small motivation so
+the value (not the deficit floor) carries responding. Because the decay is multiplicative,
+sessions-for-value-to-reach-25%-of-baseline is SCALE-FREE -> a clean control: at
+`momentum_mass_gain=0` rich and lean reach criterion in the SAME number of sessions (2=2,
+no momentum); at gain=3 rich resists more (6 vs 5 sessions). Added an additive `value`
+key to `run_multiple_schedule`'s return for this readout. Effect is real but modest
+(ctx-mass ratio ~2:1, and the mass itself decays slowly during extinction).
+
+### Item 2 — partial-reinforcement extinction effect from Pearce-Hall (exp027, `run_pree`)
+
+Single response, CRF (p=1) vs PRF (p=0.25) training then extinction. Pearce-Hall
+associability: effective rate scaled by a per-organism alpha that EMAs toward recent
+|prediction error|. After PRF an omission is partly expected (alpha low) -> slow
+extinction; after CRF the first omission is maximally surprising (alpha spikes) -> fast.
+
+The crucial design choice for a CLEAN control: extinction decay is TIME-BASED (per step),
+not press-contingent. A first attempt with press-contingent decay showed PREE even under
+the 'fixed' control — an artifact, because (a) vigorous responding self-extinguishes
+faster and (b) PRF's lower baseline + emission floor inflate its proportion-retained.
+With time-based decay the value's extinction rate constant is response-rate- and
+baseline-independent, so 'fixed' gives CRF and PRF the IDENTICAL sessions-to-criterion
+(7=7) — no PREE — and any PREE under 'pearce_hall' is associability alone: CRF 16 vs PRF
+23 sessions, with the diagnostic alpha-at-extinction-onset CRF 0.81 (surprised) vs PRF
+0.48 (expected). Readout is on value (baseline-free); the rate figure is illustrative.
+
+### Item 3 — resurgence WITHOUT coding resurgence-as-choice (exp028, `run_resurgence`)
+
+Per the steer: get resurgence to EMERGE, not implement Shahan & Craig's model. Three-phase
+concurrent chamber, one of {R1, R2, background "other" (fixed value = Herrnstein R_e)}
+emitted per step by softmax (= matching). Phase 1 reinforce R1; phase 2 extinguish R1 +
+reinforce R2; phase 3 extinguish both. Resurgence (R1 recovering in phase 3 from its
+phase-2 suppressed level) is computed NOWHERE — it falls out of softmax reallocation when
+R2's reinforcement is removed. Key realization: the procedure is SYMMETRIC (R2 gets phase-2
+training as R1 got phase-1), so R1 and R2 correctly converge to PARITY at test; resurgence
+is the RISE of R1, not R1 exceeding R2 (an earlier "R1>R2@test" criterion was wrong-headed).
+
+The control nails causation: with `control_reinforce_r2=True` (R2 stays reinforced in
+phase 3), R1 does NOT recover (+0.13 -> -0.00) — it is REMOVAL of the alternative's
+reinforcement (choice reallocation), not time or disinhibition, that drives recovery.
+
+How much latent R1 strength survives phase 2 is set by the SAME mechanisms from items 1-2
+(nothing resurgence-specific):
+- single value (RW), gain 0: R1 -> background floor in phase 2 (endP2 0.02); bare choice
+  reallocation, resurgence +0.13 to parity.
+- + momentum mass (gain 8): training-history mass (slow-decaying reinforcement trace,
+  `mass_grow`/`mass_decay`, mirroring the slow `ctx` in `run_multiple_schedule`) slows R1's
+  phase-2 decay -> LARGER resurgence (+0.19). (Required making the mass trace persistent;
+  an EMA-toward-current-reinforcement washed out within the long phase.)
+- dual exc/inhib (vectorized port of `learning.DualExcitatoryInhibitory`): omission grows a
+  separate inhibition and PRESERVES R1's excitation -> R1 stays far less suppressed in
+  phase 2 (endP2 0.20 vs 0.02) and resurges from a higher floor (0.20 -> 0.33).
+
+The single-rule figure is textbook: R1 high / R2 floor (P1), crossover (P2), R1 climbs back
+as R2 collapses (P3). Resurgence-as-choice, emergent.
+
+### Open / honest scope
+- Momentum-under-extinction effect size is modest (mass ratio bound); a dedicated prep
+  training rich/lean to EQUAL baseline value (mass the only difference) would sharpen it.
+- Pearce-Hall lives only in the chamber value world; porting it to the foraging
+  `LearningRule` (gridworld) is straightforward future work but not done.
+- Resurgence uses the one-response-per-step allocation measure (+ background option), the
+  natural matching framing; a free-operant rate version is a possible refinement.
+
+---
+
+## 2026-06-03 (cont.) — Resurgence model-mimicry study (4th mechanism: Resurgence as Choice)
+
+Context: behavioral momentum's account of resurgence (the augmented BMT model, Shahan &
+Sweeney 2011) was rebuked by Craig & Shahan (2016) for mispredicting reinforcement-rate
+effects; Shahan & Craig (2017) replaced it with Resurgence as Choice. The interesting
+meta-point: MANY mechanisms produce resurgence, so the phenomenon underdetermines the
+process. New side study spun out under studies/resurgence_mechanisms/.
+
+Added a 4th, FORMAL mechanism to chamber.run_resurgence: value_rule="rac" (Resurgence as
+Choice). Distinct from the other three on BOTH axes -- value is a temporally-weighted
+(leaky-integrated) reinforcement tally (vr <- (1-1/rac_tau)*vr + rac_bump*reinforced), and
+allocation is power-law MATCHING over relative value (not softmax over a local delta-rule
+value). Resurgence needs NO preserved target strength: when the alternative's reinforcement
+stops, its integrated value decays and the target's RELATIVE value recovers. The recovery
+is transient and its visibility depends on rac_tau vs phase length (had to set tau ~ phase/5,
+i.e. 500 vs 2500, so the rise completes within phase 3; tau too long -> R2 decays too slowly,
+target never recovers within the phase -- itself a genuine RaC time-scale signature). Tuned:
+tau=500, bump=0.04, sensitivity=1.0, floor=0.1 -> endP2 0.03, P3 peak 0.24, resurgence +0.20,
+control +0.00. +1 unit test (59 total). exp028 untouched (rac is a new branch; single/dual
+paths byte-identical, baseline still valid).
+
+studies/resurgence_mechanisms/compare_mechanisms.py runs all four through the IDENTICAL
+preparation:
+- mimicry_four_mechanisms.png: all four reproduce the canonical curve (resurgence +0.14 to
+  +0.26), differing only in SHAPE (momentum overshoots; dual suppressed only to a high floor;
+  RaC smooth/transient). The basic result cannot discriminate them.
+- dissociation_reinforcement_rate.png: TWO parametric sweeps.
+  * ALTERNATIVE rate (phase 2): all four rise -> NOT diagnostic (and matches the data).
+  * TARGET rate (phase 1): ONLY momentum rises (0.24->0.27); local/dual/RaC flat. This is
+    the Craig & Shahan (2016) dissociation -- the simulated version of why momentum was
+    rejected (it makes resurgence depend on target reinforcement history; the others don't).
+
+README.md is the full writeup: model-mimicry thesis, each mechanism's process/benefits/
+drawbacks, the diagnostic-experiment catalog (target-rate isolates momentum; context/renewal
+and retention-interval/spontaneous-recovery isolate the dual/inhibition account; multi-
+alternative matching and time-scale isolate RaC; local choice is the parsimonious null), the
+methodological moral (the canonical curve is not evidence for any one process; the decisive
+tests are about WHAT IS RETAINED, not how much), limitations, and references. The study is a
+studies/ artifact -- deterministic and runnable but deliberately NOT in the reproduce baseline.

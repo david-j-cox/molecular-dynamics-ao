@@ -536,6 +536,55 @@ def plot_momentum(rate_rich, rate_lean, onset: int, path: str | Path,
     return _save(fig, path)
 
 
+def plot_pree(crf, prf, onset: int, path: str | Path,
+              ylabel: str = "Press rate (prop. of baseline)") -> Path:
+    """Partial-reinforcement extinction effect: CRF vs PRF responding across sessions.
+
+    Solid black = continuous reinforcement (CRF), dashed gray = partial (PRF). The
+    dotted vertical line marks the onset of extinction; PREE is the PRF curve
+    declining MORE SLOWLY (greater persistence) than the CRF curve.
+    """
+    crf, prf = np.asarray(crf), np.asarray(prf)
+    s = np.arange(len(crf))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(s, crf, color="black", ls="-", marker="o", ms=4, label="Continuous (CRF)")
+    ax.plot(s, prf, color="0.45", ls="--", marker="s", ms=4, label="Partial (PRF)")
+    ax.axvline(onset - 0.5, color="0.6", ls=":", lw=1.0)
+    ax.text(onset - 0.5, ax.get_ylim()[1], " extinction", fontsize=11, va="top", ha="left")
+    ax.set_xlabel("Session")
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
+def plot_resurgence(r1, r2, phase_blocks: int, path: str | Path,
+                    phase_labels=("Train R1", "Reinforce R2", "Test: R2 ext")) -> Path:
+    """Three-phase resurgence: R1 (target) and R2 (alternative) allocation by block.
+
+    Solid black = R1, dashed gray = R2; dotted vlines mark the phase boundaries.
+    Resurgence is R1 RISING in the test phase (when R2's reinforcement is removed)
+    from its phase-2 suppressed level -- emergent choice reallocation, not a coded
+    effect.
+    """
+    r1, r2 = np.asarray(r1), np.asarray(r2)
+    b = np.arange(len(r1))
+    me = max(1, len(b) // 30)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(b, r1, color="black", ls="-", marker="o", ms=3, markevery=me, label="R1 (target)")
+    ax.plot(b, r2, color="0.5", ls="--", marker="s", ms=3, markevery=me, label="R2 (alternative)")
+    for i in (1, 2):
+        ax.axvline(i * phase_blocks - 0.5, color="0.6", ls=":", lw=1.0)
+    ymax = ax.get_ylim()[1]
+    for i, lab in enumerate(phase_labels):
+        ax.text((i + 0.5) * phase_blocks, ymax, lab, fontsize=10, va="top", ha="center")
+    ax.set_xlabel("Block")
+    ax.set_ylabel("Response allocation")
+    ax.set_ylim(bottom=0)
+    _legend_outside(ax)
+    return _save(fig, path)
+
+
 def plot_giveup_regimes(dist, const_mean, const_ci, bio_mean, bio_ci,
                         path: str | Path) -> Path:
     """Give-up density vs travel distance under two resource models.
