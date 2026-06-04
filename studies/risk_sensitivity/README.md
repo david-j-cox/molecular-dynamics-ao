@@ -123,12 +123,32 @@ dusk safe-suffices edge:    0.22  0.40  0.58  0.76  0.94
 A heavier survival burden pushes the whole risk-prone band to higher reserves. The
 requirement is derived from the dynamics, and it is the right parametric axis.
 
+## It evolves (`evolution.py`)
+
+The capstone removes the planner too. A population carries a **heritable** state-dependent
+risk trait — a threshold linear in time of day, `theta(t) = a + b·(t/day)` — and gambles when
+its reserve is below `theta(t)`. Organisms forage through day/night cycles and die at E ≤ 0;
+the survivors reproduce with mutation (`survival.evolve_risk_policy`). Selection is the bare
+survival dynamics — **nothing rewards "gamble when hungry"**, there is no utility, no DP, and
+no learning rule.
+
+The rule emerges anyway (`figures/evolved_policy.png`): the time-of-day slope `b` evolves
+positive (from ≈0 to ≈0.31) within ~10 generations, so the evolved threshold **rises through
+the day**, and it **converges on the DP-optimal threshold at dusk** (evolved 0.73 vs DP 0.70)
+— where the decision is most consequential and selection is strongest. It is looser at dawn
+(0.44 vs 0.19), where there is all day to recover and the choice barely affects survival. So
+risk-sensitivity is not installed; it is what survival **selects for**, and selection sculpts
+it most precisely exactly where it matters.
+
+This completes the arc — **imposed** (exp030) → **derived** (the DP) → **executed** (the
+behavioral loop) → **evolved** — converging on the same energy-budget rule each time, from
+progressively fewer assumptions.
+
 ## Limitations
 
-- The DP gives the *normative* optimum (a planner with full knowledge of the option
-  distributions). The behavioral model executes that policy but is still handed the values;
-  the remaining step is to *learn* the distributions from experience (or let selection shape
-  an innate state-dependent rule).
+- The DP gives the *normative* optimum (full knowledge of the option distributions); the
+  evolved genome is a *linear* threshold (hence the dawn slack against the curved DP optimum).
+  The remaining step is *within-life learning* of the distributions from experience.
 - The band edges show a fine sawtooth — a real "reachability comb" from the discrete
   (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
   smoother outcome distribution fills it in; the envelope is what matters.

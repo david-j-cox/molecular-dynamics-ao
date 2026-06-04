@@ -78,8 +78,18 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     "why not gamble harder when more negative" question: gamble for EVERY E in the band,
     bounded below only by ruin; exp030's bump is the bounded-rational (softmax) version. The
     day/night structure (Phase 5) supplies the principled requirement.
-[ ] Next: behavioral chamber chooses by softmax over the DP-DERIVED survival values (not the
-    imposed sigmoid); then learn the distributions / let selection shape an innate rule.
+[x] Closed the loop: behavioral pop chooses by softmax over the DP-DERIVED survival values
+    (survival.simulate_survival_choice) -- realized policy reproduces the band, realized
+    survival-by-start matches the planner's V(E). Parametric sweep: dusk threshold tracks the
+    requirement R (parametric.py).
+[x] EVOLVED the rule (survival.evolve_risk_policy, studies/risk_sensitivity/evolution.py):
+    heritable state-dependent risk trait theta(t)=a+b*(t/day), selection by survival only;
+    slope b evolves positive, evolved threshold converges on the DP optimum at dusk (looser at
+    dawn where it matters less). IMPOSED -> DERIVED -> EXECUTED -> EVOLVED. First evolutionary
+    result in the engine (opens the evolution thread).
+[ ] Next: within-life LEARNING of the option distributions (the evolved genome is a fixed
+    linear threshold; learning would let the organism estimate the distributions from
+    experience). Also: day/night modulation of the variance itself (risk x the sun).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

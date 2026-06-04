@@ -1484,3 +1484,32 @@ distributions / let selection shape the rule.
 
 Validation: behavioral_md.survival + 5 tests (75 total); ruff clean. Study artifact (DP is
 deterministic; not added to the reproduce baseline).
+
+---
+
+## 2026-06-04 (cont.) — The energy-budget rule EVOLVES (selection, no utility/DP/learning)
+
+Capstone of the risk arc. exp030 IMPOSED a survival utility; survival_dp DERIVED the policy;
+simulate_survival_choice EXECUTED it behaviorally. survival.evolve_risk_policy removes even
+the planner: a population carries a heritable state-dependent risk trait theta(t)=a+b*(t/day)
+(gamble when E<theta), forages day/night, dies at E<=0, and survivors reproduce with Gaussian
+mutation on (a,b). Selection is the bare survival dynamics -- nothing rewards "gamble when
+hungry".
+
+The rule emerges anyway (studies/risk_sensitivity/evolution.py, evolved_policy.png): the
+time-of-day slope b evolves from ~0 to ~0.31 within ~10 generations, so the evolved threshold
+RISES through the day, and it CONVERGES on the DP-optimal threshold at DUSK (evolved 0.73 vs
+DP 0.70) where the decision matters most and selection is strongest. It is looser at DAWN
+(0.44 vs 0.19) where there is all day to recover and the choice barely affects survival ->
+selection sculpts the policy most precisely exactly where it matters. Final survival ~0.26 (real
+selection pressure). Economy: day net on safe (24*0.02=0.48) < night drain R=0.72, so safe
+alone is insufficient and gambling is forced when behind -- the energy-budget condition.
+
+Arc complete: IMPOSED (exp030) -> DERIVED (DP) -> EXECUTED (behavioral) -> EVOLVED, converging
+on the same energy-budget rule from progressively fewer assumptions. This is the first
+EVOLUTIONARY result in the engine (opens the long-parked evolution thread). Genome is a linear
+threshold (hence the dawn slack vs the curved DP optimum); next is within-life LEARNING of the
+distributions.
+
+Validation: evolve_risk_policy + 1 test (76 total); ruff clean. Study artifact; not in the
+reproduce baseline.

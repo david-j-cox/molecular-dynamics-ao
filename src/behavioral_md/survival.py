@@ -155,3 +155,65 @@ def simulate_survival_choice(result: dict, safe_outcomes, risky_outcomes, n_org:
             "bin_count": bin_count.tolist(),
             "survival_by_start": (surv_alive / np.maximum(surv_n, 1)).tolist(),
             "survival": float(alive.mean())}
+
+
+def evolve_risk_policy(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
+                       metabolism: float, pop_size: int = 3000, n_generations: int = 250,
+                       n_cycles: int = 3, e_init: float = 0.5, mutation: float = 0.04,
+                       cap: float = 1.0, seed: int = 0) -> dict:
+    """Evolve the risk policy from selection alone -- no utility, no DP, no learning rule.
+
+    Each organism carries a HERITABLE state-dependent risk trait: a threshold that is linear
+    in time of day, ``theta(t) = a + b * (t / day_steps)``; it gambles (risky) when its
+    reserve is below ``theta(t)``, otherwise plays safe. Organisms forage through
+    ``n_cycles`` day/night cycles (day = choose; night = forced fast) and die at E <= 0; the
+    survivors reproduce, offspring inheriting ``(a, b)`` with Gaussian mutation. Selection is
+    the bare survival dynamics -- nothing rewards "gamble when hungry".
+
+    Over generations the population converges on the adaptive policy; ``theta(t)`` should
+    track the DP-optimal threshold (the energy-budget rule), now EVOLVED rather than derived
+    or imposed. Returns the per-generation mean ``(a, b)`` and survival, and the final
+    evolved threshold over the day.
+    """
+    rng = np.random.default_rng(seed)
+    a = rng.uniform(0.0, cap, pop_size)
+    b = rng.uniform(-cap, cap, pop_size)
+    sp = np.array([o[0] for o in safe_outcomes])
+    sd = np.array([o[1] for o in safe_outcomes])
+    rp = np.array([o[0] for o in risky_outcomes])
+    rd = np.array([o[1] for o in risky_outcomes])
+
+    def sample(p, d):
+        return d[(rng.random(pop_size)[:, None] < np.cumsum(p)[None, :]).argmax(1)]
+
+    hist_a, hist_b, hist_surv = [], [], []
+    for _ in range(n_generations):
+        energy = np.full(pop_size, e_init)
+        alive = np.ones(pop_size, bool)
+        for _c in range(n_cycles):
+            for t in range(day_steps):
+                theta = a + b * (t / day_steps)
+                gamble = (energy < theta) & alive
+                intake = np.where(gamble, sample(rp, rd), sample(sp, sd))
+                energy = np.where(alive, np.clip(energy + intake - metabolism, 0.0, cap), energy)
+                alive = alive & (energy > 0.0)
+            for _ in range(night_steps):
+                energy = np.where(alive, np.clip(energy - metabolism, 0.0, cap), energy)
+                alive = alive & (energy > 0.0)
+        surv = np.where(alive)[0]
+        hist_a.append(float(a[surv].mean()) if len(surv) else np.nan)
+        hist_b.append(float(b[surv].mean()) if len(surv) else np.nan)
+        hist_surv.append(len(surv) / pop_size)
+        if len(surv) == 0:                                  # extinction: reseed (rare if tuned)
+            a = rng.uniform(0.0, cap, pop_size)
+            b = rng.uniform(-cap, cap, pop_size)
+            continue
+        parents = surv[rng.integers(0, len(surv), pop_size)]
+        a = np.clip(a[parents] + rng.normal(0, mutation, pop_size), 0.0, cap)
+        b = np.clip(b[parents] + rng.normal(0, mutation, pop_size), -cap, cap)
+
+    phase = np.arange(day_steps) / day_steps
+    evolved_theta = float(np.nanmean(hist_a[-20:])) + float(np.nanmean(hist_b[-20:])) * phase
+    return {"mean_a": hist_a, "mean_b": hist_b, "survival": hist_surv,
+            "evolved_theta": np.clip(evolved_theta, 0.0, cap).tolist(),
+            "day_steps": day_steps}

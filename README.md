@@ -509,11 +509,14 @@ pre-commit install --hook-type pre-push     # pytest on push
   **outcome variance** and the **energy-budget rule** (`exp030`,
   `studies/risk_sensitivity/`): a survival-shaped utility makes the organism risk-prone
   below the energy requirement and risk-averse above (Caraco), in both reward-variance and
-  predation-variance preparations, with a flat risk-neutral control. And **derived from
-  first principles** (`survival.survival_dp`): a survival DP over a day/night cycle yields the
-  energy-budget rule with *no* imposed utility — a risk-prone band whose requirement
-  (`night_steps × metabolism`) and ruin edge both emerge from the dynamics.
-- [x] **Tests + CI** — 75-test pytest suite, GitHub Actions (ruff + pytest).
+  predation-variance preparations, with a flat risk-neutral control. **Derived from first
+  principles** (`survival.survival_dp`): a survival DP over a day/night cycle yields the rule
+  with *no* imposed utility — a risk-prone band whose requirement (`night_steps × metabolism`)
+  and ruin edge both emerge. And it **evolves** (`survival.evolve_risk_policy`,
+  `studies/risk_sensitivity/`): a population with a heritable state-dependent risk trait,
+  selected only by survival, converges on the DP-optimal threshold — imposed → derived →
+  executed → evolved, the same energy-budget rule from progressively fewer assumptions.
+- [x] **Tests + CI** — 76-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

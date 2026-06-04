@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from behavioral_md.survival import risk_threshold, survival_dp
+from behavioral_md.survival import evolve_risk_policy, risk_threshold, survival_dp
 
 
 def _solve(day=24, night=24, metab=0.03, s=0.05):
@@ -47,3 +47,17 @@ def test_ruin_below_the_band_at_dusk():
     dusk = res["policy_risky"][-1]
     very_low = e < 0.2
     assert dusk[very_low].sum() == 0     # no gambling deep in the ruin region at dusk
+
+def test_risk_policy_evolves_time_dependent_threshold():
+    """Risk-sensitivity EVOLVES from selection alone: the time-of-day slope b goes
+    positive (threshold rises toward dusk) and the evolved dusk threshold lands near the
+    DP optimum, with no imposed utility, DP, or learning rule."""
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    ev = evolve_risk_policy(safe, risky, 24, 24, 0.03, pop_size=2000, n_generations=120,
+                            n_cycles=3, seed=0)
+    b = np.nanmean(ev["mean_b"][-20:])
+    assert b > 0.1                                   # threshold rises toward dusk
+    assert 0.0 < ev["survival"][-1] < 1.0            # real selection pressure
+    dp = risk_threshold(survival_dp(safe, risky, 24, 24, 0.03))
+    evolved = np.array(ev["evolved_theta"])
+    assert abs(evolved[-1] - dp[-1]) < 0.15          # evolved dusk threshold ~ DP optimum

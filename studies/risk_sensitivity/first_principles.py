@@ -16,7 +16,7 @@ parameter; both fall out of the survival problem. Contrast exp030's bump, center
 freely-chosen e_req.
 
 Run:   python studies/risk_sensitivity/first_principles.py
-Saves: studies/risk_sensitivity/figures/survival_policy_map.png + summary.json
+Saves: studies/risk_sensitivity/figures/survival_policy_map.png + policy_map_summary.json
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def main() -> None:
     for t in (0, 8, 16, 23):
         prone = np.where(res["policy_risky"][t] > 0.5)[0]
         band[t] = [float(e[prone.min()]), float(e[prone.max()])] if len(prone) else None
-    (FIG / "summary.json").write_text(json.dumps(
+    (FIG / "policy_map_summary.json").write_text(json.dumps(
         {"night_requirement": R, "upper_edge_by_step": thr.tolist(), "band_samples": band},
         indent=2))
 
