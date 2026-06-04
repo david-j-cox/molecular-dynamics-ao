@@ -87,9 +87,16 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     slope b evolves positive, evolved threshold converges on the DP optimum at dusk (looser at
     dawn where it matters less). IMPOSED -> DERIVED -> EXECUTED -> EVOLVED. First evolutionary
     result in the engine (opens the evolution thread).
-[ ] Next: within-life LEARNING of the option distributions (the evolved genome is a fixed
-    linear threshold; learning would let the organism estimate the distributions from
-    experience). Also: day/night modulation of the variance itself (risk x the sun).
+[x] Within-life LEARNING (survival.simulate_learning_choice, learning.py): the organism no
+    longer KNOWS the distributions -- it starts ignorant, estimates each option's outcomes from
+    experience, re-plans the DP on its estimate each cycle, forages, respawns on death keeping
+    what it learned. Decaying epsilon-greedy breaks the exploration lock (point-mass estimates
+    -> always safe -> never learns). Gamble recall 0->1 by cycle ~3; estimated risky variance
+    -> true; survival 0.50->0.80; learned threshold tracks the CURVED DP optimum (better than
+    the evolved linear genome). ARC COMPLETE: imposed -> derived -> executed -> evolved ->
+    learned, the same rule from progressively fewer assumptions.
+[ ] Next (strictest): MODEL-FREE learner -- survival values learned directly from living/dying
+    (no DP planning). Also: day/night modulation of the variance itself (risk x the sun).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

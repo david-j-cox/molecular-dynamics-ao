@@ -61,3 +61,19 @@ def test_risk_policy_evolves_time_dependent_threshold():
     dp = risk_threshold(survival_dp(safe, risky, 24, 24, 0.03))
     evolved = np.array(ev["evolved_theta"])
     assert abs(evolved[-1] - dp[-1]) < 0.15          # evolved dusk threshold ~ DP optimum
+
+
+def test_within_life_learning_discovers_the_rule():
+    """Starting ignorant, the organism learns the risky option's variance from experience
+    and its planned policy comes to gamble where the optimum prescribes (recall 0 -> 1);
+    the learned threshold lands on the DP optimum."""
+    from behavioral_md.survival import simulate_learning_choice
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    r = simulate_learning_choice(safe, risky, 24, 24, 0.03, n_org=40, n_cycles=30, seed=0)
+    rec = np.array(r["gamble_recall"])
+    assert rec[0] < 0.2                                   # ignorant: does not gamble
+    assert np.mean(rec[-10:]) > 0.8                       # learned: gambles in the band
+    # Estimated variance converges to the truth (it discovered risky is risky).
+    assert abs(r["risky_variance"][-1] - r["true_risky_variance"]) < 0.0005
+    # Learned dusk threshold matches the DP optimum.
+    assert abs(r["learned_theta"][-1] - r["dp_theta"][-1]) < 0.1

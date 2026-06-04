@@ -140,15 +140,39 @@ the day**, and it **converges on the DP-optimal threshold at dusk** (evolved 0.7
 risk-sensitivity is not installed; it is what survival **selects for**, and selection sculpts
 it most precisely exactly where it matters.
 
-This completes the arc — **imposed** (exp030) → **derived** (the DP) → **executed** (the
-behavioral loop) → **evolved** — converging on the same energy-budget rule each time, from
-progressively fewer assumptions.
+## It is learned within life (`learning.py`)
+
+The last assumption was that the organism *knows* the option distributions. Here it does not:
+it starts ignorant, estimates each option's outcome distribution from what it observes, plans
+survival (the DP) on its current estimate, and forages day/night (respawning on death, keeping
+what it has learned; `survival.simulate_learning_choice`). Nothing tells it which option is
+risky.
+
+It finds out (`figures/within_life_learning.png`). With a little annealing exploration it
+samples the risky option, its estimated variance climbs to the truth within a few cycles, and
+its planned policy comes to gamble **exactly where the energy-budget rule prescribes** (gamble
+recall 0 → 1); survival improves as it learns. Because learning recovers the *actual*
+distributions, the learned threshold tracks the curved DP optimum across the whole day — more
+faithfully than the evolved *linear* genome, which only approximated it.
+
+## The arc
+
+The same energy-budget rule appears at every level of explanation, from most assumed to least:
+
+| stage | source of the rule | what is assumed |
+|---|---|---|
+| **imposed** (`exp030`) | a survival utility's curvature | the utility + `e_req` |
+| **derived** (the DP) | survival-maximizing dynamic programming | only the death dynamics |
+| **executed** (the behavioral loop) | softmax over DP-derived survival values | the DP's values |
+| **evolved** (`evolution.py`) | selection on a heritable trait | the option distributions (support) |
+| **learned** (`learning.py`) | within-life learning + planning | *nothing* — discovered from experience |
 
 ## Limitations
 
-- The DP gives the *normative* optimum (full knowledge of the option distributions); the
-  evolved genome is a *linear* threshold (hence the dawn slack against the curved DP optimum).
-  The remaining step is *within-life learning* of the distributions from experience.
+- The DP gives the *normative* optimum; the learner plans with it on its estimated
+  distributions (model-based), so it inherits the planner's full knowledge of its *own* learned
+  model. A model-free learner (survival values learned directly from living and dying, with no
+  planning) would be the strictest version, at the cost of slower, noisier convergence.
 - The band edges show a fine sawtooth — a real "reachability comb" from the discrete
   (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
   smoother outcome distribution fills it in; the envelope is what matters.

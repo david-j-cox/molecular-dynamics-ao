@@ -217,3 +217,109 @@ def evolve_risk_policy(safe_outcomes, risky_outcomes, day_steps: int, night_step
     return {"mean_a": hist_a, "mean_b": hist_b, "survival": hist_surv,
             "evolved_theta": np.clip(evolved_theta, 0.0, cap).tolist(),
             "day_steps": day_steps}
+
+
+def simulate_learning_choice(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
+                             metabolism: float, n_org: int = 60, n_cycles: int = 40,
+                             e_init: float = 0.5, cap: float = 1.0, n_egrid: int = 201,
+                             seed: int = 0) -> dict:
+    """Within-life learning: organisms LEARN the option distributions from experience and
+    plan survival on their own estimate -- the distributions are no longer handed to them.
+
+    Each organism starts ignorant (a single pseudo-observation of each option at the overall
+    mean, so it is initially indifferent and therefore explores). Each cycle it re-solves the
+    survival DP on its CURRENT empirical estimate of the two options' outcome distributions,
+    forages the day/night cycle under that policy, observes the true outcomes (updating its
+    estimate), and respawns at ``e_init`` on death while keeping what it has learned. Nothing
+    tells it which option is risky; it finds out.
+
+    As experience accumulates the estimate converges on the true distributions, so the planned
+    policy converges on the DP optimum and the energy-budget rule appears. Returns per-cycle
+    population means: ``gamble_recall`` (of the states where the true optimum gambles, the
+    fraction the learned plan also gambles), ``risky_variance`` (estimated), ``survival``, and
+    the final learned threshold ``learned_theta`` over the day vs the true ``dp_theta``.
+    """
+    rng = np.random.default_rng(seed)
+    s_vals = np.array([o[1] for o in safe_outcomes])
+    s_p = np.array([o[0] for o in safe_outcomes])
+    r_vals = np.array([o[1] for o in risky_outcomes])
+    r_p = np.array([o[0] for o in risky_outcomes])
+    grand_mean = 0.5 * ((s_vals * s_p).sum() + (r_vals * r_p).sum())
+
+    # True reference policy + threshold (the optimum the learners should approach).
+    true = survival_dp(safe_outcomes, risky_outcomes, day_steps, night_steps, metabolism,
+                       cap=cap, n_egrid=n_egrid)
+    true_policy = true["policy_risky"]
+    gamble_mask = true_policy > 0.5
+    dp_theta = risk_threshold(true).tolist()
+
+    # Per organism: counts of observed outcomes for each option's true support, seeded with
+    # one pseudo-observation at the grand mean so the organism begins indifferent (explores).
+    s_support = np.concatenate([s_vals, [grand_mean]])
+    r_support = np.concatenate([r_vals, [grand_mean]])
+    s_count = np.zeros((n_org, len(s_support)))
+    r_count = np.zeros((n_org, len(r_support)))
+    s_count[:, -1] = 1.0
+    r_count[:, -1] = 1.0
+
+    energy = np.full(n_org, e_init)
+    accuracy, variance, survival = [], [], []
+
+    def emp(vals, counts_row):
+        tot = counts_row.sum()
+        return list(zip((counts_row / tot).tolist(), vals.tolist(), strict=True))
+
+    def sample_true(p, v):
+        return v[(rng.random() < np.cumsum(p)).argmax()]
+
+    for cyc in range(n_cycles):
+        # Decaying epsilon-greedy exploration: the planned policy never tries the risky
+        # option while both look like point masses at the mean, so it must be nudged to
+        # sample (and thereby discover) the variance. Exploration anneals away as it learns.
+        epsilon = max(0.05, 0.45 * (1.0 - cyc / n_cycles))
+        cyc_acc = np.zeros(n_org)
+        cyc_var = np.zeros(n_org)
+        alive = np.ones(n_org, bool)
+        for i in range(n_org):
+            res = survival_dp(emp(s_support, s_count[i]), emp(r_support, r_count[i]),
+                              day_steps, night_steps, metabolism, cap=cap, n_egrid=n_egrid)
+            pol = res["policy_risky"]
+            # Recall on the gamble states: of the (energy, time) cells where the TRUE optimum
+            # gambles, what fraction does the learned plan also gamble? (Insensitive overall
+            # accuracy is dominated by the risk-averse majority; this isolates the learning.)
+            cyc_acc[i] = float(pol[gamble_mask].mean()) if gamble_mask.any() else 1.0
+            rc = r_count[i] / r_count[i].sum()
+            mu = (rc * r_support).sum()
+            cyc_var[i] = float((rc * (r_support - mu) ** 2).sum())
+            e = energy[i]
+            for t in range(day_steps):               # day: forage under the learned plan
+                b = min(int(e / cap * n_egrid), n_egrid - 1)
+                gamble = pol[t, b] > 0.5             # the planned choice
+                if rng.random() < epsilon:
+                    gamble = not gamble             # explore the other option
+                if gamble:
+                    out = sample_true(r_p, r_vals)
+                    r_count[i, np.argmin(np.abs(r_support - out))] += 1
+                else:
+                    out = sample_true(s_p, s_vals)
+                    s_count[i, np.argmin(np.abs(s_support - out))] += 1
+                e = min(max(e + out - metabolism, 0.0), cap)
+                if e <= 0.0:
+                    break
+            for _n in range(night_steps):            # night: forced fast
+                e = max(e - metabolism, 0.0)
+                if e <= 0.0:
+                    break
+            alive[i] = e > 0.0
+            energy[i] = e if e > 0.0 else e_init     # respawn, keep what was learned
+        accuracy.append(float(cyc_acc.mean()))
+        variance.append(float(cyc_var.mean()))
+        survival.append(float(alive.mean()))
+
+    true_var = float((r_p * (r_vals - (r_p * r_vals).sum()) ** 2).sum())
+    # Final learned threshold: re-plan on the population-pooled estimate.
+    pooled = survival_dp(emp(s_support, s_count.sum(0)), emp(r_support, r_count.sum(0)),
+                         day_steps, night_steps, metabolism, cap=cap, n_egrid=n_egrid)
+    return {"gamble_recall": accuracy, "risky_variance": variance, "survival": survival,
+            "true_risky_variance": true_var, "learned_theta": risk_threshold(pooled).tolist(),
+            "dp_theta": dp_theta}

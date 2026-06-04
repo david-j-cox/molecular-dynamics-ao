@@ -1513,3 +1513,38 @@ distributions.
 
 Validation: evolve_risk_policy + 1 test (76 total); ruff clean. Study artifact; not in the
 reproduce baseline.
+
+---
+
+## 2026-06-04 (cont.) — Within-life LEARNING of the option distributions (arc complete)
+
+The last gap: the organism no longer KNOWS the option distributions. survival.
+simulate_learning_choice has each organism start ignorant (one pseudo-observation of each
+option at the grand mean -> initially indifferent), estimate each option's outcome
+distribution from observed outcomes, re-plan the survival DP on its CURRENT estimate each
+cycle, forage day/night, and respawn on death keeping what it learned. Nothing tells it which
+option is risky.
+
+Exploration was the catch: with both options estimated as point masses at the mean, the DP
+always picks safe -> never samples risky -> never learns (locked in). Fixed with decaying
+epsilon-greedy (0.45 -> 0.05) so it samples the risky option and discovers the variance.
+
+Result (studies/risk_sensitivity/learning.py, within_life_learning.png): GAMBLE RECALL (of the
+states where the true optimum gambles, the fraction the learned plan also gambles) goes 0.00
+(cycle 0, ignorant) -> 0.98 (cycle 1) -> 1.00 (cycle 3+); estimated risky variance climbs to
+true (0.0025) by ~cycle 3; survival improves 0.50 -> 0.80 as it learns and exploration anneals
+(learning has adaptive value). The learned threshold lands on the DP optimum and -- because
+learning recovers the actual distributions -- tracks the CURVED DP threshold across the whole
+day, MORE faithfully than the evolved linear genome (which only approximated it).
+
+NOTE on metric: full-grid policy accuracy is insensitive (the risk-prone band is a small
+fraction of states, so "never gamble" already scores 0.83); gamble RECALL on the true-gamble
+states isolates the learning (0 -> 1).
+
+ARC COMPLETE -- the same energy-budget rule at five levels, most assumed to least: IMPOSED
+(exp030, a utility) -> DERIVED (DP, only the dynamics) -> EXECUTED (behavioral, the DP values)
+-> EVOLVED (selection, the support) -> LEARNED (within life, nothing; discovered from
+experience). The learner is model-BASED (plans on its learned model); a model-FREE learner
+(survival values from living/dying, no planning) is the strictest remaining version.
+
+Validation: simulate_learning_choice + 1 test (77 total); ruff clean. Study artifact.

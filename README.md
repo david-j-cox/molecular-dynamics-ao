@@ -512,11 +512,13 @@ pre-commit install --hook-type pre-push     # pytest on push
   predation-variance preparations, with a flat risk-neutral control. **Derived from first
   principles** (`survival.survival_dp`): a survival DP over a day/night cycle yields the rule
   with *no* imposed utility — a risk-prone band whose requirement (`night_steps × metabolism`)
-  and ruin edge both emerge. And it **evolves** (`survival.evolve_risk_policy`,
-  `studies/risk_sensitivity/`): a population with a heritable state-dependent risk trait,
-  selected only by survival, converges on the DP-optimal threshold — imposed → derived →
-  executed → evolved, the same energy-budget rule from progressively fewer assumptions.
-- [x] **Tests + CI** — 76-test pytest suite, GitHub Actions (ruff + pytest).
+  and ruin edge both emerge. It **evolves** (`survival.evolve_risk_policy`) — a population
+  with a heritable state-dependent risk trait, selected only by survival, converges on the
+  DP-optimal threshold. And it is **learned within life** (`survival.simulate_learning_choice`)
+  — an organism that starts not knowing which option is risky discovers it from experience and
+  plans the rule. The same energy-budget rule at five levels (imposed → derived → executed →
+  evolved → learned), from progressively fewer assumptions; see `studies/risk_sensitivity/`.
+- [x] **Tests + CI** — 77-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
