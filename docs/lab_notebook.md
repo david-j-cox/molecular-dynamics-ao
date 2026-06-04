@@ -1681,3 +1681,48 @@ Validation: +3 tests (skewed_outcomes fixes mean/variance with skew tracking the
 continuous removes the comb at the same dusk requirement; skew preference reverses at R -- below
 prefers negative, above prefers positive, opposite orderings), 85 total; ruff clean. Study
 artifact. New: survival.skewed_outcomes + outcome_moments; richer_worlds.py + figure.
+
+---
+
+## 2026-06-04 -- Richer worlds pt.2: multi-patch foraging (risk-sensitive patch choice + MVT)
+
+Generalized the binary safe-vs-risky choice to a real forager's problem: a MENU of patches, and
+depleting patches it must decide when to leave. Both fall out of the same survival objective, and
+both connect to the rate-maximizing (risk-NEUTRAL) marginal-value-theorem work in the JAX engine
+(exp020_patch_leaving_mvt.py). New: survival.survival_dp_patches (DP over a patch menu) and
+survival.survival_dp_depleting (3D DP over energy x time x patch biomass, with a travel cost).
+
+Result 1 -- patch choice is a THREE-way energy-budget rule (multi_patch.py, left panel). Menu:
+safe (mean 0.045, std 0.02), rich (mean 0.060, std 0.04), wild (mean 0.050, std 0.11). The
+survival-optimal patch over (energy, time-of-day):
+  - SAFE (low variance) above R -- comfortable, hold steady (doesn't even use the higher-mean
+    patch). Share of the (time x energy) grid: 0.29.
+  - RICH (high mean) below R with time -- maximize intake rate to climb toward R. This is the
+    classic rate-maximizing / optimal-foraging regime. Share 0.53.
+  - WILD (high variance) below R near the deadline -- no time to climb steadily, so gamble on
+    variance (the dusk lottery). Share 0.18; the wild wedge grows from dusk and reaches to lower
+    energies the closer to dusk.
+So survival INTERPOLATES between rate-maximizing (rich) and variance-seeking (wild) depending on
+how much time is left to reach the requirement -- the optimal-foraging regime and the risk-prone
+regime are two faces of one survival policy. (Honest artifact: a thin safe sliver in the deep-ruin
+corners where all patches tie and argmax defaults to index 0.)
+
+Result 2 -- the giving-up rule is FINITE-HORIZON (right panel). A depleting patch (intake mean =
+max_rate x biomass, CV 0.6) with a travel cost to reach a fresh one. Through the day the organism
+abandons depleted patches readily (P(leave) -> 1.0 mid-day: classic MVT relocation), but it STOPS
+leaving near dusk, and the leaving deadline tracks the travel cost:
+  travel 2 -> last leave t=27;  travel 4 -> t=24;  travel 6 -> t=22   (day=30; cutoff ~ day-travel)
+Once fewer than ~travel steps remain there is no time to reach and exploit a fresh patch before
+the night fast, so leaving collapses. Infinite-horizon MVT, with its single time-invariant
+giving-up density, cannot express this; survival's deadline produces it. (Honest: a minor early-day
+dip in P(leave) from the discrete biomass grid; the plateau and the deadline crash are robust, and
+the crash-tracks-travel claim is the testable result.)
+
+Note both deviations are SURVIVAL refinements of MVT, not contradictions: away from the deadline
+and the ruin edge, survival reduces to the risk-neutral rate-maximizing MVT (the rich-patch regime,
+the mid-day leaving plateau). MVT is the not-desperate limit.
+
+Validation: +2 tests (patch choice is the three-way rule: safe above R, rich below-R-early, wild
+below-R-at-dusk; giving-up is finite-horizon: leaves mid-day, stops at the deadline, cutoff earlier
+for costlier travel), 87 total; ruff clean. Study artifact. New: survival.survival_dp_patches +
+survival_dp_depleting; multi_patch.py + figure.

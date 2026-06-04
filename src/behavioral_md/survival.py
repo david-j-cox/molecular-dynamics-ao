@@ -524,3 +524,70 @@ def outcome_moments(outcomes):
     sd = np.sqrt(var)
     skew = float((p * ((x - m) / sd) ** 3).sum()) if sd > 0 else 0.0
     return m, var, skew
+
+
+def survival_dp_patches(patches, day_steps: int, night_steps: int, metabolism: float,
+                        cap: float = 1.0, n_egrid: int = 801) -> dict:
+    """Survival DP over a MENU of foraging patches (multi-patch risk-sensitive choice).
+
+    ``patches`` is a list of outcome distributions ``[[(p, intake), ...], ...]`` -- e.g. a
+    low-variance "safe" patch, a high-mean "rich" patch, and a high-variance "wild" patch. Each
+    day-step the organism forages whichever patch maximizes its probability of surviving the cycle
+    (backward DP over day + night, death at E <= 0; the binary :func:`survival_dp` is the two-patch
+    case). Returns ``choice[t, e]`` = index of the optimal patch at each (time, energy), plus the
+    per-patch survival values ``q[t, patch, e]``. The energy-budget rule selects among the menu:
+    the safe patch when comfortable (above the requirement), the rich (rate-maximizing) patch when
+    below it with time to climb, and the wild (variance) patch when the deadline leaves no time to
+    climb steadily.
+    """
+    e = np.linspace(0.0, cap, n_egrid)
+    value = (e > 0.0).astype(float)
+    for _ in range(night_steps):
+        value = _survive_next(e, e - metabolism, value, cap)
+    n_patch = len(patches)
+    q = np.zeros((day_steps, n_patch, n_egrid))
+    for t in range(day_steps - 1, -1, -1):
+        for j, outs in enumerate(patches):
+            q[t, j] = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in outs)
+        value = q[t].max(0)
+    return {"energy": e, "q": q, "choice": q.argmax(1), "value": value,
+            "night_requirement": float(night_steps * metabolism), "day_steps": day_steps,
+            "night_steps": night_steps, "metabolism": metabolism}
+
+
+def survival_dp_depleting(max_rate: float, cv: float, travel_steps: int, day_steps: int,
+                          night_steps: int, metabolism: float, n_biomass: int = 41,
+                          cap: float = 1.0, n_egrid: int = 601) -> dict:
+    """Survival DP for a DEPLETING patch with a travel cost (risk-sensitive MVT).
+
+    The organism is in a patch of biomass ``b in [0, 1]``; foraging draws a noisy intake of mean
+    ``max_rate * b`` (coefficient of variation ``cv``, via :func:`skewed_outcomes`) and depletes
+    the patch one biomass-grid step. Or it can TRAVEL to a fresh (full) patch, paying
+    ``travel_steps`` steps of pure metabolism with no intake. It maximizes survival over the
+    day/night cycle (death at E <= 0). Returns ``action[t, e, b]`` (0 = forage, 1 = leave) and the
+    value function. Classic marginal-value-theorem leaving emerges, but with a finite-horizon
+    twist: leaving stops near dusk, once too few steps remain to recoup the travel cost before the
+    night fast -- a deadline that infinite-horizon MVT lacks.
+    """
+    e = np.linspace(0.0, cap, n_egrid)
+    biomass = np.linspace(0.0, 1.0, n_biomass)
+    night = (e > 0.0).astype(float)
+    for _ in range(night_steps):
+        night = _survive_next(e, e - metabolism, night, cap)
+    dists = [skewed_outcomes(max_rate * b, max(cv * max_rate * b, 1e-9), 0.0, n_points=41)
+             for b in biomass]
+    value = np.zeros((day_steps + 1, n_egrid, n_biomass))
+    value[day_steps, :, :] = night[:, None]
+    action = np.zeros((day_steps, n_egrid, n_biomass), int)
+    for t in range(day_steps - 1, -1, -1):
+        arrive = min(t + travel_steps, day_steps)
+        travel_q = _survive_next(e, e - travel_steps * metabolism, value[arrive, :, -1], cap)
+        for j in range(n_biomass):
+            depleted = max(j - 1, 0)
+            forage_q = sum(p * _survive_next(e, e + d - metabolism, value[t + 1, :, depleted], cap)
+                           for p, d in dists[j])
+            value[t, :, j] = np.maximum(forage_q, travel_q)
+            action[t, :, j] = (travel_q > forage_q + 1e-12).astype(int)
+    return {"energy": e, "biomass": biomass, "action": action, "value": value,
+            "night_requirement": float(night_steps * metabolism), "day_steps": day_steps,
+            "night_steps": night_steps, "travel_steps": travel_steps, "metabolism": metabolism}

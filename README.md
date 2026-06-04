@@ -533,7 +533,12 @@ pre-commit install --hook-type pre-push     # pytest on push
   survival, not the grid), and the energy-budget rule *extends to the third moment*: at fixed
   mean and variance the skew preference reverses at the requirement (negative skew when building
   the buffer, positive skew when safe) — a higher-moment effect mean-variance theory can't express.
-- [x] **Tests + CI** — 85-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Multi-patch foraging — risk-sensitive choice + finite-horizon MVT**
+  (`survival.survival_dp_patches`, `survival_dp_depleting`, `multi_patch.py`) — patch choice is a
+  three-way energy-budget rule (safe / rich-rate-maximizing / wild-variance by energy and
+  time-of-day), and the giving-up rule is finite-horizon (leaving stops near dusk, cutoff tracking
+  the travel cost). Survival refines the risk-neutral MVT of `exp020`; MVT is its not-desperate limit.
+- [x] **Tests + CI** — 87-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

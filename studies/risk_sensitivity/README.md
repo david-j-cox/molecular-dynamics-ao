@@ -256,13 +256,54 @@ cross near the symmetric gamble — a genuine reversal, not the flat response me
 win — but that is the *variance* lifeline of the sun-variance study, and here variance is held
 fixed, isolating the pure skew effect.)
 
+## Multi-patch foraging: risk-sensitive patch choice and MVT (`multi_patch.py`)
+
+The arc so far was a binary safe-vs-risky choice. A real forager faces a *menu* of patches and
+*depleting* patches it must decide when to leave. Both fall out of the same survival objective
+(`survival.survival_dp_patches`, `survival.survival_dp_depleting`) and both connect to the
+rate-maximizing — and therefore risk-*neutral* — marginal-value-theorem work in the JAX engine
+(`experiments/exp020_patch_leaving_mvt.py`). Survival makes patch foraging risk-sensitive.
+
+**Patch choice is a three-way energy-budget rule** (left panel of `figures/multi_patch.png`). A
+menu of a low-variance *safe* patch, a high-mean *rich* patch, and a high-variance *wild* patch;
+the survival-optimal choice over (energy, time-of-day):
+
+```
+                       share of (time × energy) grid
+safe  (low variance)            0.29     above R: comfortable, hold steady
+rich  (high mean)               0.53     below R with time: maximize rate to climb toward R
+wild  (high variance)           0.18     below R near the deadline: gamble on variance
+```
+
+Survival **interpolates between rate-maximizing (rich) and variance-seeking (wild)** depending on
+how much time is left to reach the requirement — the optimal-foraging regime and the risk-prone
+regime are two faces of one policy.
+
+**The giving-up rule is finite-horizon** (right panel). A depleting patch with a travel cost to
+reach a fresh one. The organism abandons depleted patches readily through the day (`P(leave)` → 1.0
+mid-day: classic MVT relocation), but **stops leaving near dusk**, and the leaving deadline tracks
+the travel cost:
+
+```
+travel cost (steps):     2     4     6
+last step it still leaves:  27    24    22       (day = 30; cutoff ≈ day − travel)
+```
+
+Once fewer than ~travel steps remain there is no time to reach and exploit a fresh patch before the
+night fast. Infinite-horizon MVT, with its single time-invariant giving-up density, cannot express
+this; survival's deadline produces it. Both deviations are survival *refinements* of MVT, not
+contradictions — away from the deadline and the ruin edge, survival reduces to the risk-neutral
+rate-maximizing MVT (the rich-patch regime, the mid-day leaving plateau). MVT is the not-desperate
+limit.
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the
   population; individual Q-tables remain high-variance (the price of no model and no planning).
-  The energy economy is deliberately minimal; **multiple patches** (risk-sensitive patch choice,
-  joining the MVT work elsewhere in the engine) is the natural next preparation. (The day/night
-  sun modulating the variance, and continuous/skewed outcomes, are now done — see above.)
+  The energy economy is deliberately minimal. (The day/night sun modulating the variance,
+  continuous/skewed outcomes, and multiple patches — choice and depleting/MVT — are now done; see
+  above.) The remaining open thread is evolving the multi-patch/depleting policies as heritable
+  traits (`survival.evolve_risk_policy` currently evolves only the binary threshold).
 - The *upper* (safe-suffices) band edge's sawtooth was a two-point reachability comb and is
   removed by a continuous outcome distribution (`richer_worlds.py`). The *lower* (ruin) edge still
   jitters — it is a near-indifference region (both options ≈ 0 survival), not a discretization

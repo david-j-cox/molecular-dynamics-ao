@@ -122,8 +122,15 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     not the grid. (b) The energy-budget rule EXTENDS TO SKEW: at fixed mean & variance (where
     mean-variance theory predicts indifference) the policy's skew preference REVERSES at R --
     negative skew below (steady small gains), positive skew above (avoid the rare catastrophe).
-[ ] Next: richer worlds pt.2 -- multiple patches (risk-sensitive patch choice, joining the MVT
-    work). Evolution thread open (survival.evolve_risk_policy).
+[x] RICHER WORLDS pt.2 -- multi-patch foraging (survival.survival_dp_patches + survival_dp_depleting,
+    multi_patch.py). (a) Patch choice is a THREE-way energy-budget rule: safe (low var) above R,
+    rich (high mean, rate-maximizing) below R with time, wild (high var) below R near dusk --
+    survival interpolates rate-maximizing <-> variance-seeking by time-to-requirement. (b) The
+    giving-up rule is FINITE-HORIZON: leaves depleted patches mid-day (classic MVT) but stops near
+    dusk, cutoff ~ day-travel (tracks the travel cost) -- a deadline infinite-horizon MVT lacks.
+    Joins exp020 (risk-neutral MVT) as the not-desperate limit.
+[ ] Next: evolve the multi-patch / depleting policies as heritable traits (evolve_risk_policy
+    currently evolves only the binary threshold). Other open: matching/concurrent-schedule threads.
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

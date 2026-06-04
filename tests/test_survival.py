@@ -212,3 +212,43 @@ def test_skew_preference_reverses_at_the_requirement():
     assert above_right > above_left + 1e-4                # above R: prefers POSITIVE skew
     # The two regimes order oppositely in skew -> a genuine reversal, not a flat (mv) response.
     assert (below_left - below_right) * (above_left - above_right) < 0
+
+
+def test_patch_choice_is_a_three_way_energy_budget_rule():
+    """With a menu of safe (low-variance), rich (high-mean), and wild (high-variance) patches,
+    the survival-optimal choice is the safe patch when comfortable, the rich (rate-maximizing)
+    patch below the requirement with time, and the wild (variance) patch near the deadline."""
+    from behavioral_md.survival import skewed_outcomes, survival_dp_patches
+    menu = [skewed_outcomes(0.045, 0.02, 0.0),       # 0 safe
+            skewed_outcomes(0.060, 0.04, 0.0),       # 1 rich
+            skewed_outcomes(0.050, 0.11, 0.0)]       # 2 wild
+    res = survival_dp_patches(menu, 30, 24, 0.03)
+    e, choice = res["energy"], res["choice"]
+    hi = np.argmin(np.abs(e - 0.90))
+    mid = np.argmin(np.abs(e - 0.50))
+    assert np.all(choice[:, hi] == 0)                # comfortable -> safe (low variance) all day
+    assert choice[2, mid] == 1                       # below R, early -> rich (rate-maximizing)
+    assert choice[-1, mid] == 2                       # below R, at dusk -> wild (high variance)
+
+
+def test_giving_up_is_finite_horizon():
+    """A depleting patch with a travel cost: the forager leaves readily mid-day (MVT relocation)
+    but stops leaving near dusk, and the leaving deadline moves earlier as travel gets costlier --
+    a finite-horizon effect infinite-horizon MVT cannot express."""
+    from behavioral_md.survival import survival_dp_depleting
+    day, night, metab = 22, 16, 0.03
+    R = night * metab
+
+    def last_leave(travel):
+        d = survival_dp_depleting(0.12, 0.6, travel, day, night, metab,
+                                  n_biomass=21, n_egrid=401)
+        eb, bb, act = d["energy"], d["biomass"], d["action"]
+        sel = np.ix_((eb > 0.2) & (eb < R), (bb >= 0.3) & (bb <= 0.6))
+        pl = np.array([act[t][sel].mean() for t in range(day)])
+        return pl, (int(np.where(pl > 0.3)[0].max()) if (pl > 0.3).any() else -1)
+
+    pl2, ll2 = last_leave(2)
+    _, ll6 = last_leave(6)
+    assert pl2[: day // 2].max() > 0.8               # leaves readily through the day (MVT)
+    assert pl2[-2:].max() < 0.2                       # stops leaving at the deadline
+    assert ll2 > ll6                                  # costlier travel -> stops leaving earlier
