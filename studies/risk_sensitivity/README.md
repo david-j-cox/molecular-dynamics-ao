@@ -155,6 +155,21 @@ recall 0 → 1); survival improves as it learns. Because learning recovers the *
 distributions, the learned threshold tracks the curved DP optimum across the whole day — more
 faithfully than the evolved *linear* genome, which only approximated it.
 
+## Strictest of all: model-free (`model_free.py`)
+
+The within-life learner still *plans* (it learns the distributions and runs the DP). The
+model-free learner does neither: each organism holds a tabular value `Q[energy_bin,
+time_of_day, action]` and learns it by Monte-Carlo from the bare survival signal — after each
+cycle, every visited (state, action) is nudged toward 1 if it survived and 0 if it died
+(`survival.simulate_model_free_choice`). No model, no planning; survival values learned
+directly from living and dying.
+
+The rule emerges anyway (`figures/model_free.png`): the aggregate greedy policy's gamble recall
+climbs to ~0.93 and its threshold lands on the DP optimum (mean |diff| ≈ 0.03) across the whole
+day. It is the cost of assuming the least — markedly slower and noisier than the model-based
+learner (recall ~1.0 in ~3 cycles vs ~0.9 in ~100, and individual Monte-Carlo Q-tables stay
+high-variance) — but it gets there from nothing but reinforcement.
+
 ## The arc
 
 The same energy-budget rule appears at every level of explanation, from most assumed to least:
@@ -164,15 +179,17 @@ The same energy-budget rule appears at every level of explanation, from most ass
 | **imposed** (`exp030`) | a survival utility's curvature | the utility + `e_req` |
 | **derived** (the DP) | survival-maximizing dynamic programming | only the death dynamics |
 | **executed** (the behavioral loop) | softmax over DP-derived survival values | the DP's values |
-| **evolved** (`evolution.py`) | selection on a heritable trait | the option distributions (support) |
-| **learned** (`learning.py`) | within-life learning + planning | *nothing* — discovered from experience |
+| **evolved** (`evolution.py`) | selection on a heritable trait | the option support |
+| **learned, model-based** (`learning.py`) | within-life learning + planning | discovered, then planned |
+| **learned, model-free** (`model_free.py`) | reinforcement on the survival signal | *nothing* — no model, no planning |
 
 ## Limitations
 
-- The DP gives the *normative* optimum; the learner plans with it on its estimated
-  distributions (model-based), so it inherits the planner's full knowledge of its *own* learned
-  model. A model-free learner (survival values learned directly from living and dying, with no
-  planning) would be the strictest version, at the cost of slower, noisier convergence.
+- Model-free convergence is slow and the aggregate readout pools experience across the
+  population; individual Q-tables remain high-variance (the price of no model and no planning).
+  The energy economy and the linear/sigmoid option structure are deliberately minimal; richer
+  worlds (continuous outcomes, multiple patches, the day/night sun modulating the variance
+  itself) are the natural next preparations.
 - The band edges show a fine sawtooth — a real "reachability comb" from the discrete
   (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
   smoother outcome distribution fills it in; the envelope is what matters.

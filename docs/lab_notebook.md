@@ -1548,3 +1548,31 @@ experience). The learner is model-BASED (plans on its learned model); a model-FR
 (survival values from living/dying, no planning) is the strictest remaining version.
 
 Validation: simulate_learning_choice + 1 test (77 total); ruff clean. Study artifact.
+
+---
+
+## 2026-06-04 (cont.) — Model-FREE survival learner (the strictest version)
+
+The within-life learner (learning.py) still PLANS (learns distributions, runs the DP). The
+strictest version removes both model and planner: survival.simulate_model_free_choice has each
+organism hold a tabular Q[energy_bin, time_of_day, action] and learn it by MONTE-CARLO from the
+bare survival signal -- after each day/night cycle, every visited (state, action) is nudged
+toward 1 if it survived and 0 if it died (alpha=0.1, decaying epsilon-greedy 0.3->0.05, random
+start energy each cycle for state coverage). No model of the distributions, no planning;
+survival values learned directly from living and dying.
+
+Result (studies/risk_sensitivity/model_free.py, model_free.png): the AGGREGATE greedy policy's
+gamble recall climbs 0.73 -> 0.93 over ~100 cycles and its threshold lands on the DP optimum
+(mean |diff| ~= 0.03) across the whole day. The energy-budget rule emerges from nothing but
+reinforcement. It is the cost of assuming the least -- markedly slower/noisier than model-based
+(recall ~1.0 in ~3 cycles vs ~0.9 in ~100). Honest metric note: INDIVIDUAL Monte-Carlo Q-tables
+are high-variance (per-organism recall plateaus ~0.5); the population-MEAN value function is the
+clean readout (pooled experience), so the recall reported is on the aggregate greedy policy.
+
+ARC FULLY COMPLETE -- the same energy-budget rule at six levels, most assumed to least: IMPOSED
+(a utility) -> DERIVED (DP, only the dynamics) -> EXECUTED (DP values) -> EVOLVED (selection, the
+support) -> LEARNED MODEL-BASED (estimate + plan) -> LEARNED MODEL-FREE (reinforcement on the
+survival signal, no model, no planning). A behavioral regularity (Caraco's energy-budget rule)
+shown to be what survival IMPLIES, SELECTS FOR, and TEACHES -- by planning or by reinforcement.
+
+Validation: simulate_model_free_choice + 1 test (78 total); ruff clean. Study artifact.

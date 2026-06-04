@@ -95,8 +95,16 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     -> true; survival 0.50->0.80; learned threshold tracks the CURVED DP optimum (better than
     the evolved linear genome). ARC COMPLETE: imposed -> derived -> executed -> evolved ->
     learned, the same rule from progressively fewer assumptions.
-[ ] Next (strictest): MODEL-FREE learner -- survival values learned directly from living/dying
-    (no DP planning). Also: day/night modulation of the variance itself (risk x the sun).
+[x] MODEL-FREE learner (survival.simulate_model_free_choice, model_free.py): tabular
+    Q[energy_bin, time, action] learned by Monte-Carlo from the bare survival signal (survived
+    the cycle -> 1, died -> 0); no model, no planning. Aggregate gamble recall 0.73 -> 0.93 over
+    ~100 cycles; threshold lands on the DP optimum (mean|diff|~0.03). Cost of assuming the least:
+    slower/noisier than model-based (recall ~1.0 in ~3 cycles). Individual MC Q-tables are
+    high-variance; the population-mean value function is the clean readout. ARC FULLY COMPLETE:
+    imposed -> derived -> executed -> evolved -> learned(model-based) -> learned(model-free).
+[ ] Next: day/night modulation of the variance itself (risk x the sun -- the Phase 5 feature
+    drives the risk); richer worlds (continuous outcomes, multi-patch). Evolution thread is now
+    open (selection machinery exists in survival.evolve_risk_policy).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

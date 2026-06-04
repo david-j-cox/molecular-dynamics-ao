@@ -77,3 +77,18 @@ def test_within_life_learning_discovers_the_rule():
     assert abs(r["risky_variance"][-1] - r["true_risky_variance"]) < 0.0005
     # Learned dusk threshold matches the DP optimum.
     assert abs(r["learned_theta"][-1] - r["dp_theta"][-1]) < 0.1
+
+
+def test_model_free_learner_recovers_the_rule():
+    """A model-free learner (tabular Q learned by Monte-Carlo from the survival signal, no
+    model and no planning) recovers the energy-budget rule: gamble recall rises and the
+    learned threshold lands near the DP optimum."""
+    from behavioral_md.survival import simulate_model_free_choice
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    r = simulate_model_free_choice(safe, risky, 24, 24, 0.03, n_org=200, n_cycles=200, seed=0)
+    rec = np.array(r["gamble_recall"])
+    assert np.mean(rec[-30:]) > np.mean(rec[:10]) + 0.1   # it learns (recall climbs)
+    assert np.mean(rec[-30:]) > 0.8                       # recovers most of the band
+    learned = np.array(r["learned_theta"], float)
+    dp = np.array(r["dp_theta"], float)
+    assert np.nanmean(np.abs(learned - dp)) < 0.1         # threshold ~ DP optimum

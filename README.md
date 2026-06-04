@@ -516,9 +516,12 @@ pre-commit install --hook-type pre-push     # pytest on push
   with a heritable state-dependent risk trait, selected only by survival, converges on the
   DP-optimal threshold. And it is **learned within life** (`survival.simulate_learning_choice`)
   — an organism that starts not knowing which option is risky discovers it from experience and
-  plans the rule. The same energy-budget rule at five levels (imposed → derived → executed →
-  evolved → learned), from progressively fewer assumptions; see `studies/risk_sensitivity/`.
-- [x] **Tests + CI** — 77-test pytest suite, GitHub Actions (ruff + pytest).
+  plans the rule — and, most strictly, by **model-free reinforcement**
+  (`survival.simulate_model_free_choice`): tabular survival values learned from living and dying,
+  no model and no planning, still recovering the DP-optimal threshold. The same energy-budget
+  rule at six levels (imposed → derived → executed → evolved → learned model-based → learned
+  model-free), from progressively fewer assumptions; see `studies/risk_sensitivity/`.
+- [x] **Tests + CI** — 78-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

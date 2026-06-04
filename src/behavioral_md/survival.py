@@ -323,3 +323,84 @@ def simulate_learning_choice(safe_outcomes, risky_outcomes, day_steps: int, nigh
     return {"gamble_recall": accuracy, "risky_variance": variance, "survival": survival,
             "true_risky_variance": true_var, "learned_theta": risk_threshold(pooled).tolist(),
             "dp_theta": dp_theta}
+
+
+def simulate_model_free_choice(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
+                               metabolism: float, n_org: int = 200, n_cycles: int = 300,
+                               n_ebins: int = 25, alpha: float = 0.1, cap: float = 1.0,
+                               seed: int = 0) -> dict:
+    """Model-FREE survival learning: no planning, no model of the distributions.
+
+    Each organism holds a tabular value ``Q[energy_bin, time_of_day, action]`` and learns it
+    by Monte-Carlo from the bare SURVIVAL signal: it forages a day/night cycle (epsilon-greedy
+    over Q), and at the end every (state, action) it visited is updated toward 1 if it survived
+    the cycle and 0 if it died. Nothing models the option distributions and nothing plans;
+    survival values are learned directly from living and dying. Each cycle starts from a random
+    reserve (for state coverage) -- the organism experiences many days from many states.
+
+    As Q converges to the true survival probabilities, the greedy policy becomes the energy-
+    budget rule. Returns per-cycle population-mean ``gamble_recall`` (of the states where the
+    true optimum gambles, the fraction the greedy Q-policy also gambles) and ``survival``, plus
+    the final learned threshold ``learned_theta`` vs the true ``dp_theta``.
+    """
+    rng = np.random.default_rng(seed)
+    s_vals = np.array([o[1] for o in safe_outcomes])
+    s_p = np.array([o[0] for o in safe_outcomes])
+    r_vals = np.array([o[1] for o in risky_outcomes])
+    r_p = np.array([o[0] for o in risky_outcomes])
+
+    # True reference policy, downsampled to the coarse energy bins the learner uses.
+    true = survival_dp(safe_outcomes, risky_outcomes, day_steps, night_steps, metabolism, cap=cap)
+    centers = (np.arange(n_ebins) + 0.5) / n_ebins * cap
+    true_gamble = np.zeros((n_ebins, day_steps), bool)
+    for t in range(day_steps):
+        true_gamble[:, t] = np.interp(centers, true["energy"], true["policy_risky"][t]) > 0.5
+    dp_theta = risk_threshold(true).tolist()
+
+    idx = np.arange(n_org)
+    q = np.full((n_org, n_ebins, day_steps, 2), 0.5)     # neutral init
+    recall, survival = [], []
+
+    def draw(p, v):
+        return v[(rng.random(n_org)[:, None] < np.cumsum(p)[None, :]).argmax(1)]
+
+    for cyc in range(n_cycles):
+        eps = max(0.05, 0.3 * (1.0 - cyc / n_cycles))
+        energy = rng.uniform(0.0, cap, n_org)            # random start (state coverage)
+        alive = np.ones(n_org, bool)
+        b_rec = np.zeros((n_org, day_steps), int)
+        a_rec = np.zeros((n_org, day_steps), int)
+        on = np.zeros((n_org, day_steps), bool)
+        for t in range(day_steps):
+            b = np.clip((energy / cap * n_ebins).astype(int), 0, n_ebins - 1)
+            gamble = q[idx, b, t, 1] > q[idx, b, t, 0]
+            flip = rng.random(n_org) < eps               # epsilon-greedy exploration
+            gamble = np.where(flip, ~gamble, gamble)
+            b_rec[:, t], a_rec[:, t], on[:, t] = b, gamble.astype(int), alive
+            out = np.where(gamble, draw(r_p, r_vals), draw(s_p, s_vals))
+            energy = np.where(alive, np.clip(energy + out - metabolism, 0.0, cap), energy)
+            alive = alive & (energy > 0.0)
+        for _ in range(night_steps):
+            energy = np.where(alive, np.clip(energy - metabolism, 0.0, cap), energy)
+            alive = alive & (energy > 0.0)
+
+        survived = alive.astype(float)                   # the only learning signal
+        for t in range(day_steps):                       # Monte-Carlo backup of the outcome
+            bi, ai, m = b_rec[:, t], a_rec[:, t], on[:, t]
+            cur = q[idx, bi, t, ai]
+            q[idx, bi, t, ai] = np.where(m, cur + alpha * (survived - cur), cur)
+
+        # Recall of the AGGREGATE learned value function (pooled experience). Individual
+        # Monte-Carlo Q-tables are high-variance; the population mean is the clean readout.
+        mg = q.mean(0)[:, :, 1] > q.mean(0)[:, :, 0]     # [n_ebins, day_steps]
+        recall.append(float(mg[true_gamble].mean()))
+        survival.append(float(survived.mean()))
+
+    # Final learned threshold from the population-mean greedy policy.
+    mean_greedy = (q.mean(0)[:, :, 1] > q.mean(0)[:, :, 0])     # [n_ebins, day_steps]
+    learned_theta = []
+    for t in range(day_steps):
+        prone = np.where(mean_greedy[:, t])[0]
+        learned_theta.append(float(centers[prone.max()]) if len(prone) else float("nan"))
+    return {"gamble_recall": recall, "survival": survival,
+            "learned_theta": learned_theta, "dp_theta": dp_theta}
