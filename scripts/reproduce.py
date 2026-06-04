@@ -63,6 +63,7 @@ EXPERIMENTS = [
     "experiments/exp027_pree_pearce_hall.py",
     "experiments/exp028_resurgence.py",
     "experiments/exp029_punishment_asymmetry.py",
+    "experiments/exp030_risk_sensitivity.py",
     "scripts/run_demo.py",
     "scripts/run_extinction_demo.py",
     "scripts/run_generalization_demo.py",

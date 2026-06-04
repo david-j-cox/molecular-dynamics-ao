@@ -61,11 +61,14 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     "risk" is STATIONARY + DETERMINISTIC (fixed location, constant magnitude, contact
     1.0/0.0, no variance); risk-sensitive foraging (Caraco; energy-budget rule) is about
     OUTCOME VARIANCE, which is not in the model.
-[ ] PATH: genuine risk-sensitivity needs PROBABILISTIC/variance risk -- a risky patch
-    (predation w.p. p, large energy loss = high variance) vs a safe patch (low steady
-    return, matched mean); test the energy-budget rule (risk-prone when starving). A
-    patch-CHOICE prep, not the single fixed-danger gridworld. Day/night can then modulate
-    predation probability or its detectability. The env sun feature is reusable as-is.
+[x] PATH DONE -- risk-sensitive foraging via VARIANCE + the energy-budget rule
+    (chamber.run_risk_choice, exp030, studies/risk_sensitivity/). Concurrent SAFE
+    (constant) vs RISKY (variable, MATCHED MEAN) choice with energy + death; choice by
+    softmax over EXPECTED SURVIVAL UTILITY U(E)=logistic((E-e_req)/width) ~ P(survive). U
+    convex below e_req / concave above -> by Jensen, risk-prone when starving, risk-averse
+    when fed; reversal AT e_req = Caraco's energy-budget rule, EMERGENT. Two versions
+    (reward variance reversal +0.31; predation variance +0.54), linear-utility control flat
+    at 0.50. (Day/night modulation of the variance is a further extension; not done.)
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

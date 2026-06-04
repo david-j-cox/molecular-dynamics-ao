@@ -139,6 +139,7 @@ flowchart LR
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Punishment / reinforcement asymmetry | three concurrent-choice accounts (subtractive/de Villiers, competitive/Deluty, concatenated/Klapes) in `chamber.run_punishment_choice`; foraging `consequence.Subtractive`/`ConcatenatedAsymmetric`; exp029 + `studies/punishment_asymmetry/` | implemented |
+| Risk-sensitive foraging (energy-budget rule) | `chamber.run_risk_choice`: safe vs risky (matched-mean) choice; survival-utility curvature → risk-prone below the energy requirement, risk-averse above (Caraco); exp030 + `studies/risk_sensitivity/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
@@ -328,6 +329,7 @@ separate food channels):
 | Partial-reinforcement extinction effect | `exp027` | Pearce-Hall associability → PRF persists longer in extinction than CRF; fixed-associability control shows none |
 | Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
 | Punishment asymmetry | `exp029` | three accounts all suppress the punished response, but subtractive (de Villiers) and competitive (Deluty) suppression depend on the alternative's reinforcement with opposite slopes; concatenated `a_p` recovered log-linearly |
+| Risk-sensitive foraging | `exp030` | the energy-budget rule: risk-prone below the energy requirement, risk-averse above; emerges from a survival-shaped utility; flat under a linear-utility control |
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -501,7 +503,14 @@ pre-commit install --hook-type pre-push     # pytest on push
   *obtained* punishment rate is inverted-U in the *scheduled* rate, so fitting the matching
   law on obtained rates can recover a punishment sensitivity of the **wrong sign** (+2.04
   on scheduled vs −2.24 on obtained). Use scheduled/programmed rates.
-- [x] **Tests + CI** — 65-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Day/night ambient sun + risk-sensitive foraging** — a global light cycle grading
+  perception (`config.day_night`; `studies/.../` notebook records that a *stationary*
+  deterministic hazard cannot yield risk-sensitivity). Risk-sensitivity done properly via
+  **outcome variance** and the **energy-budget rule** (`exp030`,
+  `studies/risk_sensitivity/`): a survival-shaped utility makes the organism risk-prone
+  below the energy requirement and risk-averse above (Caraco), in both reward-variance and
+  predation-variance preparations, with a flat risk-neutral control.
+- [x] **Tests + CI** — 70-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

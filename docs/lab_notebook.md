@@ -1400,3 +1400,44 @@ energy-budget rule (risk-prone when starving). This is a patch-CHOICE prep (cf. 
 matching/chamber machinery), not the single fixed-danger gridworld. Day/night could then
 modulate either the predation probability or its detectability. The env sun feature is
 committed and reusable; the risk model is what needs redesigning.
+
+---
+
+## 2026-06-04 — Risk-sensitive foraging done RIGHT: the energy-budget rule (Caraco)
+
+Follow-up to the Phase 5 finding. The reason risk-sensitive foraging didn't emerge there
+was conceptual: a stationary DETERMINISTIC hazard has no variance, and risk-sensitive
+foraging (Caraco 1980; Stephens & Krebs) is about sensitivity to OUTCOME VARIANCE under the
+energy-budget rule. Built the proper version (chamber.run_risk_choice) and it works cleanly.
+
+A concurrent choice between a SAFE option (constant outcome) and a RISKY option (variable,
+MATCHED MEAN), with energy dynamics + a real death boundary (E<=0 fatal). The organism
+chooses by softmax over the EXPECTED SURVIVAL UTILITY of each option at its CURRENT energy:
+U(E) = logistic((E - e_req)/width) ~ P(survive). U is CONVEX below the requirement, CONCAVE
+above -> by Jensen the risky option's mean-preserving spread is favored when starving
+(risk-prone) and disfavored when fed (risk-averse). The preference reverses at e_req -- the
+energy-budget rule, emergent from survival-utility maximization (nothing codes "gamble when
+hungry"). util_shape="linear" is the risk-neutral CONTROL.
+
+Two preparations (exp030, studies/risk_sensitivity/), both matched to mean +0.05:
+- reward variance:    SAFE +0.05 sure;  RISKY 0 or +0.10 (p=0.5).   reversal +0.31
+- predation variance: SAFE lean +0.05;  RISKY rich +0.0875 but predation strike p=0.2
+                      costs -0.10.                                  reversal +0.54
+Linear control flat at 0.50 in both -> the reversal is the survival-utility curvature, not
+the schedules. P(risky) below vs above e_req: reward 0.65/0.35, predation 0.83/0.29.
+
+Tuning that mattered: the Jensen gap scales with the risky option's VARIANCE relative to the
+utility WIDTH, so the reward spread has to span a meaningful fraction of util_width (small
+spreads gave a ~0.04 swing; spread 0.10 vs width 0.08 gives the full reversal). And the
+economy must be near break-even (mean reward ~= cost) so energy DIFFUSES around e_req and
+organisms visit BOTH sides; otherwise energy piles at capacity (all well-fed, all risk-
+averse) and the reversal is never sampled. The effect is sharpest near e_req where U is most
+curved and washes out at the energy extremes where U saturates (indifference) -- correct: risk
+attitude matters most near the survival margin.
+
+Caveat: the organism is GIVEN the option distributions (an innate state-dependent rule, as in
+Caraco) rather than learning them; e_req/width are parameters, not derived from the horizon.
+A fuller model would learn the distributions and compute U from the actual survival problem.
+
+Validation: +2 chamber tests (70 total); ruff clean; reproduce baseline recaptured with
+exp030; exp001-029 + demos unchanged.

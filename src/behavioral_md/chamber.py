@@ -695,3 +695,81 @@ def run_punishment_choice(model: str, cfg: ChamberConfig, n_org: int, n_steps: i
     return {"emit": emit_count, "reinforced": reinf_count, "punished": punish_count,
             "steps": n_steps - warm}
 
+
+def run_risk_choice(safe_outcomes, risky_outcomes, cfg: ChamberConfig, n_org: int,
+                    n_steps: int, seed: int = 0, e_req: float = 0.5,
+                    util_width: float = 0.08, cost: float = 0.02, e_init: float = 0.5,
+                    n_ebins: int = 12, util_shape: str = "survival"):
+    """Energy-budget-rule risk-sensitive choice between a SAFE and a RISKY option.
+
+    Each option is a list of ``(probability, energy_delta)`` outcomes; the two are usually
+    matched-mean so the only difference is VARIANCE. Each step the organism chooses by a
+    softmax over the EXPECTED SURVIVAL UTILITY of each option AT ITS CURRENT ENERGY E:
+
+        U(E) = logistic((E - e_req) / util_width)   ~  P(survive | energy E)
+
+    U is CONVEX below the requirement ``e_req`` and CONCAVE above it. By Jensen's
+    inequality the variable (risky) option's spread is then favored when starving
+    (convex -> risk-prone) and disfavored when well-fed (concave -> risk-averse): the
+    preference reverses at ``e_req`` -- the energy-budget rule (Caraco, 1980). Nothing
+    encodes "be risk-prone when hungry"; it falls out of maximizing a survival-shaped
+    utility. Energy drains by ``cost`` each step and is replenished by the chosen outcome;
+    an organism is frozen (dead) once E <= 0.
+
+    Returns the risky-choice fraction binned by current energy (``risky_by_energy``
+    [n_ebins], ``energy_bins`` centers), the overall risky fraction, and survival.
+    """
+    rng = np.random.default_rng(seed)
+    sp = np.array([o[0] for o in safe_outcomes], float)
+    sd = np.array([o[1] for o in safe_outcomes], float)
+    rp = np.array([o[0] for o in risky_outcomes], float)
+    rd = np.array([o[1] for o in risky_outcomes], float)
+    cap = cfg.energy_capacity
+
+    def util(e):
+        # 'survival' = a sigmoid in energy ~ P(survive): convex below e_req (risk-prone),
+        # concave above (risk-averse). 'linear' = risk-neutral utility (the control: with
+        # matched-mean options it yields no energy-budget reversal).
+        if util_shape == "linear":
+            return e / cap
+        return 1.0 / (1.0 + np.exp(-(e - e_req) / util_width))
+
+    def expected_utility(e, probs, deltas):
+        # sum_o p_o * U(clip(E + delta_o - cost)); broadcast over organisms.
+        post = np.clip(e[:, None] + (deltas - cost)[None, :], 0.0, cap)
+        return (probs[None, :] * util(post)).sum(axis=1)
+
+    energy = np.full(n_org, e_init)
+    alive = np.ones(n_org, bool)
+    risky_count = np.zeros(n_ebins)
+    bin_count = np.zeros(n_ebins)
+    total_risky = total = 0
+
+    for _ in range(n_steps):
+        eu = np.stack([expected_utility(energy, sp, sd),
+                       expected_utility(energy, rp, rd)], axis=1)   # [O, 2]
+        z = eu / cfg.temperature
+        z = z - z.max(axis=1, keepdims=True)
+        p_risky = np.exp(z[:, 1]) / np.exp(z).sum(axis=1)
+        choose_risky = (rng.random(n_org) < p_risky) & alive
+
+        # Record choice binned by the DECISION-time energy (living organisms only).
+        b = np.clip(energy / cap * n_ebins, 0, n_ebins - 1).astype(int)
+        np.add.at(bin_count, b[alive], 1.0)
+        np.add.at(risky_count, b[alive], choose_risky[alive].astype(float))
+        total += int(alive.sum())
+        total_risky += int(choose_risky.sum())
+
+        # Sample the chosen option's outcome and update energy (dead organisms frozen).
+        out_safe = sd[(rng.random(n_org)[:, None] < np.cumsum(sp)[None, :]).argmax(1)]
+        out_risky = rd[(rng.random(n_org)[:, None] < np.cumsum(rp)[None, :]).argmax(1)]
+        delta = np.where(choose_risky, out_risky, out_safe) - cost
+        energy = np.where(alive, np.clip(energy + delta, 0.0, cap), energy)
+        alive = alive & (energy > 0.0)
+
+    bins = [(i + 0.5) / n_ebins * cap for i in range(n_ebins)]
+    risky_by_energy = (risky_count / np.maximum(bin_count, 1)).tolist()
+    return {"energy_bins": bins, "risky_by_energy": risky_by_energy,
+            "bin_count": bin_count.tolist(), "overall_risky": total_risky / max(total, 1),
+            "survival": float(alive.mean())}
+

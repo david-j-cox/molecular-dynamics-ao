@@ -8,6 +8,7 @@ from behavioral_md.chamber import (
     run_pree,
     run_punishment_choice,
     run_resurgence,
+    run_risk_choice,
 )
 
 INF = float("inf")
@@ -204,3 +205,36 @@ def test_concatenated_recovers_monotonic_ap():
             logP.append(np.log(pc[0] / pc[1]))
         return -np.polyfit(logP, logB, 1)[0]
     assert recover(1.5) > recover(0.5)
+
+
+def _risk_reversal(risky, util_shape):
+    """(mean P(risky) just below requirement, just above) for one prep + utility."""
+    cfg = ChamberConfig(temperature=0.02, energy_capacity=1.0)
+    res = run_risk_choice([(1.0, 0.05)], risky, cfg, 4000, 800, seed=0, e_req=0.5,
+                          util_width=0.08, cost=0.05, e_init=0.5, util_shape=util_shape)
+    rb = np.asarray(res["risky_by_energy"])
+    bc = np.asarray(res["bin_count"])
+    b = np.asarray(res["energy_bins"])
+    rb = np.where(bc >= 2000, rb, np.nan)
+    below = np.nanmean(rb[(b < 0.5) & (b > 0.3)])
+    above = np.nanmean(rb[(b > 0.5) & (b < 0.7)])
+    return float(below), float(above)
+
+
+def test_energy_budget_rule_reward_variance():
+    """Caraco: risk-prone below the energy requirement, risk-averse above (reward
+    variance) -- only under the survival utility; the linear control shows no reversal."""
+    risky = [(0.5, 0.0), (0.5, 0.10)]                     # matched mean 0.05
+    below, above = _risk_reversal(risky, "survival")
+    assert below > above + 0.15                           # the reversal
+    lb, la = _risk_reversal(risky, "linear")
+    assert abs(lb - la) < 0.08                            # control: no reversal
+
+
+def test_energy_budget_rule_predation_variance():
+    """Same reversal with a predation downside (rich-but-risky vs lean-safe)."""
+    risky = [(0.8, 0.0875), (0.2, -0.10)]                 # matched mean 0.05
+    below, above = _risk_reversal(risky, "survival")
+    assert below > above + 0.2
+    lb, la = _risk_reversal(risky, "linear")
+    assert abs(lb - la) < 0.08
