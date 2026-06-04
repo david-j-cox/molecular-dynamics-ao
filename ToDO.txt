@@ -69,6 +69,17 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     when fed; reversal AT e_req = Caraco's energy-budget rule, EMERGENT. Two versions
     (reward variance reversal +0.31; predation variance +0.54), linear-utility control flat
     at 0.50. (Day/night modulation of the variance is a further extension; not done.)
+[x] FIRST-PRINCIPLES version (behavioral_md.survival, studies/.../first_principles.py):
+    exp030 IMPOSES the survival sigmoid + e_req (circular). The DP DERIVES the rule from the
+    bare dynamics (energy + metabolism + death) with survival as the only objective: backward
+    DP over a day (forage safe/risky) + night (forced fast). Requirement = night_steps*
+    metabolism EMERGES (R=0.72). Optimal policy is a risk-prone BAND -- upper edge (safe
+    suffices) rises toward R at dusk; lower edge = RUIN (doomed even gambling). Resolves the
+    "why not gamble harder when more negative" question: gamble for EVERY E in the band,
+    bounded below only by ruin; exp030's bump is the bounded-rational (softmax) version. The
+    day/night structure (Phase 5) supplies the principled requirement.
+[ ] Next: behavioral chamber chooses by softmax over the DP-DERIVED survival values (not the
+    imposed sigmoid); then learn the distributions / let selection shape an innate rule.
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

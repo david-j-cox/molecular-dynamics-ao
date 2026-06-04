@@ -1441,3 +1441,46 @@ A fuller model would learn the distributions and compute U from the actual survi
 
 Validation: +2 chamber tests (70 total); ruff clean; reproduce baseline recaptured with
 exp030; exp001-029 + demos unchanged.
+
+---
+
+## 2026-06-04 (cont.) — Risk-sensitivity DERIVED from survival (not imposed), via a DP
+
+Methodological correction to exp030. There the choice reads option values through an
+ASSUMED survival sigmoid U(E)=logistic((E-e_req)/width); it is that curvature (and the free
+e_req) that produces the energy-budget rule -- we installed the result in the utility. New
+module behavioral_md.survival derives the rule from the bare dynamics already in the engine
+(energy reserve + metabolic drain + hard death at E<=0) with survival as the ONLY objective.
+
+survival_dp: backward DP over one DAY (forage: safe vs risky) + NIGHT (forced fast, no
+choice). P(survive the cycle) from every (energy, time-of-day); the optimal risk policy is
+read straight off it. The "requirement" is NOT a parameter -- it is night_steps*metabolism
+(the reserve needed at dusk to outlast the fast), emergent.
+
+Result (studies/risk_sensitivity/first_principles.py, survival_policy_map.png): the optimal
+policy is a risk-prone BAND, both edges emergent:
+- upper edge (safe already secures survival -> risk-averse above) rises through the day
+  from ~0.19 toward the night requirement R=0.72 at dusk.
+- lower edge = RUIN (even gambling can't reach R -> doomed either way -> indifferent); near
+  zero early, rises late in the day as recovery time runs out.
+
+This answers the objection to exp030's figure (why doesn't P(risky) keep rising the more
+negative things get?). The OPTIMAL policy gambles for EVERY energy inside the band, not a
+moderate slice; risk-proneness is bounded BELOW only by genuine ruin (an emergent edge), not
+by a saturating utility. exp030's bump is what a BOUNDED-RATIONAL chooser (softmax over a
+saturating value) produces -- survival.softmax_policy reproduces it -- but the band and its
+bounds come from survival, not from e_req. The day/night structure (Phase 5) supplies the
+principled requirement: the sun feature finally earns its keep.
+
+Time-dependence is the emergent richness: early day you gamble only if very low (lots of
+recovery time); late day the whole band rises toward R and the ruin floor climbs. A fine
+sawtooth on the edges is a real "reachability comb" (the discrete 0/2s gamble reaches R only
+via whole numbers of lucky draws); a smoother outcome distribution fills it -- the envelope
+is the point.
+
+Next: have the behavioral chamber choose by softmax over the DP-DERIVED survival values
+(first-principles behavioral model) instead of the imposed sigmoid; then learn the
+distributions / let selection shape the rule.
+
+Validation: behavioral_md.survival + 5 tests (75 total); ruff clean. Study artifact (DP is
+deterministic; not added to the reproduce baseline).

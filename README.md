@@ -139,7 +139,7 @@ flowchart LR
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Punishment / reinforcement asymmetry | three concurrent-choice accounts (subtractive/de Villiers, competitive/Deluty, concatenated/Klapes) in `chamber.run_punishment_choice`; foraging `consequence.Subtractive`/`ConcatenatedAsymmetric`; exp029 + `studies/punishment_asymmetry/` | implemented |
-| Risk-sensitive foraging (energy-budget rule) | `chamber.run_risk_choice`: safe vs risky (matched-mean) choice; survival-utility curvature → risk-prone below the energy requirement, risk-averse above (Caraco); exp030 + `studies/risk_sensitivity/` | implemented |
+| Risk-sensitive foraging (energy-budget rule) | `chamber.run_risk_choice` (energy-budget rule given a survival utility) and `survival.survival_dp` (the rule *derived* from energy + death dynamics, no imposed utility); risk-prone below the requirement, risk-averse above (Caraco); exp030 + `studies/risk_sensitivity/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
@@ -509,8 +509,11 @@ pre-commit install --hook-type pre-push     # pytest on push
   **outcome variance** and the **energy-budget rule** (`exp030`,
   `studies/risk_sensitivity/`): a survival-shaped utility makes the organism risk-prone
   below the energy requirement and risk-averse above (Caraco), in both reward-variance and
-  predation-variance preparations, with a flat risk-neutral control.
-- [x] **Tests + CI** — 70-test pytest suite, GitHub Actions (ruff + pytest).
+  predation-variance preparations, with a flat risk-neutral control. And **derived from
+  first principles** (`survival.survival_dp`): a survival DP over a day/night cycle yields the
+  energy-budget rule with *no* imposed utility — a risk-prone band whose requirement
+  (`night_steps × metabolism`) and ruin edge both emerge from the dynamics.
+- [x] **Tests + CI** — 75-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

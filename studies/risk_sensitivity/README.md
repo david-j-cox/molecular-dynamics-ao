@@ -69,15 +69,48 @@ The lesson the two together teach: **risk-sensitivity is about variance, and the
 dependence is about the curvature of the survival utility** — not about how detectable a
 fixed danger is.
 
+## Deriving the rule instead of imposing it (`first_principles.py`)
+
+The account above has a circularity worth admitting: the survival sigmoid `U(E)` is
+*assumed*, and it is exactly its curvature that produces the energy-budget rule. We did not
+derive risk-sensitivity; we installed it in the utility. The first-principles version
+removes the utility entirely and derives the rule from the bare dynamics already in the
+engine — an energy reserve, a metabolic drain, and a hard death boundary — with **survival
+as the only objective** (`behavioral_md.survival.survival_dp`).
+
+A single day/night cycle: by **day** the organism forages (safe vs. risky); by **night** it
+cannot forage and simply burns `metabolism` each step, dying if its reserve hits zero.
+Backward dynamic programming gives the exact probability of surviving the cycle from every
+(energy, time-of-day), and the optimal risk policy is read straight off it. The "requirement"
+is not a parameter — it is `night_steps × metabolism`, the reserve you must hold at dusk to
+outlast the fast.
+
+`figures/survival_policy_map.png`: the optimal policy is a **risk-prone band**, and *both*
+edges are emergent:
+
+- **upper edge** — where the safe option already secures survival (risk-averse above); it
+  rises through the day from ≈0.19 toward the night requirement R = 0.72 at dusk.
+- **lower edge** — **ruin**, where even the gamble cannot reach R (doomed either way →
+  indifferent); it sits near zero early but rises late in the day as recovery time runs out.
+
+This is richer and more correct than the imposed sigmoid, and it answers the obvious
+objection to the `exp030` figure — *why doesn't P(risky) keep rising the more negative
+things get?* The optimal policy gambles for **every** energy inside the band, not just a
+moderate slice; risk-proneness is bounded *below* only by genuine **ruin** (an emergent
+edge), not by a utility that happens to saturate. The bump in `exp030` is what a *bounded-
+rational* chooser (softmax over a saturating value) produces — `survival.softmax_policy`
+reproduces it — but the bound and the band themselves come from survival, not from `e_req`.
+
 ## Limitations
 
-- The organism is given the option distributions (an evolved/innate state-dependent rule,
-  as in Caraco's account) rather than learning them; the survival sigmoid's `e_req`/`width`
-  are parameters, not derived from the horizon. A fuller model would learn the
-  distributions and compute `U` from the actual survival problem.
-- The reversal is strongest near `e_req` (where curvature is greatest) and washes out at
-  the energy extremes where the utility saturates; this is a feature of the sigmoid, and
-  matches the intuition that risk attitude matters most near the survival margin.
+- The DP gives the *normative* optimum (a planner with full knowledge of the option
+  distributions); it is the benchmark, not a learning organism. The natural next step is to
+  let the behavioral chamber choose by softmax over the **DP-derived** survival values
+  rather than the imposed sigmoid, and ultimately to learn the distributions from experience
+  (or let selection shape an innate state-dependent rule).
+- The band edges show a fine sawtooth — a real "reachability comb" from the discrete
+  (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
+  smoother outcome distribution fills it in; the envelope is what matters.
 
 ## References
 
