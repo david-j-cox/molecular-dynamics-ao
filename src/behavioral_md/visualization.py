@@ -597,17 +597,17 @@ def plot_risk_sensitivity(energy, version_a: dict, version_b: dict, e_req: float
     """
     energy = np.asarray(energy, float)
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=True)
-    titles = ["reward variance", "predation variance"]
+    titles = ["Reward variance", "Predation variance"]
     for ax, ver, title in zip(axes, (version_a, version_b), titles, strict=True):
         ax.plot(energy, np.asarray(ver["survival"], float), color="black", ls="-",
-                marker="o", ms=5, label="survival utility")
+                marker="o", ms=5, label="Survival utility")
         ax.plot(energy, np.asarray(ver["linear"], float), color="0.55", ls="--",
-                marker="s", ms=5, label="linear utility (control)")
+                marker="s", ms=5, label="Linear utility (control)")
         ax.axvline(e_req, color="0.6", ls=":", lw=1.0)
         ax.axhline(0.5, color="0.85", lw=0.6)
-        ax.set_xlabel("current energy")
+        ax.set_xlabel("Current energy")
         ax.set_title(title, fontsize=11)
-        ax.text(e_req, 0.02, " requirement", fontsize=9, ha="left")
+        ax.text(e_req, 0.02, " Requirement", fontsize=9, ha="left")
     axes[0].set_ylabel("P(choose risky)")
     axes[0].set_ylim(0, 1)
     axes[1].legend(loc="upper right", frameon=False)

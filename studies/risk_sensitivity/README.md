@@ -101,13 +101,34 @@ edge), not by a utility that happens to saturate. The bump in `exp030` is what a
 rational* chooser (softmax over a saturating value) produces — `survival.softmax_policy`
 reproduces it — but the bound and the band themselves come from survival, not from `e_req`.
 
+## Closing the loop, and the requirement as the one axis (`parametric.py`)
+
+Two follow-ups confirm the derivation is behavior, not just a table.
+
+**Closing the loop** (`figures/closing_the_loop.png`). A population that actually lives and
+dies, choosing by a softmax over the **DP-derived** survival values (no imposed utility;
+`survival.simulate_survival_choice`), reproduces the energy-budget band in its *realized*
+policy, and its realized survival-by-starting-energy matches the planner's `V(E)`. The
+first-principles policy is executable behavior that achieves the predicted survival.
+
+**The requirement is the axis** (`figures/requirement_sweep.png`). `R = night_steps ×
+metabolism` is the one knob that sets where the band sits. Sweeping the night length, the
+dusk safe-suffices edge tracks `R` almost exactly (it sits one forage step below it):
+
+```
+R (= night × metabolism):  0.24  0.42  0.60  0.78  0.96
+dusk safe-suffices edge:    0.22  0.40  0.58  0.76  0.94
+```
+
+A heavier survival burden pushes the whole risk-prone band to higher reserves. The
+requirement is derived from the dynamics, and it is the right parametric axis.
+
 ## Limitations
 
 - The DP gives the *normative* optimum (a planner with full knowledge of the option
-  distributions); it is the benchmark, not a learning organism. The natural next step is to
-  let the behavioral chamber choose by softmax over the **DP-derived** survival values
-  rather than the imposed sigmoid, and ultimately to learn the distributions from experience
-  (or let selection shape an innate state-dependent rule).
+  distributions). The behavioral model executes that policy but is still handed the values;
+  the remaining step is to *learn* the distributions from experience (or let selection shape
+  an innate state-dependent rule).
 - The band edges show a fine sawtooth — a real "reachability comb" from the discrete
   (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
   smoother outcome distribution fills it in; the envelope is what matters.

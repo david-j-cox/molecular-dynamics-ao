@@ -93,3 +93,65 @@ def softmax_policy(result: dict, beta: float) -> np.ndarray:
     """
     d = result["q_risky"] - result["q_safe"]
     return 1.0 / (1.0 + np.exp(-beta * d))
+
+
+def simulate_survival_choice(result: dict, safe_outcomes, risky_outcomes, n_org: int,
+                             n_cycles: int, beta: float = 40.0, seed: int = 0,
+                             cap: float = 1.0, n_ebins: int = 20):
+    """Closing the loop: a BEHAVIORAL population that actually lives and dies, choosing by
+    softmax over the DP-DERIVED survival values (no imposed utility).
+
+    Each organism cycles through day (forage; choose by ``sigma(beta*(q_risky - q_safe))``
+    at its current energy and time-of-day, looked up from ``result``) and night (forced
+    fast), with a hard death at E <= 0; energy carries across cycles. Organisms start spread
+    across the reserve so the whole policy is sampled. Returns the realized risky-choice
+    fraction binned by current energy (``risky_by_energy`` [n_ebins], ``energy_bins``), the
+    bin counts, and the survival fraction -- the energy-budget rule as executed behavior,
+    derived from survival alone.
+    """
+    rng = np.random.default_rng(seed)
+    eg = result["energy"]
+    qs_t, qr_t = result["q_safe"], result["q_risky"]
+    day, night, metab = result["day_steps"], result["night_steps"], result["metabolism"]
+    sp = np.array([o[0] for o in safe_outcomes])
+    sd = np.array([o[1] for o in safe_outcomes])
+    rp = np.array([o[0] for o in risky_outcomes])
+    rd = np.array([o[1] for o in risky_outcomes])
+
+    energy = np.linspace(0.02, cap, n_org)            # spread so all bins are visited
+    start_energy = energy.copy()
+    alive = np.ones(n_org, bool)
+    risky_count = np.zeros(n_ebins)
+    bin_count = np.zeros(n_ebins)
+
+    def sample(p, d):
+        return d[(rng.random(n_org)[:, None] < np.cumsum(p)[None, :]).argmax(1)]
+
+    for _ in range(n_cycles):
+        for t in range(day):
+            qs = np.interp(np.clip(energy, 0, cap), eg, qs_t[t])
+            qr = np.interp(np.clip(energy, 0, cap), eg, qr_t[t])
+            p_risky = 1.0 / (1.0 + np.exp(-beta * (qr - qs)))
+            choose_risky = (rng.random(n_org) < p_risky) & alive
+            b = np.clip(energy / cap * n_ebins, 0, n_ebins - 1).astype(int)
+            np.add.at(bin_count, b[alive], 1.0)
+            np.add.at(risky_count, b[alive], choose_risky[alive].astype(float))
+            intake = np.where(choose_risky, sample(rp, rd), sample(sp, sd))
+            energy = np.where(alive, np.clip(energy + intake - metab, 0.0, cap), energy)
+            alive = alive & (energy > 0.0)
+        for _ in range(night):
+            energy = np.where(alive, np.clip(energy - metab, 0.0, cap), energy)
+            alive = alive & (energy > 0.0)
+
+    bins = [(i + 0.5) / n_ebins * cap for i in range(n_ebins)]
+    # Realized survival binned by STARTING energy (compare to the DP's predicted V(E)).
+    sb = np.clip(start_energy / cap * n_ebins, 0, n_ebins - 1).astype(int)
+    surv_n = np.zeros(n_ebins)
+    surv_alive = np.zeros(n_ebins)
+    np.add.at(surv_n, sb, 1.0)
+    np.add.at(surv_alive, sb, alive.astype(float))
+    return {"energy_bins": bins,
+            "risky_by_energy": (risky_count / np.maximum(bin_count, 1)).tolist(),
+            "bin_count": bin_count.tolist(),
+            "survival_by_start": (surv_alive / np.maximum(surv_n, 1)).tolist(),
+            "survival": float(alive.mean())}
