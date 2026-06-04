@@ -132,3 +132,30 @@ def test_sun_variance_dusk_lifeline():
         prone = np.where(res["policy_risky"][t] > 0.5)[0]
         return res["energy"][prone.min()] if len(prone) else np.nan
     assert ruin(sun, 20) < ruin(con, 20) - 0.05         # dusk: the dark is a lifeline
+
+
+def test_dusk_survival_lifeline_is_realized_behavior():
+    """A population dropped into dusk behind on reserves SURVIVES the night more often under
+    the sun's high-variance dark than under a matched constant-variance control -- the ruin-edge
+    lifeline realized as who actually lives, and confined to the desperate (no edge once safe)."""
+    from behavioral_md.survival import (
+        simulate_dusk_survival,
+        sun_variance_risky,
+        survival_dp,
+        survival_dp_timevarying,
+    )
+    day, night, metab, s = 24, 24, 0.03, 0.05
+    risky_sun, _ = sun_variance_risky(day, s, 0.02, 0.12)
+    safe_by_step = [[(1.0, s)] for _ in range(day)]
+    w = float(np.sqrt(np.mean([abs(r[1][1] - s) ** 2 for r in risky_sun])))
+    sun = survival_dp_timevarying(safe_by_step, risky_sun, night, metab)
+    risky_con = [[(0.5, s - w), (0.5, s + w)] for _ in range(day)]
+    con = survival_dp([(1.0, s)], [(0.5, s - w), (0.5, s + w)], day, night, metab)
+
+    reserves = np.linspace(0.30, 0.95, 25)
+    a = simulate_dusk_survival(sun, safe_by_step, risky_sun, metab, 20, reserves, seed=0)
+    b = simulate_dusk_survival(con, safe_by_step, risky_con, metab, 20, reserves, seed=0)
+    adv = a["survival"] - b["survival"]
+    assert adv.max() > 0.1                               # a real lifeline in the desperate band
+    assert adv.min() > -0.02                             # never a net liability at dusk
+    assert adv[reserves > 0.85].max() < 0.02             # no edge once the reserve is already safe

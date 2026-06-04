@@ -436,6 +436,46 @@ def survival_dp_timevarying(safe_by_step, risky_by_step, night_steps: int, metab
             "day_steps": day_steps, "night_steps": night_steps, "metabolism": metabolism}
 
 
+def simulate_dusk_survival(result: dict, safe_by_step, risky_by_step, metabolism: float,
+                           dusk_step: int, reserves, n_org: int = 4000, cap: float = 1.0,
+                           seed: int = 0) -> dict:
+    """Realized night survival of organisms dropped into dusk behind on reserves.
+
+    Each organism starts the day-step ``dusk_step`` at a given ``reserve``, forages the
+    remaining day-steps under the DP's optimal risk policy (``result["policy_risky"]``, gambling
+    where it prescribes), drawing its actual intake from the TIME-VARYING ``risky_by_step`` /
+    ``safe_by_step`` for that step, then fasts the night (burning ``metabolism`` each step, dying
+    at E <= 0). Returns the fraction surviving the night for each starting ``reserve`` -- the
+    ruin edge as realized behavior, not a table. ``result`` should come from
+    :func:`survival_dp_timevarying` (sun) or :func:`survival_dp` (constant control).
+    """
+    rng = np.random.default_rng(seed)
+    eg = result["energy"]
+    pol = result["policy_risky"]
+    day_steps = result["day_steps"]
+    night_steps = result["night_steps"]
+    survival = np.zeros(len(reserves))
+    for i, e0 in enumerate(reserves):
+        E = np.full(n_org, float(e0))
+        alive = np.ones(n_org, bool)
+        for t in range(dusk_step, day_steps):
+            b = np.clip((E / cap * len(eg)).astype(int), 0, len(eg) - 1)
+            gamble = (pol[t][b] > 0.5) & alive
+            ro = risky_by_step[t]
+            rv = np.array([d for _, d in ro])
+            rp = np.cumsum([p for p, _ in ro])
+            out_r = rv[(rng.random(n_org)[:, None] < rp).argmax(1)]
+            out_s = safe_by_step[t][0][1]
+            out = np.where(gamble, out_r, out_s)
+            E = np.where(alive, np.clip(E + out - metabolism, 0.0, cap), E)
+            alive &= E > 0.0
+        for _ in range(night_steps):
+            E = np.where(alive, E - metabolism, E)
+            alive &= E > 0.0
+        survival[i] = alive.mean()
+    return {"reserves": np.asarray(reserves, float), "survival": survival}
+
+
 def sun_variance_risky(day_steps: int, mean: float, w_min: float, w_max: float):
     """Per-day-step risky outcomes whose SPREAD tracks darkness (a day/night sun).
 

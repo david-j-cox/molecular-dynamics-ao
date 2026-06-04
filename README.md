@@ -525,7 +525,10 @@ pre-commit install --hook-type pre-push     # pytest on push
   `survival_dp_timevarying`) — the Phase 5 sun, repurposed to set the *variance* of foraging
   (dark = erratic) rather than a fixed hazard: high-variance dark foraging is a lifeline near
   the deadline (the dusk ruin edge drops) and a liability far from it. Closes the Phase 5 loop.
-- [x] **Tests + CI** — 81-test pytest suite, GitHub Actions (ruff + pytest).
+  Realized as behavior (`survival.simulate_dusk_survival`, `behavioral_sun.py`): organisms
+  dropped into dusk behind on reserves survive the night from a *lower* reserve under the sun
+  (+0.25 peak survival advantage in the desperate band, zero once reserves are safe).
+- [x] **Tests + CI** — 82-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

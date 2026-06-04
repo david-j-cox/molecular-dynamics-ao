@@ -200,6 +200,29 @@ bite). The day/night cycle puts the high variance exactly at dusk, when a behind
 organism most needs the gamble — the "starving organism accepts night risk" intuition, emerging
 for the right reason (variance, not a fixed hazard).
 
+### Realized as behavior (`behavioral_sun.py`)
+
+The figure above is the planner's *table* (the DP ruin edge). Does it describe what organisms
+actually do, and whether they actually live? A population is dropped into the dark dusk
+(day-step 20) holding a range of reserves, forages the remaining day-steps under the optimal
+policy drawing **real** intake from the time-varying distributions, and then must outlast the
+night (`survival.simulate_dusk_survival`). `figures/behavioral_sun.png`:
+
+```
+                              sun (dark dusk)   constant (same avg.)
+reserve for >=50% survival         0.54               0.58
+peak survival advantage         +0.25 (at reserve 0.56)
+advantage once reserve safe        0.00  (>= 0.66)
+```
+
+The ruin-edge lifeline is realized as **who actually lives**: behind at dusk, an organism
+survives the night from a *lower* reserve under the dark's high variance, and is up to ~25
+percentage points more likely to live across the whole desperate band. The advantage is exactly
+**zero** once the reserve already outlasts the night — variance helps the desperate, never the
+comfortable. (The clean, decision-relevant readout is survival-from-how-little; an aggregate
+P(gamble)-by-time-of-day readout is muddier, dominated by the *dawn* liability — desperate
+organisms avoiding the high-variance dawn gamble — rather than a sharp dusk peak.)
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the

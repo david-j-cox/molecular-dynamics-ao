@@ -111,9 +111,13 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
 [x] CARVED OUT to a standalone repo for ResearchStaff write-up:
     ../risk-sensitive-foraging/ (local git, self-contained, 10 tests, 6 study scripts -> figures;
     the six-level arc frozen as of the model-free result, before the sun-variance synthesis).
-[ ] Next: behavioral population for the sun-variance result (nocturnal desperation foraging as
-    realized behavior, not just the optimal policy); richer worlds (continuous outcomes,
-    multi-patch). Evolution thread open (survival.evolve_risk_policy).
+[x] BEHAVIORAL population for the sun-variance result (nocturnal desperation foraging as realized
+    behavior; survival.simulate_dusk_survival, behavioral_sun.py). Organisms dropped into the dark
+    dusk behind on reserves survive the night from a LOWER reserve under the sun than under matched
+    constant variance (E50 0.54 vs 0.58); survival advantage +0.25 across the desperate band, and
+    exactly 0 once the reserve is already safe -- the ruin-edge lifeline as who actually lives.
+[ ] Next: richer worlds (continuous outcomes, multi-patch). Evolution thread open
+    (survival.evolve_risk_policy).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

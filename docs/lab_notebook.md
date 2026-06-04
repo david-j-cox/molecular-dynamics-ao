@@ -1603,3 +1603,39 @@ variance exactly at DUSK, when a behind-schedule organism most needs the gamble.
 Validation: +3 tests (timevarying==constant when fixed; spread peaks in dark, mean matched; dusk
 lifeline), 81 total; ruff clean. Study artifact. (Built in the parent repo; the standalone
 risk-sensitive-foraging carve-out predates this and stays the frozen six-level version.)
+
+---
+
+## 2026-06-04 -- Nocturnal desperation foraging as REALIZED behavior (sun variance, part 2)
+
+The sun-variance result above was a planner's TABLE (the DP ruin edge). The obvious objection:
+does it describe what organisms actually DO and whether they actually live? So a population now
+lives it (studies/risk_sensitivity/behavioral_sun.py, survival.simulate_dusk_survival).
+
+Design. Drop organisms into the dark dusk (day-step t=20) holding a range of reserves, let them
+forage the few remaining day-steps under the DP-optimal policy -- drawing REAL intake from the
+time-varying distributions (high-variance in the dark) -- then fast the night (night requirement
+R = 0.72). Measure the fraction surviving, under the sun vs the matched constant-variance control
+(same average spread; only the timing differs). This is the ruin edge as who-actually-lives.
+
+Result (behavioral_sun.png). The lifeline is realized:
+  - Reserve needed at dusk for >=50% night survival: sun 0.54 vs constant 0.58 -- under the dark
+    dusk's high variance an organism survives the night from a LOWER reserve.
+  - Survival advantage (sun - constant) is positive across the whole desperate band (reserve
+    0.30-0.64), peaking +0.25 at reserve 0.56: a behind-schedule forager is ~25 percentage points
+    more likely to live because the dark made foraging erratic exactly when it needed a gamble.
+  - The advantage is EXACTLY ZERO once the reserve is already safe (>= 0.66, where the safe option
+    alone outlasts the night): variance only helps the desperate, never the comfortable. This is
+    the energy-budget rule's signature, now in survival rather than in choice probability.
+
+Honest notes. (a) The behavioral signal lives in a SINGLE cycle, which is what the DP optimizes;
+over many net-negative cycles everyone eventually dies and an easy economy erases the band
+entirely (safe alone suffices -> never gamble), so the demonstration is deliberately the
+one-cycle dusk cohort. (b) An aggregate P(gamble)-by-time readout was muddier than the survival
+readout -- the clean, decision-relevant quantity is who lives from how little, so that is the
+figure. (c) The advantage curve shows the same reachability-comb sawtooth as the DP (discrete
+gamble); the positive envelope is the result.
+
+Validation: +1 test (test_dusk_survival_lifeline_is_realized_behavior: advantage peaks > 0.1, is
+never a net liability at dusk, and vanishes once the reserve is safe), 82 total; ruff clean.
+Study artifact. New: survival.simulate_dusk_survival; behavioral_sun.py + figure.
