@@ -1576,3 +1576,30 @@ survival signal, no model, no planning). A behavioral regularity (Caraco's energ
 shown to be what survival IMPLIES, SELECTS FOR, and TEACHES -- by planning or by reinforcement.
 
 Validation: simulate_model_free_choice + 1 test (78 total); ruff clean. Study artifact.
+
+---
+
+## 2026-06-04 (cont.) — The day/night SUN as the source of risk (variance, not a hazard)
+
+Closes the Phase 5 loop. Phase 5's sun could not produce risk-sensitivity because its "danger"
+was a stationary DETERMINISTIC hazard, and risk-sensitivity is about VARIANCE. So make the sun
+set the VARIANCE of foraging: steady in full light (midday), erratic in the dark (dawn/dusk),
+mean matched. survival.sun_variance_risky builds per-step risky outcomes {mean-w(t), mean+w(t)}
+with spread w(t) = w_min..w_max tracking darkness; survival_dp_timevarying solves the DP with
+time-varying option distributions. Control = constant variance with the SAME average spread
+(sqrt(mean w^2)), so only the TIMING differs.
+
+Result (studies/risk_sensitivity/sun_variance.py, sun_variance.png): high-variance foraging is a
+LIFELINE near the deadline and a LIABILITY far from it. The RUIN edge (lowest reserve from which
+gambling can still reach the night requirement) under the sun vs constant:
+  t=20 (dusk, getting dark):  sun 0.26  vs  constant 0.38   -> sun LOWER (lifeline)
+  t=0  (dawn, dark, far off):  sun 0.10  vs  constant 0.04   -> sun HIGHER (liability)
+Near the deadline a big-variance gamble can bridge the gap to R (only hope) -> ruin edge drops;
+far from it the downside has all day to bite -> ruin edge rises. The day/night sun puts the high
+variance exactly at DUSK, when a behind-schedule organism most needs the gamble. The Phase 5
+"starving organism accepts night risk" intuition, finally emerging for the right reason
+(variance, not a deterministic hazard). New: survival_dp_timevarying + sun_variance_risky.
+
+Validation: +3 tests (timevarying==constant when fixed; spread peaks in dark, mean matched; dusk
+lifeline), 81 total; ruff clean. Study artifact. (Built in the parent repo; the standalone
+risk-sensitive-foraging carve-out predates this and stays the frozen six-level version.)

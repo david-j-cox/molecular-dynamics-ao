@@ -183,6 +183,23 @@ The same energy-budget rule appears at every level of explanation, from most ass
 | **learned, model-based** (`learning.py`) | within-life learning + planning | discovered, then planned |
 | **learned, model-free** (`model_free.py`) | reinforcement on the survival signal | *nothing* — no model, no planning |
 
+## The sun as the source of risk (`sun_variance.py`)
+
+A synthesis with the day/night work elsewhere in the engine (Phase 5). That sun could not
+produce risk-sensitivity because its "danger" was a *stationary, deterministic* hazard — and
+risk-sensitivity is about variance. So let the sun set the **variance** instead: steady foraging
+in full light (midday), erratic in the dark (dawn/dusk), mean matched
+(`survival.sun_variance_risky` + `survival_dp_timevarying`). Compared to a control with the same
+*average* variance spread evenly, so only the timing differs.
+
+High-variance foraging turns out to be a **lifeline near the deadline and a liability far from
+it**. The ruin edge — the lowest reserve from which gambling can still reach the night
+requirement — drops near dusk under the sun (sun 0.26 vs. constant 0.38: a desperate forager is
+saved by the dark's high variance) but rises at dawn (0.10 vs. 0.04: the downside has all day to
+bite). The day/night cycle puts the high variance exactly at dusk, when a behind-schedule
+organism most needs the gamble — the "starving organism accepts night risk" intuition, emerging
+for the right reason (variance, not a fixed hazard).
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the

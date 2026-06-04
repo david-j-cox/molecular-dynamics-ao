@@ -404,3 +404,47 @@ def simulate_model_free_choice(safe_outcomes, risky_outcomes, day_steps: int, ni
         learned_theta.append(float(centers[prone.max()]) if len(prone) else float("nan"))
     return {"gamble_recall": recall, "survival": survival,
             "learned_theta": learned_theta, "dp_theta": dp_theta}
+
+
+def survival_dp_timevarying(safe_by_step, risky_by_step, night_steps: int, metabolism: float,
+                            cap: float = 1.0, n_egrid: int = 401) -> dict:
+    """Survival DP with TIME-VARYING option distributions over the day.
+
+    ``safe_by_step`` / ``risky_by_step`` are length-``day_steps`` lists, each a list of
+    ``(probability, intake)`` for that day-step -- so the foraging variance can be set by a
+    day/night light cycle (darker -> more variable). Otherwise identical to :func:`survival_dp`
+    (backward DP over day + night, death at E <= 0); returns the same keys.
+    """
+    day_steps = len(risky_by_step)
+    e = np.linspace(0.0, cap, n_egrid)
+    value = (e > 0.0).astype(float)
+    for _ in range(night_steps):
+        value = _survive_next(e, e - metabolism, value, cap)
+
+    q_safe = np.zeros((day_steps, n_egrid))
+    q_risky = np.zeros((day_steps, n_egrid))
+    for t in range(day_steps - 1, -1, -1):
+        qs = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in safe_by_step[t])
+        qr = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in risky_by_step[t])
+        q_safe[t] = qs
+        q_risky[t] = qr
+        value = np.maximum(qs, qr)
+
+    policy_risky = (q_risky > q_safe + 1e-12).astype(float)
+    return {"energy": e, "q_safe": q_safe, "q_risky": q_risky, "policy_risky": policy_risky,
+            "value": value, "night_requirement": float(night_steps * metabolism),
+            "day_steps": day_steps, "night_steps": night_steps, "metabolism": metabolism}
+
+
+def sun_variance_risky(day_steps: int, mean: float, w_min: float, w_max: float):
+    """Per-day-step risky outcomes whose SPREAD tracks darkness (a day/night sun).
+
+    Daylight ``L(t) = sin(pi*(t+0.5)/day_steps)`` is 0 at dawn/dusk and 1 at midday. The risky
+    option is a matched-mean two-point gamble ``{mean - w(t), mean + w(t)}`` with spread
+    ``w(t) = w_min`` in full light (steady foraging) rising to ``w_max`` in the dark (erratic
+    foraging). Returns ``(risky_by_step, daylight)`` for :func:`survival_dp_timevarying`.
+    """
+    light = np.sin(np.pi * (np.arange(day_steps) + 0.5) / day_steps)
+    w = w_min + (w_max - w_min) * (1.0 - light)
+    risky_by_step = [[(0.5, mean - wt), (0.5, mean + wt)] for wt in w]
+    return risky_by_step, light

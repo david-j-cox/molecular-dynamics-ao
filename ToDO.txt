@@ -102,9 +102,18 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     slower/noisier than model-based (recall ~1.0 in ~3 cycles). Individual MC Q-tables are
     high-variance; the population-mean value function is the clean readout. ARC FULLY COMPLETE:
     imposed -> derived -> executed -> evolved -> learned(model-based) -> learned(model-free).
-[ ] Next: day/night modulation of the variance itself (risk x the sun -- the Phase 5 feature
-    drives the risk); richer worlds (continuous outcomes, multi-patch). Evolution thread is now
-    open (selection machinery exists in survival.evolve_risk_policy).
+[x] DAY/NIGHT SUN modulates the VARIANCE (risk x the sun; survival.sun_variance_risky +
+    survival_dp_timevarying, sun_variance.py). Closes the Phase 5 loop: the sun could not make
+    a stationary deterministic hazard risk-sensitive, but it CAN set foraging variance (dark =
+    erratic). High variance is a LIFELINE near the deadline (dusk ruin edge 0.26 vs 0.38) and a
+    LIABILITY far from it (dawn 0.10 vs 0.04). The sun puts variance where the deadline makes it
+    pay -- "starving organism accepts night risk" for the right reason.
+[x] CARVED OUT to a standalone repo for ResearchStaff write-up:
+    ../risk-sensitive-foraging/ (local git, self-contained, 10 tests, 6 study scripts -> figures;
+    the six-level arc frozen as of the model-free result, before the sun-variance synthesis).
+[ ] Next: behavioral population for the sun-variance result (nocturnal desperation foraging as
+    realized behavior, not just the optimal policy); richer worlds (continuous outcomes,
+    multi-patch). Evolution thread open (survival.evolve_risk_policy).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES

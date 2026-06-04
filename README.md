@@ -521,7 +521,11 @@ pre-commit install --hook-type pre-push     # pytest on push
   no model and no planning, still recovering the DP-optimal threshold. The same energy-budget
   rule at six levels (imposed → derived → executed → evolved → learned model-based → learned
   model-free), from progressively fewer assumptions; see `studies/risk_sensitivity/`.
-- [x] **Tests + CI** — 78-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Day/night sun → foraging variance** (`survival.sun_variance_risky`,
+  `survival_dp_timevarying`) — the Phase 5 sun, repurposed to set the *variance* of foraging
+  (dark = erratic) rather than a fixed hazard: high-variance dark foraging is a lifeline near
+  the deadline (the dusk ruin edge drops) and a liability far from it. Closes the Phase 5 loop.
+- [x] **Tests + CI** — 81-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

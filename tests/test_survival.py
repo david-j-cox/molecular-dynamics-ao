@@ -92,3 +92,43 @@ def test_model_free_learner_recovers_the_rule():
     learned = np.array(r["learned_theta"], float)
     dp = np.array(r["dp_theta"], float)
     assert np.nanmean(np.abs(learned - dp)) < 0.1         # threshold ~ DP optimum
+
+
+def test_timevarying_dp_matches_constant():
+    """With constant per-step outcomes, the time-varying DP reproduces the plain DP."""
+    from behavioral_md.survival import survival_dp_timevarying
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    a = survival_dp(safe, risky, 12, 12, 0.03)
+    b = survival_dp_timevarying([safe] * 12, [risky] * 12, 12, 0.03)
+    assert np.allclose(a["policy_risky"], b["policy_risky"])
+
+
+def test_sun_variance_spread_peaks_in_dark():
+    """The sun sets foraging spread: minimal at midday (bright), maximal at dawn/dusk
+    (dark), with the mean matched at every step."""
+    from behavioral_md.survival import sun_variance_risky
+    risky, light = sun_variance_risky(24, 0.05, 0.02, 0.12)
+    spread = np.array([abs(r[1][1] - 0.05) for r in risky])
+    assert spread[light.argmax()] < spread[light.argmin()]      # bright steadier than dark
+    for r in risky:                                             # matched mean each step
+        assert abs(sum(p * d for p, d in r) - 0.05) < 1e-9
+
+
+def test_sun_variance_dusk_lifeline():
+    """High-variance dark dusk lowers the ruin edge (a desperate forager is saved) relative
+    to a constant-variance control with the same average variance."""
+    from behavioral_md.survival import (
+        sun_variance_risky,
+        survival_dp_timevarying,
+    )
+    day, night, metab, s = 24, 24, 0.03, 0.05
+    risky_sun, _ = sun_variance_risky(day, s, 0.02, 0.12)
+    spread = np.array([abs(r[1][1] - s) for r in risky_sun])
+    w = float(np.sqrt(np.mean(spread ** 2)))
+    sun = survival_dp_timevarying([[(1.0, s)]] * day, risky_sun, night, metab)
+    con = survival_dp([(1.0, s)], [(0.5, s - w), (0.5, s + w)], day, night, metab)
+
+    def ruin(res, t):
+        prone = np.where(res["policy_risky"][t] > 0.5)[0]
+        return res["energy"][prone.min()] if len(prone) else np.nan
+    assert ruin(sun, 20) < ruin(con, 20) - 0.05         # dusk: the dark is a lifeline
