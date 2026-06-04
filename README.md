@@ -528,7 +528,12 @@ pre-commit install --hook-type pre-push     # pytest on push
   Realized as behavior (`survival.simulate_dusk_survival`, `behavioral_sun.py`): organisms
   dropped into dusk behind on reserves survive the night from a *lower* reserve under the sun
   (+0.25 peak survival advantage in the desperate band, zero once reserves are safe).
-- [x] **Tests + CI** — 82-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Richer worlds — continuous outcomes + skew** (`survival.skewed_outcomes`,
+  `richer_worlds.py`) — a continuous gamble removes the two-point reachability comb (the band is
+  survival, not the grid), and the energy-budget rule *extends to the third moment*: at fixed
+  mean and variance the skew preference reverses at the requirement (negative skew when building
+  the buffer, positive skew when safe) — a higher-moment effect mean-variance theory can't express.
+- [x] **Tests + CI** — 85-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

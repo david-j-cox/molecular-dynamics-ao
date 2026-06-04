@@ -1639,3 +1639,45 @@ gamble); the positive envelope is the result.
 Validation: +1 test (test_dusk_survival_lifeline_is_realized_behavior: advantage peaks > 0.1, is
 never a net liability at dusk, and vanishes once the reserve is safe), 82 total; ruff clean.
 Study artifact. New: survival.simulate_dusk_survival; behavioral_sun.py + figure.
+
+---
+
+## 2026-06-04 -- Richer worlds: continuous outcomes + the energy-budget rule extended to SKEW
+
+Every risk result so far used a two-point gamble {mean +/- w}. Enough to derive the rule, but it
+costs a discretization artifact (the reachability comb -- R hit only by whole numbers of identical
+lucky draws -> sawtooth band edges) and it cannot ask about the SHAPE of risk beyond variance. A
+continuous distribution (survival.skewed_outcomes: a standardized, warped normal with chosen
+mean, std, and skew sign/strength; survival.outcome_moments to read its moments) fixes both.
+
+Result 1 -- continuous outcomes remove the comb (richer_worlds.py, left panel). The safe-suffices
+(upper) edge of the risk-prone band over the day: two-point roughness (std of step-to-step diffs)
+0.060 -> a clean sawtooth; continuous 0.000 -> perfectly smooth, SAME dusk requirement 0.700. The
+comb was a two-point artifact; the energy-budget band is a property of survival, not the grid.
+(The lower/ruin edge stays jittery regardless -- it is a near-indifference region, an honest
+separate caveat already noted.)
+
+Result 2 -- the energy-budget rule extends to the THIRD moment (right panel). At FIXED mean and
+variance, where mean-variance risk theory predicts INDIFFERENCE, the survival-optimal policy is
+not skew-indifferent, and its preference REVERSES at the requirement, exactly as the variance
+preference does. Gamble's survival edge over safe (q_risky - q_safe), averaged over each regime,
+swept over skewness (x10^-3):
+  BELOW R (building the buffer, time to spare):  left-skew +2.18 -> right-skew -1.94  (DEcreasing)
+  ABOVE R (already safe):                        left-skew -6.28 -> right-skew -0.53  (INcreasing)
+So below R it prefers NEGATIVE skew -- frequent small gains that climb steadily toward R beat the
+all-or-nothing lottery; above R it prefers POSITIVE skew -- i.e. it avoids negative skew, the rare
+catastrophe that is the only thing that can sink a comfortable organism. The two regime curves run
+opposite directions and cross near symmetric: a genuine reversal, not the flat line mean-variance
+predicts.
+
+Why the non-obvious direction, and no contradiction with the dusk lottery. A negative-skew gamble
+is "usually a small gain, rarely a big loss"; below R with time, banking the frequent small gains
+reaches R most reliably, while the positive-skew lottery usually loses ground betting on a rare
+jackpot. This is the MOLAR average over the whole below-R region. In the narrow near-deadline /
+near-ruin corner the positive-skew lottery can still win -- but that is the VARIANCE lifeline of
+the sun-variance study, and here variance is held fixed, isolating the pure skew effect.
+
+Validation: +3 tests (skewed_outcomes fixes mean/variance with skew tracking the parameter;
+continuous removes the comb at the same dusk requirement; skew preference reverses at R -- below
+prefers negative, above prefers positive, opposite orderings), 85 total; ruff clean. Study
+artifact. New: survival.skewed_outcomes + outcome_moments; richer_worlds.py + figure.

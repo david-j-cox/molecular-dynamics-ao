@@ -159,3 +159,56 @@ def test_dusk_survival_lifeline_is_realized_behavior():
     assert adv.max() > 0.1                               # a real lifeline in the desperate band
     assert adv.min() > -0.02                             # never a net liability at dusk
     assert adv[reserves > 0.85].max() < 0.02             # no edge once the reserve is already safe
+
+
+def test_skewed_outcomes_fixes_mean_and_variance():
+    """The continuous skewed distribution holds mean and variance fixed while the skew sign
+    and magnitude track the parameter -- the setup that lets skew be probed where mean-variance
+    theory predicts indifference."""
+    from behavioral_md.survival import outcome_moments, skewed_outcomes
+    for sk in (-1.2, -0.5, 0.0, 0.5, 1.2):
+        m, var, skew = outcome_moments(skewed_outcomes(0.05, 0.06, sk))
+        assert abs(m - 0.05) < 1e-9                       # mean fixed
+        assert abs(var - 0.06 ** 2) < 1e-9               # variance fixed
+        assert np.sign(round(skew, 6)) == np.sign(sk)    # skew sign follows the parameter
+    s_lo = outcome_moments(skewed_outcomes(0.05, 0.06, 0.4))[2]
+    s_hi = outcome_moments(skewed_outcomes(0.05, 0.06, 1.2))[2]
+    assert s_hi > s_lo                                    # stronger parameter -> more skew
+
+
+def test_continuous_outcomes_remove_the_comb():
+    """A continuous gamble removes the two-point reachability comb on the safe-suffices edge,
+    landing on the same dusk requirement -- the band is survival, not the discretization."""
+    from behavioral_md.survival import skewed_outcomes
+    day, night, metab, m, sd = 24, 24, 0.03, 0.05, 0.06
+    tp = risk_threshold(survival_dp([(1.0, m)], [(0.5, m - sd), (0.5, m + sd)],
+                                    day, night, metab, n_egrid=1601))
+    co = risk_threshold(survival_dp([(1.0, m)], skewed_outcomes(m, sd, 0.0),
+                                    day, night, metab, n_egrid=1601))
+    assert np.nanstd(np.diff(co)) < 0.2 * np.nanstd(np.diff(tp))   # comb gone
+    assert abs(np.nanmax(co[-3:]) - np.nanmax(tp[-3:])) < 1e-9     # same dusk requirement
+
+
+def test_skew_preference_reverses_at_the_requirement():
+    """The energy-budget rule extends to the third moment: at fixed mean and variance the
+    survival policy is NOT skew-indifferent, and its preference reverses at the requirement --
+    negative skew preferred below it (steady gains), positive skew above it (catastrophe
+    avoidance)."""
+    from behavioral_md.survival import skewed_outcomes
+    day, night, metab, m, sd = 24, 24, 0.03, 0.05, 0.06
+    R = night * metab
+
+    def regime_adv(sk):
+        res = survival_dp([(1.0, m)], skewed_outcomes(m, sd, sk), day, night, metab, n_egrid=1601)
+        e = res["energy"]
+        adv = res["q_risky"] - res["q_safe"]
+        below = adv[:, (e > 0.05) & (e < R)].mean()
+        above = adv[:, (e > R) & (e < 0.98)].mean()
+        return below, above
+
+    below_left, above_left = regime_adv(-1.2)
+    below_right, above_right = regime_adv(1.2)
+    assert below_left > below_right + 1e-4                # below R: prefers NEGATIVE skew
+    assert above_right > above_left + 1e-4                # above R: prefers POSITIVE skew
+    # The two regimes order oppositely in skew -> a genuine reversal, not a flat (mv) response.
+    assert (below_left - below_right) * (above_left - above_right) < 0

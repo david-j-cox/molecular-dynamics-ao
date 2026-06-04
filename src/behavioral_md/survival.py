@@ -488,3 +488,39 @@ def sun_variance_risky(day_steps: int, mean: float, w_min: float, w_max: float):
     w = w_min + (w_max - w_min) * (1.0 - light)
     risky_by_step = [[(0.5, mean - wt), (0.5, mean + wt)] for wt in w]
     return risky_by_step, light
+
+
+def skewed_outcomes(mean: float, std: float, skew: float, n_points: int = 121,
+                    n_sigma: float = 4.0):
+    """A CONTINUOUS outcome distribution with a chosen mean, std, and skew sign/strength.
+
+    A discretized standard normal ``z`` is warped by ``(exp(skew*z) - 1) / skew`` (which tends
+    to ``z`` as ``skew -> 0``), then standardized so the result has exactly ``mean`` and ``std``
+    regardless of ``skew``. ``skew > 0`` is right-skewed (a rare large gain over frequent small
+    losses -- a "lottery"); ``skew < 0`` is left-skewed (frequent small gains over a rare large
+    loss -- a "disaster"); ``skew == 0`` is a symmetric (Gaussian) gamble. Returned as a list of
+    ``(probability, intake)`` for :func:`survival_dp`, so a *richer* world than the two-point
+    gamble -- it removes the two-point reachability comb and lets skew be probed at fixed
+    mean/variance (where mean-variance theory predicts indifference).
+    """
+    z = np.linspace(-n_sigma, n_sigma, n_points)
+    w = np.exp(-0.5 * z ** 2)
+    w /= w.sum()
+    s = abs(skew)
+    base = z if s < 1e-9 else (np.exp(s * z) - 1.0) / s
+    if skew < 0:
+        base = -base
+    base = base - (w * base).sum()                       # standardize to mean 0, var 1
+    base = base / np.sqrt((w * base ** 2).sum())
+    return list(zip(w, mean + std * base, strict=True))
+
+
+def outcome_moments(outcomes):
+    """Mean, variance, and skewness of a discrete ``[(probability, value), ...]`` distribution."""
+    p = np.array([pi for pi, _ in outcomes])
+    x = np.array([xi for _, xi in outcomes])
+    m = float((p * x).sum())
+    var = float((p * (x - m) ** 2).sum())
+    sd = np.sqrt(var)
+    skew = float((p * ((x - m) / sd) ** 3).sum()) if sd > 0 else 0.0
+    return m, var, skew

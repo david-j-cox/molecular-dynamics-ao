@@ -223,16 +223,50 @@ comfortable. (The clean, decision-relevant readout is survival-from-how-little; 
 P(gamble)-by-time-of-day readout is muddier, dominated by the *dawn* liability — desperate
 organisms avoiding the high-variance dawn gamble — rather than a sharp dusk peak.)
 
+## Richer worlds: continuous outcomes and skew (`richer_worlds.py`)
+
+Every result above used a two-point gamble `{mean ± w}`. Enough to derive the rule, but it costs
+a discretization artifact (the *reachability comb* — the requirement is reachable only by whole
+numbers of identical lucky draws, so the band edges show a sawtooth) and it cannot ask about the
+*shape* of risk beyond variance. A continuous distribution (`survival.skewed_outcomes` — a
+standardized, warped normal with chosen mean, std, and skew) fixes both.
+
+**Continuous outcomes remove the comb** (left panel of `figures/richer_worlds.png`). The
+safe-suffices edge over the day is a sawtooth for the two-point gamble (roughness 0.060) and
+perfectly smooth for a continuous gamble of the same mean and variance (roughness 0.000), landing
+on the same dusk requirement. The energy-budget band is a property of survival, not of the grid.
+
+**The energy-budget rule extends to the third moment** (right panel). At *fixed mean and
+variance* — where mean-variance risk theory predicts indifference — the survival-optimal policy is
+not skew-indifferent, and its preference **reverses at the requirement**, exactly as the variance
+preference does:
+
+```
+gamble's survival edge over safe (×10⁻³), averaged over the regime:
+                          left-skew (disaster)   right-skew (lottery)
+below R (desperate)             +2.18                  −1.94        prefers NEGATIVE skew
+above R (comfortable)           −6.28                  −0.53        prefers POSITIVE skew
+```
+
+Below R, with time to build the buffer, frequent small gains (negative skew) climb toward R more
+reliably than the all-or-nothing lottery. Above R, already safe, the only threat is the rare
+catastrophe, so the policy avoids negative skew. The two regime curves run opposite directions and
+cross near the symmetric gamble — a genuine reversal, not the flat response mean-variance predicts.
+(This is the molar average; in the narrow near-deadline corner the positive-skew lottery can still
+win — but that is the *variance* lifeline of the sun-variance study, and here variance is held
+fixed, isolating the pure skew effect.)
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the
   population; individual Q-tables remain high-variance (the price of no model and no planning).
-  The energy economy and the linear/sigmoid option structure are deliberately minimal; richer
-  worlds (continuous outcomes, multiple patches, the day/night sun modulating the variance
-  itself) are the natural next preparations.
-- The band edges show a fine sawtooth — a real "reachability comb" from the discrete
-  (0 / 2s) gamble: the requirement can only be reached via whole numbers of lucky draws. A
-  smoother outcome distribution fills it in; the envelope is what matters.
+  The energy economy is deliberately minimal; **multiple patches** (risk-sensitive patch choice,
+  joining the MVT work elsewhere in the engine) is the natural next preparation. (The day/night
+  sun modulating the variance, and continuous/skewed outcomes, are now done — see above.)
+- The *upper* (safe-suffices) band edge's sawtooth was a two-point reachability comb and is
+  removed by a continuous outcome distribution (`richer_worlds.py`). The *lower* (ruin) edge still
+  jitters — it is a near-indifference region (both options ≈ 0 survival), not a discretization
+  artifact, so a smoother distribution does not settle it; the envelope is what matters.
 
 ## References
 

@@ -116,8 +116,14 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
     dusk behind on reserves survive the night from a LOWER reserve under the sun than under matched
     constant variance (E50 0.54 vs 0.58); survival advantage +0.25 across the desperate band, and
     exactly 0 once the reserve is already safe -- the ruin-edge lifeline as who actually lives.
-[ ] Next: richer worlds (continuous outcomes, multi-patch). Evolution thread open
-    (survival.evolve_risk_policy).
+[x] RICHER WORLDS pt.1 -- continuous outcomes + skew (survival.skewed_outcomes + outcome_moments,
+    richer_worlds.py). (a) A continuous gamble REMOVES the two-point reachability comb on the
+    safe-suffices edge (roughness 0.060 -> 0.000, same dusk requirement) -- the band is survival,
+    not the grid. (b) The energy-budget rule EXTENDS TO SKEW: at fixed mean & variance (where
+    mean-variance theory predicts indifference) the policy's skew preference REVERSES at R --
+    negative skew below (steady small gains), positive skew above (avoid the rare catastrophe).
+[ ] Next: richer worlds pt.2 -- multiple patches (risk-sensitive patch choice, joining the MVT
+    work). Evolution thread open (survival.evolve_risk_policy).
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
