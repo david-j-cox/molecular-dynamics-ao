@@ -8,6 +8,13 @@ about sensitivity to the **variance** of outcomes, governed by the **energy-budg
 A deterministic hazard has no variance, so the phenomenon could not emerge (see
 `lab_notebook` 2026-06-03/04). Here risk is genuine outcome variance, and it does.
 
+**Where this sits in the literature:** see [`related_work.md`](related_work.md) for a four-strand
+review with DOIs and a per-result novelty map. Bottom line: most of the arc is a faithful
+mechanistic *reproduction* of the McNamara-Houston / Mangel-Clark state-dependent dynamic
+programming program (Stephens 1981; Caraco 1980; Stephens & Krebs 1986; Houston & McNamara 1999),
+not a discovery. The one result that appears anticipated-in-principle but never explicitly stated
+is the **skew-preference reversal** (`richer_worlds.py`) — the result to write up first.
+
 Reproduce: `python experiments/exp030_risk_sensitivity.py`
 
 ## The preparation

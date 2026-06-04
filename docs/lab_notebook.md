@@ -1726,3 +1726,39 @@ Validation: +2 tests (patch choice is the three-way rule: safe above R, rich bel
 below-R-at-dusk; giving-up is finite-horizon: leaves mid-day, stops at the deadline, cutoff earlier
 for costlier travel), 87 total; ruff clean. Study artifact. New: survival.survival_dp_patches +
 survival_dp_depleting; multi_patch.py + figure.
+
+---
+
+## 2026-06-04 -- Literature deep dive: where the risk arc sits (we are mostly NOT first)
+
+Did a four-strand literature review (full report: studies/risk_sensitivity/related_work.md, with
+DOIs and a per-result novelty map). Honest bottom line: most of the arc is a faithful mechanistic
+REPRODUCTION of established theory, and we should frame it that way. The genuinely novel piece is
+the skew-preference reversal.
+
+- Energy-budget rule (risk-prone below R, risk-averse above, reversal at R; R = overnight-fast
+  reserve): ESTABLISHED. Stephens 1981; Caraco 1980/1981; Stephens & Krebs 1986 (z-score model).
+  Anchor to Stephens 1981.
+- Survival-DP derivation (not an imposed utility) + threshold rising toward dusk: ESTABLISHED, the
+  signature move of the McNamara-Houston / Mangel-Clark program. Mangel & Clark 1988; Houston &
+  McNamara 1999; McNamara & Houston 1986/1992; McNamara, Houston & Lima 1994 + Bednekoff & Houston
+  1994 (dusk-loading of reserves). Our distinctiveness is the cross-mechanism collapse
+  (optimal = evolved = learned model-based = model-free) reduced to the single axis R, which the
+  classic single-mechanism papers do not unify.
+- SKEW-PREFERENCE REVERSAL AT R (mean-variance is insufficient; negative skew below, positive above):
+  ANTICIPATED-IN-PRINCIPLE BUT NEVER STATED -- the novel result. The shortfall/z-score objective is
+  whole-distribution and SHOULD be skew-sensitive, but the field assumed NORMAL reserves (skew=0 by
+  assumption; Stephens & Charnov 1982; Lim et al. 2015). Houston & Rosenstrom 2024 (Biol. Rev.)
+  explicitly names deriving RSF for skewed distributions an OPEN frontier. Economics has the pieces
+  separately (prudence/3rd-derivative: Eeckhoudt & Schlesinger 2006; aspiration-modulated skew:
+  Diecidue & van de Ven 2008, Coricelli et al.; animal skew sensitivity: Genest/Stauffer/Schultz
+  2016 PNAS) but nobody unifies them into a survival-objective sign-flip. This is the result to
+  write up first.
+- Multi-patch three-way choice: PARTIALLY anticipated (the rate<->variance interpolation is McNamara
+  & Houston 1992); the 3-patch realization is fresh.
+- Finite-horizon giving-up density: RE-DERIVATION. Closest prior art Tenhumberg et al. 2001 (optimal
+  patch time for TIME-LIMITED foragers -- stay longer as the deadline nears, exactly our mechanism);
+  also Nonacs 2001 (state-dependent MVT), Brown 1988 (GUD/opportunity cost), Charnov 1976 (baseline).
+
+Caveat: Houston & Rosenstrom 2024 and Coricelli et al. were read via abstracts only -- pull full
+texts before any manuscript; they are the two papers most able to weaken the skew novelty claim.
