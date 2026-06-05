@@ -1972,3 +1972,27 @@ docstring's warning ("the tiny per-step energy amounts would otherwise produce n
 is confirmed quantitatively. CONCLUSION: keep the per-event-normalized teaching signal; graded
 remains an opt-in documented-worse alternative (DeltaEnergy graded=True). (Repo hygiene also landed
 today: dev->main merge + v0.1 tag.)
+
+---
+
+## 2026-06-05 -- exp039/exp040: phenomena zoo gaps (cue competition + behavioral contrast)
+
+exp039 (blocking + overshadowing): a minimal trial-based conditioning preparation drives the engine's
+real Rescorla-Wagner rule with two CSs (light = A, cue = B) and the US as the appetitive signal. Both
+classic cue-competition effects emerge ONLY under credit_assignment="rw_competitive" (cues share one
+prediction error) and vanish under "rw_independent":
+- Blocking (pretrain A, then compound A+B): w_B = 0.00 competitive vs 1.00 independent; B alone 1.00.
+- Overshadowing (compound A+B from scratch): w_B = 0.50 (shared) vs 1.00. Locked in by
+  tests/test_cue_competition.py. Default credit scheme is rw_independent, so these are off by default
+  and switched on explicitly.
+
+exp040 (behavioral contrast): added chamber.run_contrast (two-component multiple schedule; one
+component's schedule changes after baseline). Honest negative: contrast does NOT emerge from the
+local mechanism. The chamber's per-component press value and Pavlovian context update only while their
+own component is present, from their own reinforcement -- no cross-component or relative-rate term --
+so with energy clamped (motivation fixed), extinguishing component B leaves A's rate unchanged (A
+ratio 1.00) while B drops 0.66->0.20. A small POSITIVE contrast (A ratio ~1.10) appears only when
+energy is free, via shared deprivation (worse B -> less intake -> more motivation everywhere), a
+molar/motivational route, not the canonical relative-rate or Pavlovian-additivity mechanism.
+test_behavioral_contrast.py locks this in. Open extension: add a relative-reinforcement-rate /
+contextual term to produce associative contrast (flagged, not built -- a modeling decision).

@@ -62,7 +62,14 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
 [x] Resistance-to-change (momentum, exp026); PREE (exp027); demand curves (exp016);
     FR/VR/FI/VI signatures (exp017-019). Resurgence + 4-mechanism mimicry study
     (exp028 + studies/resurgence_mechanisms/).
-[ ] Still open: behavioral contrast; blocking; overshadowing.
+[x] Blocking + overshadowing (exp039 + test_cue_competition): emerge from credit_assignment=
+    "rw_competitive" (shared prediction error); vanish under rw_independent. Blocking w_B 0.00 vs
+    1.00; overshadowing w_B 0.50 vs 1.00.
+[~] Behavioral contrast (exp040 + test_behavioral_contrast; chamber.run_contrast): DOES NOT emerge
+    from the local per-component mechanism (no cross-component/relative-rate term) -- with motivation
+    fixed, extinguishing one component leaves the other unchanged (ratio 1.00). A small POSITIVE
+    contrast (ratio ~1.10) appears only via shared deprivation when energy is free. Open extension:
+    add a relative-reinforcement-rate / contextual term if associative contrast is wanted.
 [ ] Run the battery across parameter ranges as standing model-validity evidence.
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)

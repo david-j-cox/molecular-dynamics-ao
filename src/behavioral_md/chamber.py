@@ -411,6 +411,89 @@ def run_multiple_schedule(vi_params, cfg: ChamberConfig, n_org: int,
             "n_disruption": n_disruption, "vi": vi}
 
 
+def run_contrast(vi_baseline, cfg: ChamberConfig, n_org: int, comp_steps: int,
+                 n_baseline: int, n_phase2: int, *, changed: int = 1,
+                 manipulation: str = "extinction", vi_phase2: float | None = None,
+                 clamp_energy: bool = True, seed: int = 0):
+    """Behavioral contrast in a two-component multiple schedule.
+
+    Both components run the same baseline VI (``vi_baseline``) for ``n_baseline`` sessions; then for
+    ``n_phase2`` sessions the ``changed`` component (default 1) switches schedule while the other is
+    held constant. ``manipulation`` is 'extinction' (changed component reinforcement withheld) or
+    'enrich' (changed component runs richer ``vi_phase2``). Behavioral contrast is a shift in the
+    UNCHANGED component's response rate in the opposite direction to the change (positive contrast:
+    its rate rises when the other component worsens).
+
+    ``clamp_energy`` separates two possible routes: with energy held at init (True) motivation is
+    constant, so any contrast is associative; with energy free (False) a worsened component lowers
+    total intake and raises deprivation, a shared-motivation route. The engine's per-component value
+    and context are local (no cross-component term), so associative contrast is not expected; this
+    function makes that testable. Returns per-session, per-component press and reinforcement rate.
+    """
+    rng = np.random.default_rng(seed)
+    k = 2
+    vi_base = float(vi_baseline)
+    other = 1 - changed
+    n_sessions = n_baseline + n_phase2
+
+    v = np.zeros((n_org, k))
+    ctx = np.zeros((n_org, k))
+    energy = np.full(n_org, cfg.energy_init)
+    alpha = 1.0 / cfg.act_tau
+    press_rate = np.zeros((n_sessions, k))
+    reinf_rate = np.zeros((n_sessions, k))
+
+    for s in range(n_sessions):
+        phase2 = s >= n_baseline
+        for c in range(k):
+            # component schedule for this session
+            extinguish = phase2 and c == changed and manipulation == "extinction"
+            vi_c = vi_base
+            if phase2 and c == changed and manipulation == "enrich" and vi_phase2 is not None:
+                vi_c = float(vi_phase2)
+            act = np.zeros(n_org)
+            armed = np.zeros(n_org, bool)
+            presses = np.zeros(n_org)
+            reinfs = np.zeros(n_org)
+            for _ in range(comp_steps):
+                if clamp_energy:
+                    energy = np.full(n_org, cfg.energy_init)
+                deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None)
+                deficit = deficit**cfg.deficit_exponent
+                drive = cfg.approach_gain * (
+                    v[:, c] + cfg.ctx_drive_gain * ctx[:, c] + cfg.motiv_strength * deficit
+                )
+                act = np.clip((1.0 - alpha) * act + alpha * drive, -10.0, 10.0)
+                p_press = 1.0 / (1.0 + np.exp(-(act - cfg.emission_bias) / cfg.temperature))
+                press = rng.random(n_org) < p_press
+
+                armed |= rng.random(n_org) < (1.0 / vi_c)
+                reinforced = press & armed & (not extinguish)
+                armed = armed & (~reinforced)
+
+                energy = energy - cfg.basal_metabolism - press * cfg.press_cost
+                energy = np.clip(energy + reinforced * cfg.food_energy, 0.0, cfg.energy_capacity)
+
+                mass = 1.0 + cfg.momentum_mass_gain * ctx[:, c]
+                v[:, c] = np.where(
+                    reinforced, v[:, c] + cfg.learning_rate * (cfg.reinf_asymptote - v[:, c]),
+                    v[:, c] - (cfg.value_extinction / mass) * v[:, c],
+                )
+                ctx[:, c] = np.where(
+                    reinforced,
+                    ctx[:, c] + cfg.ctx_learning_rate * (cfg.ctx_asymptote - ctx[:, c]),
+                    ctx[:, c] - cfg.ctx_omission_rate * ctx[:, c],
+                )
+                act = np.where(reinforced, 0.0, act)
+                presses += press
+                reinfs += reinforced
+            press_rate[s, c] = (presses / comp_steps).mean()
+            reinf_rate[s, c] = (reinfs / comp_steps).mean()
+
+    return {"press_rate": press_rate, "reinf_rate": reinf_rate, "n_baseline": n_baseline,
+            "n_phase2": n_phase2, "changed": changed, "other": other}
+
+
 def run_pree(reinf_prob: float, cfg: ChamberConfig, n_org: int, n_train: int,
              n_ext: int, sess_steps: int, seed: int = 0):
     """Single response: acquire under reinforcement probability ``reinf_prob`` then
