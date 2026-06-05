@@ -5,7 +5,7 @@
 A Python framework that models an organism interacting with an environment using
 an analogy to **molecular dynamics**, built to stay **objective and
 non-mentalistic**: every term reduces to something measurable (energy expended,
-distance moved, stimulus intensity, response strength), never a posited internal
+distance moved, stimulus intensity, response rate/probability), never a posited internal
 state.
 
 The organism is **not** a reinforcement-learning policy. It is a *distributed
@@ -14,6 +14,15 @@ Environmental stimuli act as **force fields**; learning history changes the
 forces those stimuli produce; behavior emerges from integrating the coupled
 dynamics over time. Survival is governed by an **energy budget** drawn from
 behavioral ecology.
+
+## See it run
+
+![One organism foraging](docs/media/organism_life.gif)
+
+*A trained organism foraging in the gridworld (left): its position and recent trail, the
+food/danger/light/cue sources, and the current action and most-active atom each step; the energy
+reserve (right) dips toward starvation, then recovers on feeding. Nothing here is scripted, the path
+is read out from the coupled atom dynamics. Regenerate with `python scripts/run_animation_demo.py`.*
 
 ---
 
@@ -27,7 +36,7 @@ action) is read out from the atom activations.
 | Engine term | Behavioral meaning (objective) |
 |---|---|
 | observation | sensory stimulation available to the organism |
-| atom activation | response strength / response tendency |
+| atom activation | momentary probability of emitting the response (a model variable) |
 | mass | behavioral inertia, resistance to change |
 | force | current effective behavioral pull of the stimulus context given history |
 | history weight | learning history (accumulated effect of consequences) |

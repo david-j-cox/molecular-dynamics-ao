@@ -396,7 +396,10 @@ VISUALIZATION (visualization.py)
 [x] Generalization gradient (response vs cue value, 95% CI).
 [x] Matching plots: plot_matching (GML log-log), plot_matching_cod, peak shift.
 [x] Death-pattern plots: survival curve, time-to-death, mortality-by-life.
-[ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
+[x] Animated GIF of a life so people can SEE the engine run (visualization.animate_life +
+    scripts/run_animation_demo.py): arena with organism + trail, sources, current action +
+    top atom, energy reserve over time. Committed to docs/media/ and embedded in the README.
+[ ] Optional pygame (interactive) render -- the GIF covers the "see it" need for now.
 
 DEMOS (scripts/)
 ----------------
