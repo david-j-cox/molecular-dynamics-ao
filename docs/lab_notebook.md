@@ -1762,3 +1762,47 @@ the skew-preference reversal.
 
 Caveat: Houston & Rosenstrom 2024 and Coricelli et al. were read via abstracts only -- pull full
 texts before any manuscript; they are the two papers most able to weaken the skew novelty claim.
+
+---
+
+## 2026-06-04 -- Acquisition tuning sweep (exp031); amplify the controlled demo
+
+Goal (ToDo TUNING/QUALITY): amplify the acquisition effect on the controlled layout and reduce
+bimodal reach-failure, to decide final defaults. New harness experiments/exp031_acquisition_tuning.py
+fans (combo x seed) agents over the parallel pool; per combo reports drop (early-late latency),
+late_reach (reliability), death (mostly starvation). Grids: coarse (learning magnitude/directedness/
+intake), survival (reach-failure levers), confirm + final (higher-N before/after).
+
+FINDINGS:
+- reinforcement_asymptote 1.0 -> 2.0 is the ONE clean amplifier: raising the learned-weight ceiling
+  gives the learned approach more behavioral leverage. drop 63 -> 73, late_reach 0.84 -> 0.90, and
+  death even drops slightly 0.75 -> 0.70 (N=80 confirm). Pure win on all three.
+- learning_rate higher is WORSE, not better: lr 0.1/0.2 give NEGATIVE drop and ~90% death -- it
+  drives history weights to the [-5,5] clip and the damped-Verlet dynamics go erratic (less directed
+  softmax). 0.05 is near-optimal. The amplification lever is the asymptote, not the rate.
+- Death (~0.70) is almost entirely STARVATION (danger ~0.01); it is the single-patch economy, not a
+  bug. A perfect camper survives (sustainable intake ~regrowth 0.016/step > rest cost 0.006), but
+  deficit-gated drive lets a fed organism wander, drain, and sometimes fail to return in time --
+  the bimodal tail. The never-reach part of reach-failure is now ~10% (late_reach 0.90).
+- The reach-failure levers TRADE OFF against the signal or the risk mechanism:
+    move_cost 0.005->0.003: death 0.70->0.65 only, but drop collapses 73->43 (easy survival = small
+      visible learning). Not worth it; keep 0.005.
+    food_intake 0.05->0.08: death down a little, drop down more. Keep 0.05.
+    innate_food 0.2->0.25/0.3: negligible. Keep 0.2 (clearly learning-driven).
+    deficit_exponent 2.0->1.0 (linear hunger): lowers death, BUT p=2 convex marginal value is the
+      mechanism behind risk-proneness-when-starving (risk arc / planned capstone). Do NOT change it.
+
+DECISION (final defaults):
+- Amplify the CONTROLLED DEMO only: scripts/run_demo.py now sets reinforcement_asymptote=2.0
+  (REINF_ASYMPTOTE). Confirmed at N=100: latency 131 -> 56 (drop 75), reach 0.62 -> 0.90, mortality
+  0.70 (now printed). This is exactly "amplify the acquisition effect on the controlled layout."
+- Do NOT promote lambda=2.0 to the GLOBAL default: lambda=1.0 is the conventional RW reinforcer
+  asymptote and is load-bearing for extinction/generalization/momentum baselines; a global change
+  would drift the whole battery. softmax_temperature stays 0.3 (matching default); deficit_exponent
+  stays 2.0 (risk mechanism); move_cost stays 0.005. Engine defaults unchanged.
+- Tests: 85/85 pass (engine untouched; only the demo + new exp031 changed). Reproduce baseline
+  regenerated to capture the new run_demo output.
+
+STILL OPEN: (a) whether the learning signal should be graded by energy vs normalized per-event
+(ToDo item, not yet investigated); (b) global-default promotion of the asymptote remains a candidate
+if a battery re-baseline is wanted later.

@@ -20,13 +20,28 @@ TUNING / QUALITY (current foraging model)
     approach_food sensitivity) recovers a clean acquisition curve (latency to
     food 152 -> 106 over 40 lives). So learning works; random layout just
     swamps the signal.
-[ ] Amplify the acquisition effect size on the controlled layout (sweep
-    learning_rate, reinforcement_asymptote, energy costs, food_intake_rate).
-[ ] Reduce bimodal reach-failure (some agents never lock onto food and die):
-    reach reliability, initial search, possibly state-dependent exploration.
-[ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
+[x] Amplify the acquisition effect size on the controlled layout (exp031 sweep).
+    WINNER: reinforcement_asymptote 1.0 -> 2.0 (learned-weight ceiling = more
+    behavioral leverage for the LEARNED approach). run_demo now sets it (REINF_
+    ASYMPTOTE=2.0): latency 131->56 (drop 63->75), late reach 0.84->0.90, death
+    0.75->0.70. KEY: higher learning_rate is WORSE (lr 0.1/0.2 -> negative drop,
+    ~90% death: weights hit the clip, dynamics go erratic). See lab_notebook 2026-06-04.
+[~] Reduce bimodal reach-failure. Never-reach down to ~10% (late reach 0.90) via
+    the asymptote amplifier. Residual mortality ~0.70 is STARVATION, an inherent
+    single-patch-economy bound, not a bug (danger deaths ~0.01). Levers that cut it
+    trade against the signal or the risk mechanism: move_cost 0.005->0.003 only
+    lowers death 0.70->0.65 but collapses the drop 73->43; deficit_exponent->1.0
+    lowers death but breaks the convex marginal-value (p=2) risk mechanism. Left as
+    documented tension; not chased further. (Multi-patch economy is the real fix --
+    see PHASE 5 multi_patch, where leaving a spent patch makes survival attainable.)
+[x] Decide final defaults from a large parallel sweep (exp031). DECISION: amplify
+    the controlled DEMO only (asymptote=2.0); keep ENGINE defaults unchanged --
+    lambda=1.0 (conventional, load-bearing for extinction/generalization/momentum),
+    softmax_temperature=0.3 (matching), deficit_exponent=2.0 (risk), move_cost=0.005.
+    85/85 tests pass; reproduce baseline regenerated. (Global lambda=2.0 remains a
+    candidate iff a full battery re-baseline is wanted later.)
 [ ] Revisit whether learning signal should be graded by energy (vs normalized
-    per-event) while keeping objectivism.
+    per-event) while keeping objectivism.  [still open -- not investigated in exp031]
 
 PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------
