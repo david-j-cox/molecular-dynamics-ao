@@ -210,24 +210,35 @@ F_i = sensory_i + history_i + motivational_i + coupling_i - fatigue_i
 **Convex marginal value of energy** (state-dependent foraging): a depleted
 reserve produces stronger food-seeking, because energy is worth more nearer the
 death boundary:
+
+```math
+g(E) = \mu \left(1 - \frac{E}{E_\text{cap}}\right)^{p}, \qquad p \ge 1\ \text{(convex)}
 ```
-g(E) = motivational_strength * (1 - E/E_cap) ** deficit_exponent      (deficit_exponent ≥ 1, convex)
-```
+
+with `μ = motivational_strength` and `p = deficit_exponent`.
 
 **Damped Verlet integration** (driven, dissipative dynamics; the overdamped
 regime makes activation track current drive like a leaky accumulator, and gives
 a Brunt–Väisälä-type restoring/relaxation reading):
-```
-v_i        = (x_i(t) - x_i(t-dt)) / dt
-F_net      = F_i - c * v_i                              (c = damping_coef; c=0 -> literal pure Verlet)
-x_i(t+dt)  = 2*x_i(t) - x_i(t-dt) + (F_net / m_i) * dt^2
-x_i(t+dt)  = clip(x_i(t+dt), activation_min, activation_max)
+
+```math
+\begin{aligned}
+v_i &= \frac{x_i(t) - x_i(t-dt)}{dt}, \qquad F_\text{net} = F_i - c\,v_i \\
+x_i(t+dt) &= 2\,x_i(t) - x_i(t-dt) + \frac{F_\text{net}}{m_i}\,dt^2 \\
+x_i(t+dt) &\leftarrow \operatorname{clip}\!\big(x_i(t+dt),\ x_{\min},\ x_{\max}\big)
+\end{aligned}
 ```
 
+with `c = damping_coef` (`c=0` → literal pure Verlet); activations are clipped to
+`[activation_min, activation_max]`.
+
 **Action emission (Luce choice rule / matching law).** Over the action atoms:
+
+```math
+P(a) = \frac{\exp(x_a / T)}{\sum_b \exp(x_b / T)}
 ```
-P(action a) = exp(x_a / T) / Σ_b exp(x_b / T)           (T = softmax_temperature; T->0 -> argmax)
-```
+
+with `T = softmax_temperature` (`T → 0` → argmax).
 
 **Energy budget (objective bookkeeping).** Each step:
 ```
@@ -239,22 +250,28 @@ death (episode ends) when E <= 0     (cause: starvation, or danger if in contact
 ```
 
 **Eligibility trace (temporal weighting of credit).** Recency-weighted:
+
+```math
+e_i(t) = \gamma\, e_i(t-1) + x_i(t)
 ```
-e_i(t) = eligibility_decay * e_i(t-1) + x_i(t)          (sweet spot ~0.9-0.95; 0.99 too long)
-```
+
+with `γ = eligibility_decay` (sweet spot ~0.9-0.95; 0.99 is too long).
 
 **Learning (two-tier, valence-split Rescorla–Wagner).** The consequence model
 splits the consequence into `(appetitive, aversive)` teaching signals.
 Approach-valence drives learn from `appetitive` (reinforcement), avoid-valence
 drives from `aversive` (punishment); both *strengthen* the disposition (valence
 handles direction in the expression). For drive atom `i` over present channels
-`s`:
+`s`, with teaching magnitude `mag = appetitive if valence_i > 0 else aversive`:
+
+```math
+\underbrace{\Delta w_i[s] = \eta\, e_i\, I_s\,(\lambda\,\text{mag} - V_\text{pred})}_{\text{RW}}
+\qquad
+\underbrace{\Delta w_i[s] = \eta\,\text{mag}\, e_i\, I_s}_{\text{linear}}
 ```
-mag = appetitive if valence_i > 0 else aversive
-RW:      Δw_i[s] = lr * e_i * I_s * (λ * mag - V_pred)
-linear:  Δw_i[s] = lr * mag * e_i * I_s
-w_i[s]  = clip(w_i[s] + Δw_i[s], history_weight_min, history_weight_max)
-```
+
+with `η = lr`, `λ` the asymptote, `V_pred` the prediction, and `w_i[s]` clipped to
+`[history_weight_min, history_weight_max]`.
 `credit_assignment` selects how `V_pred`/channels are handled:
 `rw_independent` (per-channel error; enables cue conditioning/generalization),
 `rw_competitive` (shared error → blocking/overshadowing), `source_only`.
