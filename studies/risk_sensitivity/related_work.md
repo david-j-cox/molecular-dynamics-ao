@@ -96,17 +96,32 @@ explicitly derived or stated:**
   skew-sensitive — but the field collapsed it to mean-variance by assuming **normally distributed**
   reserves, so skew was assumed away (identically zero), never studied. Lim et al. (2015) state the
   normality assumption on the record.
-- **Houston & Rosenstrom (2024)** (*Biological Reviews*) explicitly flags deriving RSF predictions
-  for **skewed** reward distributions as an *open frontier* — confirming the gap is current,
-  recognized, and unfilled. This is the citation most capable of weakening a strong novelty claim;
-  **read the full text before any manuscript.**
+- **Houston & Rosenstrom (2024)** (*Biological Reviews*) — full text now read (refs/; see
+  `novelty_reconciliation.md`). CORRECTION to an earlier abstract-based claim: they do **not** flag
+  skew as the open frontier. They state (Section V.5) that they **derive RSF predictions for skewed
+  reward distributions in their Supporting Information Appendix S4**, citing **Caraco & Chasin 1984**
+  ("Foraging preferences: response to reward skew," *Anim. Behav.* 32:76-85, juncos -- empirical).
+  The open problem they actually name is the *general* mechanistic/evolutionary account and the use
+  of **choice sequences** ("the devil is in the sequence") -- which motivates our sequence-recovery
+  work, not the skew claim. **Appendix S4 now read** (refs/): it derives the skew reversal at the
+  threshold via a 3rd-order Taylor expansion of the value function (Vxx, Vxxx -- the prudence
+  mechanism) -- negative skew preferred below xs+nu*sqrt(s), positive above, positive again in the
+  far rare-event tail, with a twin-threshold version (4th inflection point near reproduction). So
+  **the skew-reversal-at-the-requirement is established theory; our result reproduces/validates it.**
+  Caraco & Chasin 1984 (single-threshold optimal skew, empirical) still to obtain for the exact 1984
+  wording, but S4 already characterizes it; not a gate. The genuinely open ground to lead with: an
+  exact global all-moments phase diagram (S4 is local-Taylor only), a derived kurtosis/temperance
+  prediction (S4 stops at the 3rd moment), the cross-mechanism collapse to a single axis R, and
+  sequence-based recovery/identifiability of R (H&R's own stated open problem).
 - Economics/psychology establish both halves *separately* but never unify them into a
   survival-objective derivation with our specific sign-flip: aspiration-level kinks make choice
   depend on more than mean-variance (**Friedman & Savage 1948**; **Lopes 1987** SP/A theory;
   **Diecidue & van de Ven 2008**); the **prudence / third-derivative** mechanism explains *why* a
-  survival kink induces skew sensitivity (**Eeckhoudt & Schlesinger 2006**); aspiration position
-  modulates skew preference behaviorally (**Coricelli, Diecidue & Zaffuto** — closest economics
-  analog, verify full text); skewness-seeking is robust in humans (**Golec & Tamarkin 1998**;
+  survival kink induces skew sensitivity (**Eeckhoudt & Schlesinger 2006**); in human choice an
+  aspiration-level heuristic and a uniform positive-skew preference coexist as two *decoupled*
+  strategies, with no requirement-crossing sign reversal (**Coricelli, Diecidue & Zaffuto 2018** --
+  full text read; closest economics analog, contrast cite); skewness-seeking is robust in humans
+  (**Golec & Tamarkin 1998**;
   **Astebro et al. 2015**) and animals discriminate skew at matched mean+variance
   (**Genest, Stauffer & Schultz 2016**, *PNAS*, monkeys).
 - Defensive cite: **Olschewski et al. 2024** (*PNAS*) — in decisions-from-experience, apparent
