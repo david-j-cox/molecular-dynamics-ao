@@ -64,12 +64,20 @@ class DeltaEnergy(ConsequenceModel):
     """
 
     danger_loss: float = 0.15
+    graded: bool = False         # if True, grade the appetitive signal by the amount eaten
+    graded_scale: float = 0.05   # intake mapping to a unit signal (~ food_intake_rate)
 
     def energy_delta(self, event: ConsequenceEvent) -> float:
         return event.food_intake - self.danger_loss * event.danger_contact
 
     def learning_signals(self, event: ConsequenceEvent) -> tuple[float, float]:
-        appetitive = 1.0 if event.food_intake > 0.0 else 0.0
+        # appetitive: normalized per event (default) or graded by amount eaten (objective: a
+        # depleted patch yields less food AND less learning). graded stays bounded because
+        # intake is capped by food_intake_rate ~= graded_scale.
+        if self.graded:
+            appetitive = event.food_intake / self.graded_scale if event.food_intake > 0.0 else 0.0
+        else:
+            appetitive = 1.0 if event.food_intake > 0.0 else 0.0
         aversive = 1.0 if event.danger_contact > 0.0 else 0.0
         return appetitive, aversive
 

@@ -40,8 +40,12 @@ TUNING / QUALITY (current foraging model)
     softmax_temperature=0.3 (matching), deficit_exponent=2.0 (risk), move_cost=0.005.
     85/85 tests pass; reproduce baseline regenerated. (Global lambda=2.0 remains a
     candidate iff a full battery re-baseline is wanted later.)
-[ ] Revisit whether learning signal should be graded by energy (vs normalized
-    per-event) while keeping objectivism.  [still open -- not investigated in exp031]
+[x] Revisit whether learning signal should be graded by energy vs normalized per-event
+    (exp038): NORMALIZED is correct. Grading the appetitive signal by amount eaten
+    (intake/food_intake_rate, still objective) COLLAPSES acquisition (drop +73 -> -110,
+    late reach 0.90 -> 0.18, death 0.70 -> 0.94), because intake is biomass-limited and the
+    patch depletes, so the graded signal shrinks toward 0 as the patch is eaten and the
+    approach weight never builds. DeltaEnergy(graded=True) is kept as an opt-in (default off).
 
 PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------

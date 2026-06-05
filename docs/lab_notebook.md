@@ -1954,3 +1954,21 @@ Verlet-on-position starves with no feeds; two competing Verlet atoms flatline; d
 Figure outputs/figures/exp037_spatial_survival_choice.png (blue imposed, green no-travel REPRODUCES,
 red travel INVERTS). The travel-cost result is worth its own study: when does spatial risk-sensitivity
 match vs invert the non-spatial energy-budget rule? exp037 ruff-clean, runs as a module.
+
+---
+
+## 2026-06-05 -- exp038: learning signal should be NORMALIZED per event, not graded by amount
+
+Resolved the open engine-quality question. Added DeltaEnergy(graded=...) (default OFF, so the engine
+and reproduce baseline are unchanged; 85/85 tests pass). Compared on the controlled acquisition
+protocol (run_demo setup: fixed layout, weak innate food, reinforcement_asymptote=2.0):
+  normalized (default): early_lat 129 -> late 56, drop 73.2, late reach 0.90, death 0.70.
+  graded by amount (intake/food_intake_rate): early 140 -> late 250, drop -110, late reach 0.18,
+    death 0.94.
+Graded COLLAPSES acquisition. Cause: intake is biomass-limited and the patch depletes, so the graded
+appetitive signal shrinks toward 0 as the patch is eaten -> the approach history weight never builds
+-> the organism stops learning to approach -> reach collapses, mortality rises. The DeltaEnergy
+docstring's warning ("the tiny per-step energy amounts would otherwise produce negligible learning")
+is confirmed quantitatively. CONCLUSION: keep the per-event-normalized teaching signal; graded
+remains an opt-in documented-worse alternative (DeltaEnergy graded=True). (Repo hygiene also landed
+today: dev->main merge + v0.1 tag.)
