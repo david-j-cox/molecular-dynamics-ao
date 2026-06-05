@@ -879,13 +879,13 @@ def animate_life(df: pd.DataFrame, path, grid_size: int = 10, fps: int = 12, tra
     ax.set_yticks(range(grid_size))
     ax.grid(True, color="0.9", lw=0.6)
     ax.set_axisbelow(True)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     for name, (sx, sy) in sources.items():
         color, marker, label = _ANIM_SOURCE_STYLE[name]
         ax.scatter([sx], [sy], s=180, c=color, marker=marker, edgecolors="k",
                    linewidths=0.6, label=label, zorder=3)
-    ax.legend(loc="upper left", fontsize=9, framealpha=0.9)
+    # legend in a horizontal row ABOVE the arena so it never overlaps the behavior
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=4, fontsize=9,
+              frameon=False, handletextpad=0.3, columnspacing=1.2)
     (trail_line,) = ax.plot([], [], "-", color="tab:blue", alpha=0.45, lw=2, zorder=4)
     (dot,) = ax.plot([], [], "o", color="tab:blue", ms=14, zorder=5)
     overlay = ax.text(0.02, -0.13, "", transform=ax.transAxes, fontsize=11, va="top")

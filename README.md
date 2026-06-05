@@ -21,8 +21,9 @@ behavioral ecology.
 
 *A trained organism foraging in the gridworld (left): its position and recent trail, the
 food/danger/light/cue sources, and the current action and most-active atom each step; the energy
-reserve (right) dips toward starvation, then recovers on feeding. Nothing here is scripted, the path
-is read out from the coupled atom dynamics. Regenerate with `python scripts/run_animation_demo.py`.*
+reserve (right) dips toward starvation on the trek to food, then the organism reaches the patch and
+sustains a full reserve by foraging it. Nothing here is scripted, the path is read out from the
+coupled atom dynamics. Regenerate with `python scripts/run_animation_demo.py`.*
 
 ---
 
