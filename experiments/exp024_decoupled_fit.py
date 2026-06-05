@@ -131,8 +131,8 @@ def main() -> None:
     for label, x, y, c in pts:
         ax.scatter([x], [y], s=60, color=c, zorder=3)
         ax.annotate(label, (x, y), textcoords="offset points", xytext=(8, 4), fontsize=10)
-    ax.set_xlabel("rate sensitivity a_rate")
-    ax.set_ylabel("amount sensitivity a_amt")
+    ax.set_xlabel("Rate sensitivity (a_rate)")
+    ax.set_ylabel("Amount sensitivity (a_amt)")
     ax.set_title("Independent control of the two matching sensitivities")
     ax.axhline(ta0, color="0.85", lw=0.5)
     ax.axvline(tr0, color="0.85", lw=0.5)

@@ -1353,3 +1353,604 @@ embodied ConsequenceModel) deferred.
 Validation: +6 tests (run_punishment_choice suppression/dissociation/a_p; Subtractive/
 Concatenated/dispatch) -> 65 pass; ruff clean; reproduce baseline recaptured 36/36 (exp029
 added; exp001-028 + demos byte-identical -- all changes additive/opt-in).
+
+---
+
+## 2026-06-03 (cont.) — Phase 5 day/night ambient sun: feature done, risk-sensitivity does NOT emerge (and why)
+
+Added a global ambient sun to the gridworld env: L(t) = 0.5*(1 - cos(2*pi*(t mod
+steps_per_day)/steps_per_day)) in [0,1] (0 = midnight, 1 = noon),
+gridworld.ambient_light. Opt-in (config.day_night, default False -> byte-identical;
+run_demo --check clean). When on, light GRADES PERCEPTION, not the physical consequences:
+sensed danger = danger_true*(danger_detect_floor + (1-floor)*L) and food
+visibility/regrowth scale by (food_light_floor + (1-floor)*L), while actual danger
+contact and food intake still use TRUE proximity. New obs key "ambient_light"; logged in
+info. 4 env tests; ruff clean.
+
+GOAL was "risk-sensitive foraging: a starving organism accepts night risk." It does NOT
+emerge, and the reason is instructive (two parts):
+
+1. TUNING / mechanism. danger_detect_floor is behaviorally INERT -- foraging is
+   byte-identical across floors 0.1/0.5/1.0 (day 200, night 160, to the integer). The
+   deficit-scaled approach drive (motiv_strength*deficit^2, up to ~2.0) dwarfs the innate
+   avoidance (sensitivity*intensity ~= 1.0*small), and the consummatory atom holds the
+   organism at the patch, so gating how well it PERCEIVES the danger changes nothing. I
+   also under-set the harm: danger_energy_loss=0.05 in the Phase 5 runs = 1 feeding-step =
+   trivial (default 0.15 = 3 feeding-steps = 15% of reserve). An earlier 1.93-vs-1.17
+   night/day reading was sampling noise across different agent counts; with matched seeds
+   the floors are identical.
+
+2. CONCEPTUAL (the deeper reason). Our "risk" is STATIONARY and DETERMINISTIC: a fixed
+   location, constant magnitude, contact = 1.0/0.0 (no probability, no variance). Only the
+   DETECTABILITY varies with light. But risk-sensitive foraging (Caraco 1980; Stephens &
+   Krebs) is about sensitivity to the VARIANCE of outcomes, governed by the energy-budget
+   rule (risk-prone below the requirement, risk-averse above). We never had "risk" in that
+   sense -- we had a deterministic hazard whose perceptibility changes (an information
+   manipulation, not a variance one). The phenomenon cannot emerge because outcome variance
+   is not in the model.
+
+What DOES emerge from the feature is a food-visibility foraging tendency (food dim at night
+-> less night foraging), but it is extreme (night ~ 0 when the floor is low) and trivial,
+so it is not committed as a demo.
+
+PATH FORWARD (for genuine risk-sensitivity): introduce PROBABILISTIC / variance risk -- a
+risky patch where predation strikes with probability p and removes a large chunk of energy
+(high variance) vs a safe patch with a low steady return (matched mean), and test the
+energy-budget rule (risk-prone when starving). This is a patch-CHOICE prep (cf. the
+matching/chamber machinery), not the single fixed-danger gridworld. Day/night could then
+modulate either the predation probability or its detectability. The env sun feature is
+committed and reusable; the risk model is what needs redesigning.
+
+---
+
+## 2026-06-04 — Risk-sensitive foraging done RIGHT: the energy-budget rule (Caraco)
+
+Follow-up to the Phase 5 finding. The reason risk-sensitive foraging didn't emerge there
+was conceptual: a stationary DETERMINISTIC hazard has no variance, and risk-sensitive
+foraging (Caraco 1980; Stephens & Krebs) is about sensitivity to OUTCOME VARIANCE under the
+energy-budget rule. Built the proper version (chamber.run_risk_choice) and it works cleanly.
+
+A concurrent choice between a SAFE option (constant outcome) and a RISKY option (variable,
+MATCHED MEAN), with energy dynamics + a real death boundary (E<=0 fatal). The organism
+chooses by softmax over the EXPECTED SURVIVAL UTILITY of each option at its CURRENT energy:
+U(E) = logistic((E - e_req)/width) ~ P(survive). U is CONVEX below the requirement, CONCAVE
+above -> by Jensen the risky option's mean-preserving spread is favored when starving
+(risk-prone) and disfavored when fed (risk-averse). The preference reverses at e_req -- the
+energy-budget rule, emergent from survival-utility maximization (nothing codes "gamble when
+hungry"). util_shape="linear" is the risk-neutral CONTROL.
+
+Two preparations (exp030, studies/risk_sensitivity/), both matched to mean +0.05:
+- reward variance:    SAFE +0.05 sure;  RISKY 0 or +0.10 (p=0.5).   reversal +0.31
+- predation variance: SAFE lean +0.05;  RISKY rich +0.0875 but predation strike p=0.2
+                      costs -0.10.                                  reversal +0.54
+Linear control flat at 0.50 in both -> the reversal is the survival-utility curvature, not
+the schedules. P(risky) below vs above e_req: reward 0.65/0.35, predation 0.83/0.29.
+
+Tuning that mattered: the Jensen gap scales with the risky option's VARIANCE relative to the
+utility WIDTH, so the reward spread has to span a meaningful fraction of util_width (small
+spreads gave a ~0.04 swing; spread 0.10 vs width 0.08 gives the full reversal). And the
+economy must be near break-even (mean reward ~= cost) so energy DIFFUSES around e_req and
+organisms visit BOTH sides; otherwise energy piles at capacity (all well-fed, all risk-
+averse) and the reversal is never sampled. The effect is sharpest near e_req where U is most
+curved and washes out at the energy extremes where U saturates (indifference) -- correct: risk
+attitude matters most near the survival margin.
+
+Caveat: the organism is GIVEN the option distributions (an innate state-dependent rule, as in
+Caraco) rather than learning them; e_req/width are parameters, not derived from the horizon.
+A fuller model would learn the distributions and compute U from the actual survival problem.
+
+Validation: +2 chamber tests (70 total); ruff clean; reproduce baseline recaptured with
+exp030; exp001-029 + demos unchanged.
+
+---
+
+## 2026-06-04 (cont.) — Risk-sensitivity DERIVED from survival (not imposed), via a DP
+
+Methodological correction to exp030. There the choice reads option values through an
+ASSUMED survival sigmoid U(E)=logistic((E-e_req)/width); it is that curvature (and the free
+e_req) that produces the energy-budget rule -- we installed the result in the utility. New
+module behavioral_md.survival derives the rule from the bare dynamics already in the engine
+(energy reserve + metabolic drain + hard death at E<=0) with survival as the ONLY objective.
+
+survival_dp: backward DP over one DAY (forage: safe vs risky) + NIGHT (forced fast, no
+choice). P(survive the cycle) from every (energy, time-of-day); the optimal risk policy is
+read straight off it. The "requirement" is NOT a parameter -- it is night_steps*metabolism
+(the reserve needed at dusk to outlast the fast), emergent.
+
+Result (studies/risk_sensitivity/first_principles.py, survival_policy_map.png): the optimal
+policy is a risk-prone BAND, both edges emergent:
+- upper edge (safe already secures survival -> risk-averse above) rises through the day
+  from ~0.19 toward the night requirement R=0.72 at dusk.
+- lower edge = RUIN (even gambling can't reach R -> doomed either way -> indifferent); near
+  zero early, rises late in the day as recovery time runs out.
+
+This answers the objection to exp030's figure (why doesn't P(risky) keep rising the more
+negative things get?). The OPTIMAL policy gambles for EVERY energy inside the band, not a
+moderate slice; risk-proneness is bounded BELOW only by genuine ruin (an emergent edge), not
+by a saturating utility. exp030's bump is what a BOUNDED-RATIONAL chooser (softmax over a
+saturating value) produces -- survival.softmax_policy reproduces it -- but the band and its
+bounds come from survival, not from e_req. The day/night structure (Phase 5) supplies the
+principled requirement: the sun feature finally earns its keep.
+
+Time-dependence is the emergent richness: early day you gamble only if very low (lots of
+recovery time); late day the whole band rises toward R and the ruin floor climbs. A fine
+sawtooth on the edges is a real "reachability comb" (the discrete 0/2s gamble reaches R only
+via whole numbers of lucky draws); a smoother outcome distribution fills it -- the envelope
+is the point.
+
+Next: have the behavioral chamber choose by softmax over the DP-DERIVED survival values
+(first-principles behavioral model) instead of the imposed sigmoid; then learn the
+distributions / let selection shape the rule.
+
+Validation: behavioral_md.survival + 5 tests (75 total); ruff clean. Study artifact (DP is
+deterministic; not added to the reproduce baseline).
+
+---
+
+## 2026-06-04 (cont.) — The energy-budget rule EVOLVES (selection, no utility/DP/learning)
+
+Capstone of the risk arc. exp030 IMPOSED a survival utility; survival_dp DERIVED the policy;
+simulate_survival_choice EXECUTED it behaviorally. survival.evolve_risk_policy removes even
+the planner: a population carries a heritable state-dependent risk trait theta(t)=a+b*(t/day)
+(gamble when E<theta), forages day/night, dies at E<=0, and survivors reproduce with Gaussian
+mutation on (a,b). Selection is the bare survival dynamics -- nothing rewards "gamble when
+hungry".
+
+The rule emerges anyway (studies/risk_sensitivity/evolution.py, evolved_policy.png): the
+time-of-day slope b evolves from ~0 to ~0.31 within ~10 generations, so the evolved threshold
+RISES through the day, and it CONVERGES on the DP-optimal threshold at DUSK (evolved 0.73 vs
+DP 0.70) where the decision matters most and selection is strongest. It is looser at DAWN
+(0.44 vs 0.19) where there is all day to recover and the choice barely affects survival ->
+selection sculpts the policy most precisely exactly where it matters. Final survival ~0.26 (real
+selection pressure). Economy: day net on safe (24*0.02=0.48) < night drain R=0.72, so safe
+alone is insufficient and gambling is forced when behind -- the energy-budget condition.
+
+Arc complete: IMPOSED (exp030) -> DERIVED (DP) -> EXECUTED (behavioral) -> EVOLVED, converging
+on the same energy-budget rule from progressively fewer assumptions. This is the first
+EVOLUTIONARY result in the engine (opens the long-parked evolution thread). Genome is a linear
+threshold (hence the dawn slack vs the curved DP optimum); next is within-life LEARNING of the
+distributions.
+
+Validation: evolve_risk_policy + 1 test (76 total); ruff clean. Study artifact; not in the
+reproduce baseline.
+
+---
+
+## 2026-06-04 (cont.) — Within-life LEARNING of the option distributions (arc complete)
+
+The last gap: the organism no longer KNOWS the option distributions. survival.
+simulate_learning_choice has each organism start ignorant (one pseudo-observation of each
+option at the grand mean -> initially indifferent), estimate each option's outcome
+distribution from observed outcomes, re-plan the survival DP on its CURRENT estimate each
+cycle, forage day/night, and respawn on death keeping what it learned. Nothing tells it which
+option is risky.
+
+Exploration was the catch: with both options estimated as point masses at the mean, the DP
+always picks safe -> never samples risky -> never learns (locked in). Fixed with decaying
+epsilon-greedy (0.45 -> 0.05) so it samples the risky option and discovers the variance.
+
+Result (studies/risk_sensitivity/learning.py, within_life_learning.png): GAMBLE RECALL (of the
+states where the true optimum gambles, the fraction the learned plan also gambles) goes 0.00
+(cycle 0, ignorant) -> 0.98 (cycle 1) -> 1.00 (cycle 3+); estimated risky variance climbs to
+true (0.0025) by ~cycle 3; survival improves 0.50 -> 0.80 as it learns and exploration anneals
+(learning has adaptive value). The learned threshold lands on the DP optimum and -- because
+learning recovers the actual distributions -- tracks the CURVED DP threshold across the whole
+day, MORE faithfully than the evolved linear genome (which only approximated it).
+
+NOTE on metric: full-grid policy accuracy is insensitive (the risk-prone band is a small
+fraction of states, so "never gamble" already scores 0.83); gamble RECALL on the true-gamble
+states isolates the learning (0 -> 1).
+
+ARC COMPLETE -- the same energy-budget rule at five levels, most assumed to least: IMPOSED
+(exp030, a utility) -> DERIVED (DP, only the dynamics) -> EXECUTED (behavioral, the DP values)
+-> EVOLVED (selection, the support) -> LEARNED (within life, nothing; discovered from
+experience). The learner is model-BASED (plans on its learned model); a model-FREE learner
+(survival values from living/dying, no planning) is the strictest remaining version.
+
+Validation: simulate_learning_choice + 1 test (77 total); ruff clean. Study artifact.
+
+---
+
+## 2026-06-04 (cont.) — Model-FREE survival learner (the strictest version)
+
+The within-life learner (learning.py) still PLANS (learns distributions, runs the DP). The
+strictest version removes both model and planner: survival.simulate_model_free_choice has each
+organism hold a tabular Q[energy_bin, time_of_day, action] and learn it by MONTE-CARLO from the
+bare survival signal -- after each day/night cycle, every visited (state, action) is nudged
+toward 1 if it survived and 0 if it died (alpha=0.1, decaying epsilon-greedy 0.3->0.05, random
+start energy each cycle for state coverage). No model of the distributions, no planning;
+survival values learned directly from living and dying.
+
+Result (studies/risk_sensitivity/model_free.py, model_free.png): the AGGREGATE greedy policy's
+gamble recall climbs 0.73 -> 0.93 over ~100 cycles and its threshold lands on the DP optimum
+(mean |diff| ~= 0.03) across the whole day. The energy-budget rule emerges from nothing but
+reinforcement. It is the cost of assuming the least -- markedly slower/noisier than model-based
+(recall ~1.0 in ~3 cycles vs ~0.9 in ~100). Honest metric note: INDIVIDUAL Monte-Carlo Q-tables
+are high-variance (per-organism recall plateaus ~0.5); the population-MEAN value function is the
+clean readout (pooled experience), so the recall reported is on the aggregate greedy policy.
+
+ARC FULLY COMPLETE -- the same energy-budget rule at six levels, most assumed to least: IMPOSED
+(a utility) -> DERIVED (DP, only the dynamics) -> EXECUTED (DP values) -> EVOLVED (selection, the
+support) -> LEARNED MODEL-BASED (estimate + plan) -> LEARNED MODEL-FREE (reinforcement on the
+survival signal, no model, no planning). A behavioral regularity (Caraco's energy-budget rule)
+shown to be what survival IMPLIES, SELECTS FOR, and TEACHES -- by planning or by reinforcement.
+
+Validation: simulate_model_free_choice + 1 test (78 total); ruff clean. Study artifact.
+
+---
+
+## 2026-06-04 (cont.) — The day/night SUN as the source of risk (variance, not a hazard)
+
+Closes the Phase 5 loop. Phase 5's sun could not produce risk-sensitivity because its "danger"
+was a stationary DETERMINISTIC hazard, and risk-sensitivity is about VARIANCE. So make the sun
+set the VARIANCE of foraging: steady in full light (midday), erratic in the dark (dawn/dusk),
+mean matched. survival.sun_variance_risky builds per-step risky outcomes {mean-w(t), mean+w(t)}
+with spread w(t) = w_min..w_max tracking darkness; survival_dp_timevarying solves the DP with
+time-varying option distributions. Control = constant variance with the SAME average spread
+(sqrt(mean w^2)), so only the TIMING differs.
+
+Result (studies/risk_sensitivity/sun_variance.py, sun_variance.png): high-variance foraging is a
+LIFELINE near the deadline and a LIABILITY far from it. The RUIN edge (lowest reserve from which
+gambling can still reach the night requirement) under the sun vs constant:
+  t=20 (dusk, getting dark):  sun 0.26  vs  constant 0.38   -> sun LOWER (lifeline)
+  t=0  (dawn, dark, far off):  sun 0.10  vs  constant 0.04   -> sun HIGHER (liability)
+Near the deadline a big-variance gamble can bridge the gap to R (only hope) -> ruin edge drops;
+far from it the downside has all day to bite -> ruin edge rises. The day/night sun puts the high
+variance exactly at DUSK, when a behind-schedule organism most needs the gamble. The Phase 5
+"starving organism accepts night risk" intuition, finally emerging for the right reason
+(variance, not a deterministic hazard). New: survival_dp_timevarying + sun_variance_risky.
+
+Validation: +3 tests (timevarying==constant when fixed; spread peaks in dark, mean matched; dusk
+lifeline), 81 total; ruff clean. Study artifact. (Built in the parent repo; the standalone
+risk-sensitive-foraging carve-out predates this and stays the frozen six-level version.)
+
+---
+
+## 2026-06-04 -- Nocturnal desperation foraging as REALIZED behavior (sun variance, part 2)
+
+The sun-variance result above was a planner's TABLE (the DP ruin edge). The obvious objection:
+does it describe what organisms actually DO and whether they actually live? So a population now
+lives it (studies/risk_sensitivity/behavioral_sun.py, survival.simulate_dusk_survival).
+
+Design. Drop organisms into the dark dusk (day-step t=20) holding a range of reserves, let them
+forage the few remaining day-steps under the DP-optimal policy -- drawing REAL intake from the
+time-varying distributions (high-variance in the dark) -- then fast the night (night requirement
+R = 0.72). Measure the fraction surviving, under the sun vs the matched constant-variance control
+(same average spread; only the timing differs). This is the ruin edge as who-actually-lives.
+
+Result (behavioral_sun.png). The lifeline is realized:
+  - Reserve needed at dusk for >=50% night survival: sun 0.54 vs constant 0.58 -- under the dark
+    dusk's high variance an organism survives the night from a LOWER reserve.
+  - Survival advantage (sun - constant) is positive across the whole desperate band (reserve
+    0.30-0.64), peaking +0.25 at reserve 0.56: a behind-schedule forager is ~25 percentage points
+    more likely to live because the dark made foraging erratic exactly when it needed a gamble.
+  - The advantage is EXACTLY ZERO once the reserve is already safe (>= 0.66, where the safe option
+    alone outlasts the night): variance only helps the desperate, never the comfortable. This is
+    the energy-budget rule's signature, now in survival rather than in choice probability.
+
+Honest notes. (a) The behavioral signal lives in a SINGLE cycle, which is what the DP optimizes;
+over many net-negative cycles everyone eventually dies and an easy economy erases the band
+entirely (safe alone suffices -> never gamble), so the demonstration is deliberately the
+one-cycle dusk cohort. (b) An aggregate P(gamble)-by-time readout was muddier than the survival
+readout -- the clean, decision-relevant quantity is who lives from how little, so that is the
+figure. (c) The advantage curve shows the same reachability-comb sawtooth as the DP (discrete
+gamble); the positive envelope is the result.
+
+Validation: +1 test (test_dusk_survival_lifeline_is_realized_behavior: advantage peaks > 0.1, is
+never a net liability at dusk, and vanishes once the reserve is safe), 82 total; ruff clean.
+Study artifact. New: survival.simulate_dusk_survival; behavioral_sun.py + figure.
+
+---
+
+## 2026-06-04 -- Richer worlds: continuous outcomes + the energy-budget rule extended to SKEW
+
+Every risk result so far used a two-point gamble {mean +/- w}. Enough to derive the rule, but it
+costs a discretization artifact (the reachability comb -- R hit only by whole numbers of identical
+lucky draws -> sawtooth band edges) and it cannot ask about the SHAPE of risk beyond variance. A
+continuous distribution (survival.skewed_outcomes: a standardized, warped normal with chosen
+mean, std, and skew sign/strength; survival.outcome_moments to read its moments) fixes both.
+
+Result 1 -- continuous outcomes remove the comb (richer_worlds.py, left panel). The safe-suffices
+(upper) edge of the risk-prone band over the day: two-point roughness (std of step-to-step diffs)
+0.060 -> a clean sawtooth; continuous 0.000 -> perfectly smooth, SAME dusk requirement 0.700. The
+comb was a two-point artifact; the energy-budget band is a property of survival, not the grid.
+(The lower/ruin edge stays jittery regardless -- it is a near-indifference region, an honest
+separate caveat already noted.)
+
+Result 2 -- the energy-budget rule extends to the THIRD moment (right panel). At FIXED mean and
+variance, where mean-variance risk theory predicts INDIFFERENCE, the survival-optimal policy is
+not skew-indifferent, and its preference REVERSES at the requirement, exactly as the variance
+preference does. Gamble's survival edge over safe (q_risky - q_safe), averaged over each regime,
+swept over skewness (x10^-3):
+  BELOW R (building the buffer, time to spare):  left-skew +2.18 -> right-skew -1.94  (DEcreasing)
+  ABOVE R (already safe):                        left-skew -6.28 -> right-skew -0.53  (INcreasing)
+So below R it prefers NEGATIVE skew -- frequent small gains that climb steadily toward R beat the
+all-or-nothing lottery; above R it prefers POSITIVE skew -- i.e. it avoids negative skew, the rare
+catastrophe that is the only thing that can sink a comfortable organism. The two regime curves run
+opposite directions and cross near symmetric: a genuine reversal, not the flat line mean-variance
+predicts.
+
+Why the non-obvious direction, and no contradiction with the dusk lottery. A negative-skew gamble
+is "usually a small gain, rarely a big loss"; below R with time, banking the frequent small gains
+reaches R most reliably, while the positive-skew lottery usually loses ground betting on a rare
+jackpot. This is the MOLAR average over the whole below-R region. In the narrow near-deadline /
+near-ruin corner the positive-skew lottery can still win -- but that is the VARIANCE lifeline of
+the sun-variance study, and here variance is held fixed, isolating the pure skew effect.
+
+Validation: +3 tests (skewed_outcomes fixes mean/variance with skew tracking the parameter;
+continuous removes the comb at the same dusk requirement; skew preference reverses at R -- below
+prefers negative, above prefers positive, opposite orderings), 85 total; ruff clean. Study
+artifact. New: survival.skewed_outcomes + outcome_moments; richer_worlds.py + figure.
+
+---
+
+## 2026-06-04 -- Richer worlds pt.2: multi-patch foraging (risk-sensitive patch choice + MVT)
+
+Generalized the binary safe-vs-risky choice to a real forager's problem: a MENU of patches, and
+depleting patches it must decide when to leave. Both fall out of the same survival objective, and
+both connect to the rate-maximizing (risk-NEUTRAL) marginal-value-theorem work in the JAX engine
+(exp020_patch_leaving_mvt.py). New: survival.survival_dp_patches (DP over a patch menu) and
+survival.survival_dp_depleting (3D DP over energy x time x patch biomass, with a travel cost).
+
+Result 1 -- patch choice is a THREE-way energy-budget rule (multi_patch.py, left panel). Menu:
+safe (mean 0.045, std 0.02), rich (mean 0.060, std 0.04), wild (mean 0.050, std 0.11). The
+survival-optimal patch over (energy, time-of-day):
+  - SAFE (low variance) above R -- comfortable, hold steady (doesn't even use the higher-mean
+    patch). Share of the (time x energy) grid: 0.29.
+  - RICH (high mean) below R with time -- maximize intake rate to climb toward R. This is the
+    classic rate-maximizing / optimal-foraging regime. Share 0.53.
+  - WILD (high variance) below R near the deadline -- no time to climb steadily, so gamble on
+    variance (the dusk lottery). Share 0.18; the wild wedge grows from dusk and reaches to lower
+    energies the closer to dusk.
+So survival INTERPOLATES between rate-maximizing (rich) and variance-seeking (wild) depending on
+how much time is left to reach the requirement -- the optimal-foraging regime and the risk-prone
+regime are two faces of one survival policy. (Honest artifact: a thin safe sliver in the deep-ruin
+corners where all patches tie and argmax defaults to index 0.)
+
+Result 2 -- the giving-up rule is FINITE-HORIZON (right panel). A depleting patch (intake mean =
+max_rate x biomass, CV 0.6) with a travel cost to reach a fresh one. Through the day the organism
+abandons depleted patches readily (P(leave) -> 1.0 mid-day: classic MVT relocation), but it STOPS
+leaving near dusk, and the leaving deadline tracks the travel cost:
+  travel 2 -> last leave t=27;  travel 4 -> t=24;  travel 6 -> t=22   (day=30; cutoff ~ day-travel)
+Once fewer than ~travel steps remain there is no time to reach and exploit a fresh patch before
+the night fast, so leaving collapses. Infinite-horizon MVT, with its single time-invariant
+giving-up density, cannot express this; survival's deadline produces it. (Honest: a minor early-day
+dip in P(leave) from the discrete biomass grid; the plateau and the deadline crash are robust, and
+the crash-tracks-travel claim is the testable result.)
+
+Note both deviations are SURVIVAL refinements of MVT, not contradictions: away from the deadline
+and the ruin edge, survival reduces to the risk-neutral rate-maximizing MVT (the rich-patch regime,
+the mid-day leaving plateau). MVT is the not-desperate limit.
+
+Validation: +2 tests (patch choice is the three-way rule: safe above R, rich below-R-early, wild
+below-R-at-dusk; giving-up is finite-horizon: leaves mid-day, stops at the deadline, cutoff earlier
+for costlier travel), 87 total; ruff clean. Study artifact. New: survival.survival_dp_patches +
+survival_dp_depleting; multi_patch.py + figure.
+
+---
+
+## 2026-06-04 -- Literature deep dive: where the risk arc sits (we are mostly NOT first)
+
+Did a four-strand literature review (full report: studies/risk_sensitivity/related_work.md, with
+DOIs and a per-result novelty map). Honest bottom line: most of the arc is a faithful mechanistic
+REPRODUCTION of established theory, and we should frame it that way. The genuinely novel piece is
+the skew-preference reversal.
+
+- Energy-budget rule (risk-prone below R, risk-averse above, reversal at R; R = overnight-fast
+  reserve): ESTABLISHED. Stephens 1981; Caraco 1980/1981; Stephens & Krebs 1986 (z-score model).
+  Anchor to Stephens 1981.
+- Survival-DP derivation (not an imposed utility) + threshold rising toward dusk: ESTABLISHED, the
+  signature move of the McNamara-Houston / Mangel-Clark program. Mangel & Clark 1988; Houston &
+  McNamara 1999; McNamara & Houston 1986/1992; McNamara, Houston & Lima 1994 + Bednekoff & Houston
+  1994 (dusk-loading of reserves). Our distinctiveness is the cross-mechanism collapse
+  (optimal = evolved = learned model-based = model-free) reduced to the single axis R, which the
+  classic single-mechanism papers do not unify.
+- SKEW-PREFERENCE REVERSAL AT R (mean-variance is insufficient; negative skew below, positive above):
+  ANTICIPATED-IN-PRINCIPLE BUT NEVER STATED -- the novel result. The shortfall/z-score objective is
+  whole-distribution and SHOULD be skew-sensitive, but the field assumed NORMAL reserves (skew=0 by
+  assumption; Stephens & Charnov 1982; Lim et al. 2015). Houston & Rosenstrom 2024 (Biol. Rev.)
+  explicitly names deriving RSF for skewed distributions an OPEN frontier. Economics has the pieces
+  separately (prudence/3rd-derivative: Eeckhoudt & Schlesinger 2006; aspiration-modulated skew:
+  Diecidue & van de Ven 2008, Coricelli et al.; animal skew sensitivity: Genest/Stauffer/Schultz
+  2016 PNAS) but nobody unifies them into a survival-objective sign-flip. This is the result to
+  write up first.
+- Multi-patch three-way choice: PARTIALLY anticipated (the rate<->variance interpolation is McNamara
+  & Houston 1992); the 3-patch realization is fresh.
+- Finite-horizon giving-up density: RE-DERIVATION. Closest prior art Tenhumberg et al. 2001 (optimal
+  patch time for TIME-LIMITED foragers -- stay longer as the deadline nears, exactly our mechanism);
+  also Nonacs 2001 (state-dependent MVT), Brown 1988 (GUD/opportunity cost), Charnov 1976 (baseline).
+
+Caveat: Houston & Rosenstrom 2024 and Coricelli et al. were read via abstracts only -- pull full
+texts before any manuscript; they are the two papers most able to weaken the skew novelty claim.
+
+---
+
+## 2026-06-04 -- Acquisition tuning sweep (exp031); amplify the controlled demo
+
+Goal (ToDo TUNING/QUALITY): amplify the acquisition effect on the controlled layout and reduce
+bimodal reach-failure, to decide final defaults. New harness experiments/exp031_acquisition_tuning.py
+fans (combo x seed) agents over the parallel pool; per combo reports drop (early-late latency),
+late_reach (reliability), death (mostly starvation). Grids: coarse (learning magnitude/directedness/
+intake), survival (reach-failure levers), confirm + final (higher-N before/after).
+
+FINDINGS:
+- reinforcement_asymptote 1.0 -> 2.0 is the ONE clean amplifier: raising the learned-weight ceiling
+  gives the learned approach more behavioral leverage. drop 63 -> 73, late_reach 0.84 -> 0.90, and
+  death even drops slightly 0.75 -> 0.70 (N=80 confirm). Pure win on all three.
+- learning_rate higher is WORSE, not better: lr 0.1/0.2 give NEGATIVE drop and ~90% death -- it
+  drives history weights to the [-5,5] clip and the damped-Verlet dynamics go erratic (less directed
+  softmax). 0.05 is near-optimal. The amplification lever is the asymptote, not the rate.
+- Death (~0.70) is almost entirely STARVATION (danger ~0.01); it is the single-patch economy, not a
+  bug. A perfect camper survives (sustainable intake ~regrowth 0.016/step > rest cost 0.006), but
+  deficit-gated drive lets a fed organism wander, drain, and sometimes fail to return in time --
+  the bimodal tail. The never-reach part of reach-failure is now ~10% (late_reach 0.90).
+- The reach-failure levers TRADE OFF against the signal or the risk mechanism:
+    move_cost 0.005->0.003: death 0.70->0.65 only, but drop collapses 73->43 (easy survival = small
+      visible learning). Not worth it; keep 0.005.
+    food_intake 0.05->0.08: death down a little, drop down more. Keep 0.05.
+    innate_food 0.2->0.25/0.3: negligible. Keep 0.2 (clearly learning-driven).
+    deficit_exponent 2.0->1.0 (linear hunger): lowers death, BUT p=2 convex marginal value is the
+      mechanism behind risk-proneness-when-starving (risk arc / planned capstone). Do NOT change it.
+
+DECISION (final defaults):
+- Amplify the CONTROLLED DEMO only: scripts/run_demo.py now sets reinforcement_asymptote=2.0
+  (REINF_ASYMPTOTE). Confirmed at N=100: latency 131 -> 56 (drop 75), reach 0.62 -> 0.90, mortality
+  0.70 (now printed). This is exactly "amplify the acquisition effect on the controlled layout."
+- Do NOT promote lambda=2.0 to the GLOBAL default: lambda=1.0 is the conventional RW reinforcer
+  asymptote and is load-bearing for extinction/generalization/momentum baselines; a global change
+  would drift the whole battery. softmax_temperature stays 0.3 (matching default); deficit_exponent
+  stays 2.0 (risk mechanism); move_cost stays 0.005. Engine defaults unchanged.
+- Tests: 85/85 pass (engine untouched; only the demo + new exp031 changed). Reproduce baseline
+  regenerated to capture the new run_demo output.
+
+STILL OPEN: (a) whether the learning signal should be graded by energy vs normalized per-event
+(ToDo item, not yet investigated); (b) global-default promotion of the asymptote remains a candidate
+if a battery re-baseline is wanted later.
+
+---
+
+## 2026-06-05 -- Mechanistic energy-budget test (exp032): the rule does NOT emerge (molecular/molar)
+
+Question: does the real atom engine (force + convex motivational gain + damped Verlet + eligibility-RW
++ energy/death) reproduce the energy-budget rule on a matched-mean safe-vs-risky choice, without an
+imposed survival utility? NO. exp032 compares three curves of P(risky) vs current energy:
+  imposed utility (exp030 ref, U(E) installed): clean reversal, below R 0.70 / above 0.30 (+0.21).
+  mechanistic, energy teaching: flat/low ~0.15, no reversal.
+  mechanistic, single-step survival teaching: flat ~0.5, no reversal.
+
+WHY (three reasons): (1) the convex gain mu*deficit^p scales BOTH options equally -> cancels in the
+choice, cannot create a variance preference; (2) per-step Rescorla-Wagner on matched means -> equal
+learned values -> no preference (small asymmetry runs toward safe, a death/selection artifact);
+(3) single-step survival is trivial (a draw almost never crosses 0 at these reserves), so post>0 is
+~always 1 -> no signal. The survival contingency only bites over a HORIZON (surviving the night).
+
+MOLECULAR/MOLAR reading (full writeup: studies/molecular_molar_bridge/README.md). The atom engine is
+MOLECULAR (momentary forces, per-step credit); it reproduces molar AGGREGATES (matching, demand,
+momentum) but not the energy-budget rule, whose contingency is an extended-horizon terminal event
+(survive the period; the death boundary after the fast). This is the molecular vs molar scaling debate
+(Baum 2002) made concrete. The missing ingredient is HORIZON credit assignment, not anything specific
+to risk -- proven by the model-free survival learner, which recovers the rule from cycle survival.
+
+DESIGN PROBLEM (open, for the next build): restore the molar influence WITHOUT hard-coding the answer
+(the imposed U(E) is question-begging). Litmus tests for non-question-begging: inject only
+environmental FACTS (death over a period; passage of time), never U(E)/R/the policy; use a GENERAL
+mechanism (temporal credit assignment or selection), not a bespoke variance term; and it must
+GENERALIZE (shift R / the distributions and the policy tracks with no retuning). Candidate mechanisms:
+(1) within-life horizon-survival TD/eligibility (the eligibility trace is the molecular implement of
+molar credit; lengthen the horizon, terminal signal = survived the period); (2) time-to-deadline as a
+sensed channel (env already has the day/night cycle), so the policy can condition on (energy, time);
+(3) selection across lives on atom params (installs nothing; molar fact enters only via who
+reproduces). Recommendation: (1)+(2) within-life, validated by generalization; (3) as independent
+confirmation. exp032 is in the tree; mechanism build not yet started.
+
+---
+
+## 2026-06-05 -- exp033: contact-only (A) fails, daily-survival signal (B) reproduces the rule
+
+Tested two molar->molecular bridges on a day/night economy (energy + death), state-conditioned by
+(energy bin x day-phase), measured at the EMERGENT requirement R = night_cost*night_steps = 0.30
+(reserve needed to outlast the fast; not a free parameter). Figure
+outputs/figures/exp033_multilevel_reinforcement.png.
+
+  imposed utility (ref): reversal +0.20 (built in).
+  A -- reinforcer-as-only-currency (contact is the only signal; survival implicit; death = truncation;
+       choice value = "followed by contacts"): reversal -0.07. FAILS. The safe option's higher contact
+       RATE (feeds every step; risky only on its good draw) dominates and the value saturates without a
+       sharp boundary differential. Long eligibility (decay up to 0.995) does not rescue it.
+  B -- daily survival signal scales down (alive-at-dawn=1 / died=0, credited onto the day's choices via
+       the eligibility trace; survival is a bare 0/1 FACT at the day scale, not a utility): reversal
+       +0.17. SUCCEEDS, tracks the imposed reference below R, with an EMERGENT requirement and no U(E).
+
+CONCLUSION (answers the no-hard-coding question): the molar consequence (survival) must enter as an
+explicit signal, but only as a bare period-scale FACT scaled down onto molecular choices by temporal
+credit -- not a value function. Pure reinforcer-currency (A) is too weak; an imposed utility (exp030)
+too strong; the daily survival fact (B) is the minimal faithful bridge. Convexity and the requirement
+are emergent. This is approach B from the design chat (survival has value at a daily level that scales
+down to the many-per-day food contacts). Writeup: studies/molecular_molar_bridge/README.md.
+
+exp033 is a TABULAR prototype of the mechanism (state = energy x time bins), not yet the atom engine.
+NEXT: (1) port B into the atom engine as a hierarchical operant level (daily survival reinforcer
+modulating the molecular history weights); (2) validate by GENERALIZATION (shift night length / option
+distributions -> reversal must track with no retuning); (3) add an upper (reproduction/predation)
+boundary for risk-aversion above. exp032/exp033 in the tree, uncommitted.
+
+---
+
+## 2026-06-05 -- exp034/exp035: B generalizes and yields the twin-threshold rule
+
+Two validation tests of approach B (daily survival signal), both passed.
+
+exp034 (generalization; the non-hard-coding proof): with the learner FIXED, shift the night length
+(R = night_cost*night_steps) and the emergent risk-prone/averse crossover tracks the new R on its
+own: nights 4/8/12 -> R 0.20/0.40/0.60 -> crossover 0.25/0.45/0.65, corr 1.000, mean offset 0.05
+(one bin). Nothing about R or the policy was installed; only the environmental requirement changed.
+This is the test that separates a real mechanism from a disguised hard-code -- B passes.
+Figure outputs/figures/exp034_bridge_generalization.png. Note: exp034/exp035 import
+run_survival_signal from exp033, so run them as modules (python -m experiments.exp034...).
+
+exp035 (upper boundary; risk-aversion above R): a single starvation boundary makes survival saturate
+at 1 above R, so B is only weakly averse when fed. Adding predation above an upper reserve x_r
+(heavier = slower/more visible; McNamara & Houston 1990) -- another bare environmental FACT, not a
+utility -- sharpens aversion in the well-fed band: P(risky) in [R, x_r] falls 0.36 -> 0.27 (x_r=0.45,
+pred_prob=0.20), risk-proneness below R unchanged (0.61). The twin-threshold energy-budget rule
+(prone below R, averse above) emerges from two real death sources. (Above x_r the policy is noisy:
+organisms there are eaten regardless of choice; rarely/unstably visited -- presentational caveat,
+not the signal.) run_survival_signal gained optional predation_threshold/predation_prob (off by
+default, so exp033/exp034 unchanged). Figure outputs/figures/exp035_upper_boundary.png.
+
+STATUS: the tabular prototype has passed mechanism (exp033), generalization (exp034), and
+twin-threshold (exp035). Remaining: port B into the atom engine as a hierarchical operant level
+(daily survival reinforcer modulating the molecular history weights). Writeup:
+studies/molecular_molar_bridge/README.md.
+
+---
+
+## 2026-06-05 -- exp036: atom-substrate port splits credit (works) from expression (needs timescale sep)
+
+Ported approach B onto the engine's own dynamics: choice = force decomposition -> verlet_update ->
+softmax, with energy-state-conditioned history weights credited by the period-scale survival signal.
+Two outcomes:
+- LEARNING ports cleanly: W(risky)-W(safe) = +0.06 below R, -0.06 just above -- the survival-credit
+  mechanism shapes the atom history weights exactly as in the tabular prototype.
+- EXPRESSION fails in a per-step choice: P(risky) flat ~0.50 (reversal -0.00). The damped-Verlet
+  activation needs SUSTAINED drive to build magnitude (constant drive settles to weight-ordered
+  activations, 0.72 vs 0.60 -> softmax 0.92/0.08), but the energy state changes every step here, so
+  the activation never reflects the current state and the softmax smears to indifference. (First
+  guessed saturation/clipping -- WRONG; verified the dynamics discriminate when weights differ.)
+
+So there are TWO molar->molecular problems: (1) CREDIT (molar outcome -> molecular weights), solved
+by survival-eligibility; (2) EXPRESSION (molecular dynamics enacting a molar state-dependent policy),
+which needs TIMESCALE SEPARATION -- molecular fast vs molar state slow, i.e. commit to an option over
+a stretch of ~constant state. The spatial foraging loop supplies this; an abstract per-step choice
+does not. exp036 prints the learned-weight structure next to the flat choice to make this explicit.
+
+NEXT: spatial gridworld integration (the faithful demonstration) -- two food patches (safe constant,
+risky variable, matched mean), energy as an interoceptive cue, a day/night period, survival-credit
+learning on the real Organism. The commit-to-a-patch loop gives the timescale separation exp036
+shows is required. exp036 in the tree, ruff-clean (runs as a module: python -m experiments.exp036...).
+
+---
+
+## 2026-06-05 -- exp037: rule survives the atom dynamics (drive readout); spatial travel inverts it
+
+1D spatial forager (SAFE at x=-1 constant, RISKY at x=+1 variable, matched mean), approach B's
+survival-credit learning on energy x phase-conditioned weights, emission = DRIVE READOUT
+(orient on the pull difference = the movement atom's steady state; exp036 showed the transient
+integrated activation under-builds and smears). Resolves the two open issues:
+
+- EXPRESSION: with the drive readout, the atom-dynamics organism REPRODUCES the rule. With intake per
+  step (no travel concentration): reversal +0.24, risk-prone below R, tracks the imposed reference.
+  So the port works -- the failure in exp036 was the readout (transient activation), not the mechanism.
+- SPATIAL TRAVEL INVERTS THE RULE. With intake only on patch contact (real foraging): reversal -0.19,
+  risk-AVERSE below R. Causally confirmed -- flipping only the travel flag flips the sign. Structural
+  reason (new): spatial travel CONCENTRATES the cost of a failed gamble -- a risky 0-draw = a whole
+  trip's travel cost for nothing = a large one-encounter drop = lethal when low. So the low organism
+  takes the reliable immediate intake (safe). The classic energy-budget rule assumes PER-STEP
+  matched-mean options with the deadline as the sole forcing; concentrated per-encounter cost breaks
+  that and reverses the prediction. So risk-proneness-when-low does NOT survive spatial travel costs.
+
+Long iteration to get here (several prototypes: integrated-activation orientation flatlines; particle-
+Verlet-on-position starves with no feeds; two competing Verlet atoms flatline; drive readout works).
+Figure outputs/figures/exp037_spatial_survival_choice.png (blue imposed, green no-travel REPRODUCES,
+red travel INVERTS). The travel-cost result is worth its own study: when does spatial risk-sensitivity
+match vs invert the non-spatial energy-budget rule? exp037 ruff-clean, runs as a module.

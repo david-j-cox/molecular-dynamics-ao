@@ -20,13 +20,28 @@ TUNING / QUALITY (current foraging model)
     approach_food sensitivity) recovers a clean acquisition curve (latency to
     food 152 -> 106 over 40 lives). So learning works; random layout just
     swamps the signal.
-[ ] Amplify the acquisition effect size on the controlled layout (sweep
-    learning_rate, reinforcement_asymptote, energy costs, food_intake_rate).
-[ ] Reduce bimodal reach-failure (some agents never lock onto food and die):
-    reach reliability, initial search, possibly state-dependent exploration.
-[ ] Decide final defaults from a large parallel sweep (use experiments/_parallel).
+[x] Amplify the acquisition effect size on the controlled layout (exp031 sweep).
+    WINNER: reinforcement_asymptote 1.0 -> 2.0 (learned-weight ceiling = more
+    behavioral leverage for the LEARNED approach). run_demo now sets it (REINF_
+    ASYMPTOTE=2.0): latency 131->56 (drop 63->75), late reach 0.84->0.90, death
+    0.75->0.70. KEY: higher learning_rate is WORSE (lr 0.1/0.2 -> negative drop,
+    ~90% death: weights hit the clip, dynamics go erratic). See lab_notebook 2026-06-04.
+[~] Reduce bimodal reach-failure. Never-reach down to ~10% (late reach 0.90) via
+    the asymptote amplifier. Residual mortality ~0.70 is STARVATION, an inherent
+    single-patch-economy bound, not a bug (danger deaths ~0.01). Levers that cut it
+    trade against the signal or the risk mechanism: move_cost 0.005->0.003 only
+    lowers death 0.70->0.65 but collapses the drop 73->43; deficit_exponent->1.0
+    lowers death but breaks the convex marginal-value (p=2) risk mechanism. Left as
+    documented tension; not chased further. (Multi-patch economy is the real fix --
+    see PHASE 5 multi_patch, where leaving a spent patch makes survival attainable.)
+[x] Decide final defaults from a large parallel sweep (exp031). DECISION: amplify
+    the controlled DEMO only (asymptote=2.0); keep ENGINE defaults unchanged --
+    lambda=1.0 (conventional, load-bearing for extinction/generalization/momentum),
+    softmax_temperature=0.3 (matching), deficit_exponent=2.0 (risk), move_cost=0.005.
+    85/85 tests pass; reproduce baseline regenerated. (Global lambda=2.0 remains a
+    candidate iff a full battery re-baseline is wanted later.)
 [ ] Revisit whether learning signal should be graded by energy (vs normalized
-    per-event) while keeping objectivism.
+    per-event) while keeping objectivism.  [still open -- not investigated in exp031]
 
 PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------
@@ -48,12 +63,90 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)
 -----------------------------------------
-[ ] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod 96)/96)); 96 steps/day.
-[ ] Danger detectability graded with light (low floor): danger_sensed =
-    danger_true*(floor + (1-floor)*L).
-[ ] Food growth and visibility scale with L (food easier to see / grows in day).
-[ ] Verify risk-sensitive foraging emerges (starving organism accepts night risk).
-[ ] Log light level; add day/night activity + mortality metrics.
+[x] Global ambient light L(t) = 0.5*(1 - cos(2*pi*(t mod steps_per_day)/steps_per_day))
+    (gridworld.ambient_light); config.day_night opt-in (default off -> byte-identical).
+[x] Danger detectability graded with light: sensed = danger_true*(floor + (1-floor)*L)
+    (danger_detect_floor); food visibility AND regrowth scale by (food_light_floor +
+    (1-floor)*L). PERCEPTION is graded; actual danger contact + food intake use TRUE
+    proximity. New obs key "ambient_light" + logged in info. 4 env tests.
+[~] Verify risk-sensitive foraging -- DOES NOT EMERGE, for two reasons (lab_notebook
+    2026-06-03): (1) danger_detect_floor is behaviorally INERT (byte-identical foraging
+    across floors 0.1/0.5/1.0) -- deficit-scaled approach dwarfs avoidance + consummatory
+    hold; and the harm magnitude was under-set (0.05 = 1 feeding-step). (2) DEEPER: our
+    "risk" is STATIONARY + DETERMINISTIC (fixed location, constant magnitude, contact
+    1.0/0.0, no variance); risk-sensitive foraging (Caraco; energy-budget rule) is about
+    OUTCOME VARIANCE, which is not in the model.
+[x] PATH DONE -- risk-sensitive foraging via VARIANCE + the energy-budget rule
+    (chamber.run_risk_choice, exp030, studies/risk_sensitivity/). Concurrent SAFE
+    (constant) vs RISKY (variable, MATCHED MEAN) choice with energy + death; choice by
+    softmax over EXPECTED SURVIVAL UTILITY U(E)=logistic((E-e_req)/width) ~ P(survive). U
+    convex below e_req / concave above -> by Jensen, risk-prone when starving, risk-averse
+    when fed; reversal AT e_req = Caraco's energy-budget rule, EMERGENT. Two versions
+    (reward variance reversal +0.31; predation variance +0.54), linear-utility control flat
+    at 0.50. (Day/night modulation of the variance is a further extension; not done.)
+[x] FIRST-PRINCIPLES version (behavioral_md.survival, studies/.../first_principles.py):
+    exp030 IMPOSES the survival sigmoid + e_req (circular). The DP DERIVES the rule from the
+    bare dynamics (energy + metabolism + death) with survival as the only objective: backward
+    DP over a day (forage safe/risky) + night (forced fast). Requirement = night_steps*
+    metabolism EMERGES (R=0.72). Optimal policy is a risk-prone BAND -- upper edge (safe
+    suffices) rises toward R at dusk; lower edge = RUIN (doomed even gambling). Resolves the
+    "why not gamble harder when more negative" question: gamble for EVERY E in the band,
+    bounded below only by ruin; exp030's bump is the bounded-rational (softmax) version. The
+    day/night structure (Phase 5) supplies the principled requirement.
+[x] Closed the loop: behavioral pop chooses by softmax over the DP-DERIVED survival values
+    (survival.simulate_survival_choice) -- realized policy reproduces the band, realized
+    survival-by-start matches the planner's V(E). Parametric sweep: dusk threshold tracks the
+    requirement R (parametric.py).
+[x] EVOLVED the rule (survival.evolve_risk_policy, studies/risk_sensitivity/evolution.py):
+    heritable state-dependent risk trait theta(t)=a+b*(t/day), selection by survival only;
+    slope b evolves positive, evolved threshold converges on the DP optimum at dusk (looser at
+    dawn where it matters less). IMPOSED -> DERIVED -> EXECUTED -> EVOLVED. First evolutionary
+    result in the engine (opens the evolution thread).
+[x] Within-life LEARNING (survival.simulate_learning_choice, learning.py): the organism no
+    longer KNOWS the distributions -- it starts ignorant, estimates each option's outcomes from
+    experience, re-plans the DP on its estimate each cycle, forages, respawns on death keeping
+    what it learned. Decaying epsilon-greedy breaks the exploration lock (point-mass estimates
+    -> always safe -> never learns). Gamble recall 0->1 by cycle ~3; estimated risky variance
+    -> true; survival 0.50->0.80; learned threshold tracks the CURVED DP optimum (better than
+    the evolved linear genome). ARC COMPLETE: imposed -> derived -> executed -> evolved ->
+    learned, the same rule from progressively fewer assumptions.
+[x] MODEL-FREE learner (survival.simulate_model_free_choice, model_free.py): tabular
+    Q[energy_bin, time, action] learned by Monte-Carlo from the bare survival signal (survived
+    the cycle -> 1, died -> 0); no model, no planning. Aggregate gamble recall 0.73 -> 0.93 over
+    ~100 cycles; threshold lands on the DP optimum (mean|diff|~0.03). Cost of assuming the least:
+    slower/noisier than model-based (recall ~1.0 in ~3 cycles). Individual MC Q-tables are
+    high-variance; the population-mean value function is the clean readout. ARC FULLY COMPLETE:
+    imposed -> derived -> executed -> evolved -> learned(model-based) -> learned(model-free).
+[x] DAY/NIGHT SUN modulates the VARIANCE (risk x the sun; survival.sun_variance_risky +
+    survival_dp_timevarying, sun_variance.py). Closes the Phase 5 loop: the sun could not make
+    a stationary deterministic hazard risk-sensitive, but it CAN set foraging variance (dark =
+    erratic). High variance is a LIFELINE near the deadline (dusk ruin edge 0.26 vs 0.38) and a
+    LIABILITY far from it (dawn 0.10 vs 0.04). The sun puts variance where the deadline makes it
+    pay -- "starving organism accepts night risk" for the right reason.
+[x] CARVED OUT to a standalone repo for ResearchStaff write-up:
+    ../risk-sensitive-foraging/ (local git, self-contained, 10 tests, 6 study scripts -> figures;
+    the six-level arc frozen as of the model-free result, before the sun-variance synthesis).
+[x] BEHAVIORAL population for the sun-variance result (nocturnal desperation foraging as realized
+    behavior; survival.simulate_dusk_survival, behavioral_sun.py). Organisms dropped into the dark
+    dusk behind on reserves survive the night from a LOWER reserve under the sun than under matched
+    constant variance (E50 0.54 vs 0.58); survival advantage +0.25 across the desperate band, and
+    exactly 0 once the reserve is already safe -- the ruin-edge lifeline as who actually lives.
+[x] RICHER WORLDS pt.1 -- continuous outcomes + skew (survival.skewed_outcomes + outcome_moments,
+    richer_worlds.py). (a) A continuous gamble REMOVES the two-point reachability comb on the
+    safe-suffices edge (roughness 0.060 -> 0.000, same dusk requirement) -- the band is survival,
+    not the grid. (b) The energy-budget rule EXTENDS TO SKEW: at fixed mean & variance (where
+    mean-variance theory predicts indifference) the policy's skew preference REVERSES at R --
+    negative skew below (steady small gains), positive skew above (avoid the rare catastrophe).
+[x] RICHER WORLDS pt.2 -- multi-patch foraging (survival.survival_dp_patches + survival_dp_depleting,
+    multi_patch.py). (a) Patch choice is a THREE-way energy-budget rule: safe (low var) above R,
+    rich (high mean, rate-maximizing) below R with time, wild (high var) below R near dusk --
+    survival interpolates rate-maximizing <-> variance-seeking by time-to-requirement. (b) The
+    giving-up rule is FINITE-HORIZON: leaves depleted patches mid-day (classic MVT) but stops near
+    dusk, cutoff ~ day-travel (tracks the travel cost) -- a deadline infinite-horizon MVT lacks.
+    Joins exp020 (risk-neutral MVT) as the not-desperate limit.
+[ ] Next: evolve the multi-patch / depleting policies as heritable traits (evolve_risk_policy
+    currently evolves only the binary threshold). Other open: matching/concurrent-schedule threads.
+[ ] Day/night activity + mortality metrics (deferred with the risk redesign).
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 -------------------------------------------

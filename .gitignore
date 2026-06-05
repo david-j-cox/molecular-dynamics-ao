@@ -34,3 +34,6 @@ outputs/*.log
 
 # Local Claude Code settings
 .claude/
+
+# Copyrighted reference PDFs / supplements (local reading only, not redistributable)
+studies/*/refs/

@@ -585,6 +585,36 @@ def plot_resurgence(r1, r2, phase_blocks: int, path: str | Path,
     return _save(fig, path)
 
 
+def plot_risk_sensitivity(energy, version_a: dict, version_b: dict, e_req: float,
+                          path: str | Path) -> Path:
+    """Energy-budget rule: P(choose risky) vs current energy, two preparations.
+
+    Each version dict has ``survival`` and ``linear`` arrays over the ``energy`` bin
+    centers (use NaN for undersampled bins). Solid black = survival-shaped utility
+    (risk-prone below the requirement, risk-averse above -- the reversal); dashed gray
+    = linear-utility control (risk-neutral, flat). The dotted vertical line marks the
+    energy requirement ``e_req`` where the reversal occurs.
+    """
+    energy = np.asarray(energy, float)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=True)
+    titles = ["Reward variance", "Predation variance"]
+    for ax, ver, title in zip(axes, (version_a, version_b), titles, strict=True):
+        ax.plot(energy, np.asarray(ver["survival"], float), color="black", ls="-",
+                marker="o", ms=5, label="Survival utility")
+        ax.plot(energy, np.asarray(ver["linear"], float), color="0.55", ls="--",
+                marker="s", ms=5, label="Linear utility (control)")
+        ax.axvline(e_req, color="0.6", ls=":", lw=1.0)
+        ax.axhline(0.5, color="0.85", lw=0.6)
+        ax.set_xlabel("Current energy")
+        ax.set_title(title, fontsize=11)
+        ax.text(e_req, 0.02, " Requirement", fontsize=9, ha="left")
+    axes[0].set_ylabel("P(choose risky)")
+    axes[0].set_ylim(0, 1)
+    axes[1].legend(loc="upper right", frameon=False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
 def plot_punishment_suppression(rates, curves: dict, path: str | Path) -> Path:
     """Allocation to the punished response vs scheduled punishment rate, per model.
 

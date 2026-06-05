@@ -3,6 +3,7 @@
 
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments import ACTIONS, BehavioralFieldEnv
+from behavioral_md.environments.gridworld import ambient_light
 
 
 def test_reset_returns_valid_observation():
@@ -47,3 +48,40 @@ def test_food_biomass_depletes_and_regrows():
 
 def test_actions_cover_seven_discrete():
     assert set(ACTIONS) == set(range(7))
+
+
+def test_ambient_light_cycle():
+    """L(t) = 0.5*(1-cos(2pi*phase)): 0 at midnight (t=0), 1 at noon (t=spd/2)."""
+    assert ambient_light(0, 96) == 0.0
+    assert abs(ambient_light(48, 96) - 1.0) < 1e-9
+    assert ambient_light(96, 96) == 0.0          # wraps to next midnight
+    assert 0.0 <= ambient_light(13, 96) <= 1.0
+
+
+_LAY = {"position": [4, 4], "food": [4, 8], "danger": [4, 4], "light": [0, 0], "cue": [7, 7]}
+
+
+def test_day_night_off_is_unmodulated():
+    """With day_night off, ambient_light is 1.0 and intensities are unscaled."""
+    env = BehavioralFieldEnv(SimulationConfig(day_night=False))
+    obs, _ = env.reset(seed=0, options={"layout": _LAY})
+    assert obs["ambient_light"][0] == 1.0
+    raw = float(env._intensity(env.danger_pos))
+    assert abs(float(obs["danger_intensity"][0]) - raw) < 1e-9
+
+
+def test_day_night_grades_danger_detectability():
+    """With day_night on, sensed danger = true * (floor + (1-floor)*L): low at night,
+    full by day."""
+    cfg = SimulationConfig(day_night=True, steps_per_day=8, danger_detect_floor=0.2)
+    env = BehavioralFieldEnv(cfg)
+    obs, _ = env.reset(seed=0, options={"layout": _LAY})  # t=0, midnight, L=0
+    raw = float(env._intensity(env.danger_pos))
+    assert abs(float(obs["danger_intensity"][0]) - raw * 0.2) < 1e-6   # floor at night
+    seen = []
+    for _ in range(8):
+        obs, _r, _te, _tr, info = env.step(0)
+        seen.append(float(obs["danger_intensity"][0]))
+    # Detectability peaks at noon (L=1 -> raw) and is lowest at night (-> raw*floor).
+    assert max(seen) > min(seen)
+    assert max(seen) <= raw + 1e-6

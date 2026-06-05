@@ -133,8 +133,8 @@ def main() -> None:
     for label, x, y, c in pts:
         ax.scatter([x], [y], s=60, color=c, zorder=3)
         ax.annotate(label, (x, y), textcoords="offset points", xytext=(8, 4), fontsize=10)
-    ax.set_xlabel("probability sensitivity a_prob")
-    ax.set_ylabel("delay sensitivity a_delay")
+    ax.set_xlabel("Probability sensitivity (a_prob)")
+    ax.set_ylabel("Delay sensitivity (a_delay)")
     ax.set_title("Independent control of probability and delay sensitivity")
     ax.axhline(td0, color="0.85", lw=0.5)
     ax.axvline(tp0, color="0.85", lw=0.5)

@@ -139,6 +139,7 @@ flowchart LR
 | Changeover delay (COD) | matching sensitivity rises with inter-patch travel (Shull & Pliskoff) | implemented |
 | Patch-leaving / marginal-value theorem | `forage.py`: multi-patch salience; give-up density falls and residence rises with travel distance | implemented |
 | Punishment / reinforcement asymmetry | three concurrent-choice accounts (subtractive/de Villiers, competitive/Deluty, concatenated/Klapes) in `chamber.run_punishment_choice`; foraging `consequence.Subtractive`/`ConcatenatedAsymmetric`; exp029 + `studies/punishment_asymmetry/` | implemented |
+| Risk-sensitive foraging (energy-budget rule) | `chamber.run_risk_choice` (energy-budget rule given a survival utility) and `survival.survival_dp` (the rule *derived* from energy + death dynamics, no imposed utility); risk-prone below the requirement, risk-averse above (Caraco); exp030 + `studies/risk_sensitivity/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
@@ -328,6 +329,7 @@ separate food channels):
 | Partial-reinforcement extinction effect | `exp027` | Pearce-Hall associability → PRF persists longer in extinction than CRF; fixed-associability control shows none |
 | Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
 | Punishment asymmetry | `exp029` | three accounts all suppress the punished response, but subtractive (de Villiers) and competitive (Deluty) suppression depend on the alternative's reinforcement with opposite slopes; concatenated `a_p` recovered log-linearly |
+| Risk-sensitive foraging | `exp030` | the energy-budget rule: risk-prone below the energy requirement, risk-averse above; emerges from a survival-shaped utility; flat under a linear-utility control |
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -501,7 +503,42 @@ pre-commit install --hook-type pre-push     # pytest on push
   *obtained* punishment rate is inverted-U in the *scheduled* rate, so fitting the matching
   law on obtained rates can recover a punishment sensitivity of the **wrong sign** (+2.04
   on scheduled vs −2.24 on obtained). Use scheduled/programmed rates.
-- [x] **Tests + CI** — 65-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Day/night ambient sun + risk-sensitive foraging** — a global light cycle grading
+  perception (`config.day_night`; `studies/.../` notebook records that a *stationary*
+  deterministic hazard cannot yield risk-sensitivity). Risk-sensitivity done properly via
+  **outcome variance** and the **energy-budget rule** (`exp030`,
+  `studies/risk_sensitivity/`): a survival-shaped utility makes the organism risk-prone
+  below the energy requirement and risk-averse above (Caraco), in both reward-variance and
+  predation-variance preparations, with a flat risk-neutral control. **Derived from first
+  principles** (`survival.survival_dp`): a survival DP over a day/night cycle yields the rule
+  with *no* imposed utility — a risk-prone band whose requirement (`night_steps × metabolism`)
+  and ruin edge both emerge. It **evolves** (`survival.evolve_risk_policy`) — a population
+  with a heritable state-dependent risk trait, selected only by survival, converges on the
+  DP-optimal threshold. And it is **learned within life** (`survival.simulate_learning_choice`)
+  — an organism that starts not knowing which option is risky discovers it from experience and
+  plans the rule — and, most strictly, by **model-free reinforcement**
+  (`survival.simulate_model_free_choice`): tabular survival values learned from living and dying,
+  no model and no planning, still recovering the DP-optimal threshold. The same energy-budget
+  rule at six levels (imposed → derived → executed → evolved → learned model-based → learned
+  model-free), from progressively fewer assumptions; see `studies/risk_sensitivity/`.
+- [x] **Day/night sun → foraging variance** (`survival.sun_variance_risky`,
+  `survival_dp_timevarying`) — the Phase 5 sun, repurposed to set the *variance* of foraging
+  (dark = erratic) rather than a fixed hazard: high-variance dark foraging is a lifeline near
+  the deadline (the dusk ruin edge drops) and a liability far from it. Closes the Phase 5 loop.
+  Realized as behavior (`survival.simulate_dusk_survival`, `behavioral_sun.py`): organisms
+  dropped into dusk behind on reserves survive the night from a *lower* reserve under the sun
+  (+0.25 peak survival advantage in the desperate band, zero once reserves are safe).
+- [x] **Richer worlds — continuous outcomes + skew** (`survival.skewed_outcomes`,
+  `richer_worlds.py`) — a continuous gamble removes the two-point reachability comb (the band is
+  survival, not the grid), and the energy-budget rule *extends to the third moment*: at fixed
+  mean and variance the skew preference reverses at the requirement (negative skew when building
+  the buffer, positive skew when safe) — a higher-moment effect mean-variance theory can't express.
+- [x] **Multi-patch foraging — risk-sensitive choice + finite-horizon MVT**
+  (`survival.survival_dp_patches`, `survival_dp_depleting`, `multi_patch.py`) — patch choice is a
+  three-way energy-budget rule (safe / rich-rate-maximizing / wild-variance by energy and
+  time-of-day), and the giving-up rule is finite-horizon (leaving stops near dusk, cutoff tracking
+  the travel cost). Survival refines the risk-neutral MVT of `exp020`; MVT is its not-desperate limit.
+- [x] **Tests + CI** — 87-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model

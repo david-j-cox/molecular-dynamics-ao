@@ -285,6 +285,25 @@ class SimulationConfig(BaseModel):
         ),
     )
 
+    # --- Day/night ambient light (Phase 5) ---------------------------------
+    # A global sun L(t) = 0.5*(1 - cos(2*pi*(t mod steps_per_day)/steps_per_day)) in
+    # [0,1] (0 = midnight, 1 = noon). Opt-in: when off, L is ignored and behavior is
+    # byte-identical. When on, light GRADES PERCEPTION, not the physical consequences:
+    # danger is harder to detect and food harder to see at night, and food regrows
+    # faster by day. Physical danger contact and food intake still depend on TRUE
+    # proximity -- so a starving organism that forages at night accepts a risk it cannot
+    # see (risk-sensitive foraging).
+    day_night: bool = Field(False, description="Enable the day/night ambient light cycle.")
+    steps_per_day: int = Field(96, ge=2, description="Timesteps per full day/night cycle.")
+    danger_detect_floor: float = Field(
+        0.2, ge=0.0, le=1.0,
+        description="Night danger detectability: danger_sensed = danger_true*(floor+(1-floor)*L).",
+    )
+    food_light_floor: float = Field(
+        0.3, ge=0.0, le=1.0,
+        description="Night floor on food visibility AND regrowth (scale by floor+(1-floor)*L).",
+    )
+
     # --- Rendering ---------------------------------------------------------
     render_mode: Literal["human", "rgb_array", "none"] = Field(
         "none", description="Gymnasium render mode."

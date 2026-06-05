@@ -42,7 +42,10 @@ FIG = Path(__file__).parent / "figures"
 INF = float("inf")
 plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False,
                      "axes.labelsize": 12, "xtick.labelsize": 10,
-                     "ytick.labelsize": 10, "legend.fontsize": 10})
+                     "ytick.labelsize": 10, "legend.fontsize": 10,
+                     "font.family": "serif",
+                     "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+                     "mathtext.fontset": "stix"})
 
 
 # --- Preparation 1: concurrent choice (chamber) ----------------------------------- #
