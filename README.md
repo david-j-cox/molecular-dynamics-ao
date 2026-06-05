@@ -225,7 +225,7 @@ a Brunt–Väisälä-type restoring/relaxation reading):
 \begin{aligned}
 v_i &= \frac{x_i(t) - x_i(t-dt)}{dt}, \qquad F_\text{net} = F_i - c\,v_i \\
 x_i(t+dt) &= 2\,x_i(t) - x_i(t-dt) + \frac{F_\text{net}}{m_i}\,dt^2 \\
-x_i(t+dt) &\leftarrow \operatorname{clip}\!\big(x_i(t+dt),\ x_{\min},\ x_{\max}\big)
+x_i(t+dt) &\leftarrow \mathrm{clip}\left(x_i(t+dt),\ x_{\min},\ x_{\max}\right)
 \end{aligned}
 ```
 
@@ -265,9 +265,10 @@ handles direction in the expression). For drive atom `i` over present channels
 `s`, with teaching magnitude `mag = appetitive if valence_i > 0 else aversive`:
 
 ```math
-\underbrace{\Delta w_i[s] = \eta\, e_i\, I_s\,(\lambda\,\text{mag} - V_\text{pred})}_{\text{RW}}
-\qquad
-\underbrace{\Delta w_i[s] = \eta\,\text{mag}\, e_i\, I_s}_{\text{linear}}
+\begin{aligned}
+\text{RW:} \quad & \Delta w_i[s] = \eta\, e_i\, I_s\,(\lambda\,\text{mag} - V_\text{pred}) \\
+\text{linear:} \quad & \Delta w_i[s] = \eta\,\text{mag}\, e_i\, I_s
+\end{aligned}
 ```
 
 with `η = lr`, `λ` the asymptote, `V_pred` the prediction, and `w_i[s]` clipped to
