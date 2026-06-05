@@ -1928,3 +1928,29 @@ NEXT: spatial gridworld integration (the faithful demonstration) -- two food pat
 risky variable, matched mean), energy as an interoceptive cue, a day/night period, survival-credit
 learning on the real Organism. The commit-to-a-patch loop gives the timescale separation exp036
 shows is required. exp036 in the tree, ruff-clean (runs as a module: python -m experiments.exp036...).
+
+---
+
+## 2026-06-05 -- exp037: rule survives the atom dynamics (drive readout); spatial travel inverts it
+
+1D spatial forager (SAFE at x=-1 constant, RISKY at x=+1 variable, matched mean), approach B's
+survival-credit learning on energy x phase-conditioned weights, emission = DRIVE READOUT
+(orient on the pull difference = the movement atom's steady state; exp036 showed the transient
+integrated activation under-builds and smears). Resolves the two open issues:
+
+- EXPRESSION: with the drive readout, the atom-dynamics organism REPRODUCES the rule. With intake per
+  step (no travel concentration): reversal +0.24, risk-prone below R, tracks the imposed reference.
+  So the port works -- the failure in exp036 was the readout (transient activation), not the mechanism.
+- SPATIAL TRAVEL INVERTS THE RULE. With intake only on patch contact (real foraging): reversal -0.19,
+  risk-AVERSE below R. Causally confirmed -- flipping only the travel flag flips the sign. Structural
+  reason (new): spatial travel CONCENTRATES the cost of a failed gamble -- a risky 0-draw = a whole
+  trip's travel cost for nothing = a large one-encounter drop = lethal when low. So the low organism
+  takes the reliable immediate intake (safe). The classic energy-budget rule assumes PER-STEP
+  matched-mean options with the deadline as the sole forcing; concentrated per-encounter cost breaks
+  that and reverses the prediction. So risk-proneness-when-low does NOT survive spatial travel costs.
+
+Long iteration to get here (several prototypes: integrated-activation orientation flatlines; particle-
+Verlet-on-position starves with no feeds; two competing Verlet atoms flatline; drive readout works).
+Figure outputs/figures/exp037_spatial_survival_choice.png (blue imposed, green no-travel REPRODUCES,
+red travel INVERTS). The travel-cost result is worth its own study: when does spatial risk-sensitivity
+match vs invert the non-spatial energy-budget rule? exp037 ruff-clean, runs as a module.

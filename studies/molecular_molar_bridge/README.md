@@ -182,6 +182,30 @@ This isolates a second molar->molecular problem distinct from credit assignment:
    foraging loop supplies exactly this (approach a patch over many steps; reserve changes slowly); an
    abstract per-step choice does not. So the faithful atom-engine demonstration must be **spatial**.
 
+## Spatial loop (exp037): the rule survives the atom dynamics, but spatial travel inverts it
+
+A 1D spatial forager (SAFE patch at x=-1, RISKY at x=+1), with approach B's survival-credit learning
+on energy-state-conditioned weights and a **drive-readout** emission (orient on the pull difference,
+the steady-state of the movement atom -- exp036 showed the transient integrated activation
+under-builds). Two results:
+
+- **The rule survives the atom dynamics.** With intake per step (no travel-cost concentration), the
+  atom-dynamics organism reproduces the energy-budget rule: P(feed risky) reversal **+0.24**
+  (risk-prone below R), tracking the imposed reference. So the port works -- given the correct
+  drive/steady-state readout, the distributed mechanism + survival credit express the rule.
+- **Spatial travel INVERTS it.** When intake comes only on patch contact (real foraging), the rule
+  flips: reversal **-0.19** (risk-*averse* below R). Confirmed causal: switching only the
+  travel/no-travel flag flips the sign. The reason is structural and new: spatial travel
+  **concentrates the cost of a failed gamble** -- a risky 0-draw means a whole trip's travel cost
+  spent for nothing, a large one-encounter energy drop that is lethal when already low. So when low,
+  the organism takes the reliable immediate intake (safe). The classic energy-budget rule assumes
+  per-step matched-mean options with a deadline as the sole forcing; concentrated per-encounter cost
+  breaks that assumption and reverses the prediction.
+
+This is a genuine structural finding: **risk-proneness-when-low does not survive spatial foraging
+with travel costs** -- the molar->molecular bridge (survival credit) is intact, but the realized
+policy depends on the foraging structure (per-step vs per-encounter cost).
+
 ## Status
 
 - exp032: negative baseline (the rule does not emerge from per-step atom dynamics).
@@ -189,11 +213,12 @@ This isolates a second molar->molecular problem distinct from credit assignment:
 - exp034: **B generalizes** -- the reversal tracks R with no retuning (corr 1.0).
 - exp035: **a predation upper boundary yields risk-aversion above R** (twin-threshold rule).
 - exp036: **B's learning ports to the atom history weights, but a per-step choice cannot express it**
-  (timescale mismatch). The credit-assignment piece is solved; expression needs timescale separation.
-- Next: the **spatial gridworld integration** -- two food patches (safe constant, risky variable),
-  energy as an interoceptive cue, a day/night period, and the survival-credit learning rule on the
-  real `Organism`. The commit-to-a-patch spatial loop supplies the timescale separation exp036 shows
-  is required. See `docs/lab_notebook.md`.
+  (timescale mismatch). Credit solved; expression needs timescale separation.
+- exp037: **the atom dynamics + survival credit reproduce the rule (drive-readout emission), but
+  spatial travel-cost concentration inverts it** -- a structural limit on the energy-budget rule.
+- Open: a full `BehavioralFieldEnv` integration; and the travel-cost result deserves its own writeup
+  (when does spatial risk-sensitivity match vs invert the non-spatial rule?). See
+  `docs/lab_notebook.md`.
 
 ## References
 - Baum, W. M. (1973). The correlation-based law of effect. *JEAB* 20, 137-153. doi:10.1901/jeab.1973.20-137
