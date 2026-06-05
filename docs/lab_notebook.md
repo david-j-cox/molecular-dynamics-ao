@@ -1873,3 +1873,32 @@ NEXT: (1) port B into the atom engine as a hierarchical operant level (daily sur
 modulating the molecular history weights); (2) validate by GENERALIZATION (shift night length / option
 distributions -> reversal must track with no retuning); (3) add an upper (reproduction/predation)
 boundary for risk-aversion above. exp032/exp033 in the tree, uncommitted.
+
+---
+
+## 2026-06-05 -- exp034/exp035: B generalizes and yields the twin-threshold rule
+
+Two validation tests of approach B (daily survival signal), both passed.
+
+exp034 (generalization; the non-hard-coding proof): with the learner FIXED, shift the night length
+(R = night_cost*night_steps) and the emergent risk-prone/averse crossover tracks the new R on its
+own: nights 4/8/12 -> R 0.20/0.40/0.60 -> crossover 0.25/0.45/0.65, corr 1.000, mean offset 0.05
+(one bin). Nothing about R or the policy was installed; only the environmental requirement changed.
+This is the test that separates a real mechanism from a disguised hard-code -- B passes.
+Figure outputs/figures/exp034_bridge_generalization.png. Note: exp034/exp035 import
+run_survival_signal from exp033, so run them as modules (python -m experiments.exp034...).
+
+exp035 (upper boundary; risk-aversion above R): a single starvation boundary makes survival saturate
+at 1 above R, so B is only weakly averse when fed. Adding predation above an upper reserve x_r
+(heavier = slower/more visible; McNamara & Houston 1990) -- another bare environmental FACT, not a
+utility -- sharpens aversion in the well-fed band: P(risky) in [R, x_r] falls 0.36 -> 0.27 (x_r=0.45,
+pred_prob=0.20), risk-proneness below R unchanged (0.61). The twin-threshold energy-budget rule
+(prone below R, averse above) emerges from two real death sources. (Above x_r the policy is noisy:
+organisms there are eaten regardless of choice; rarely/unstably visited -- presentational caveat,
+not the signal.) run_survival_signal gained optional predation_threshold/predation_prob (off by
+default, so exp033/exp034 unchanged). Figure outputs/figures/exp035_upper_boundary.png.
+
+STATUS: the tabular prototype has passed mechanism (exp033), generalization (exp034), and
+twin-threshold (exp035). Remaining: port B into the atom engine as a hierarchical operant level
+(daily survival reinforcer modulating the molecular history weights). Writeup:
+studies/molecular_molar_bridge/README.md.

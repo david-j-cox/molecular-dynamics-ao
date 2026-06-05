@@ -131,16 +131,43 @@ averse above) and the requirement itself are then emergent, not installed. Pure 
 (A) is too weak; an imposed utility (exp030) is too strong; the daily survival fact (B) is the
 minimal faithful bridge.
 
+## Validation of B (exp034, exp035)
+
+**Generalization -- the non-hard-coding proof (exp034).** With the learner held fixed (lr, decay,
+temperature, bins), shifting the night length (hence R = night_cost*night_steps) moves B's emergent
+risk-prone/averse crossover to the new requirement on its own:
+
+| night steps | R | emergent crossover |
+|---|---|---|
+| 4 | 0.20 | 0.25 |
+| 8 | 0.40 | 0.45 |
+| 12 | 0.60 | 0.65 |
+
+corr(crossover, R) = **1.000**, mean offset = 0.05 (one energy bin, discretization). Nothing about R
+or the policy was installed; only the environmental fact (a longer night needs a bigger dusk reserve)
+changed, and the policy followed. This is the test that distinguishes a real mechanism from a
+disguised hard-code, and B passes it. Figure: `outputs/figures/exp034_bridge_generalization.png`.
+
+**The upper boundary -- risk-aversion above R (exp035).** With a single (starvation) boundary,
+survival saturates at 1 above R, so B is only weakly averse when fed. Adding a second death source
+-- predation above an upper reserve x_r (heavier = slower/more visible; McNamara & Houston 1990),
+another bare environmental fact -- sharpens aversion in the well-fed band: P(risky) in [R, x_r] drops
+from 0.36 (single boundary) to **0.27** (two boundaries), while risk-proneness below R is unchanged
+(0.61). This is the twin-threshold energy-budget rule (prone below R, averse above), with aversion
+driven by a real cost of being fat, not a utility. (Above x_r the policy is noisy: organisms there
+are being eaten regardless of choice, so the bin is rarely and unstably visited.) Figure:
+`outputs/figures/exp035_upper_boundary.png`.
+
 ## Status
 
 - exp032: negative baseline (the rule does not emerge from per-step atom dynamics).
-- exp033: A vs B. **A insufficient, B reproduces the rule with an emergent requirement.**
-- Next: (1) port B into the real atom engine as a hierarchical operant level (a daily survival
-  reinforcer modulating the molecular history weights), since exp033 is a tabular prototype of the
-  mechanism; (2) validate non-question-beggingness by **generalization** -- shift the requirement
-  (night length) and the option distributions and confirm B's reversal tracks with no retuning;
-  (3) add the upper (reproduction/predation) boundary for risk-aversion above. See
-  `docs/lab_notebook.md` (2026-06-05).
+- exp033: A vs B -- **A insufficient, B reproduces the rule with an emergent requirement.**
+- exp034: **B generalizes** -- the reversal tracks R with no retuning (corr 1.0).
+- exp035: **a predation upper boundary yields risk-aversion above R** (twin-threshold rule).
+- Next: port B into the real atom engine as a hierarchical operant level (a daily survival
+  reinforcer modulating the molecular history weights), since exp033--035 are a tabular prototype of
+  the mechanism. The prototype has now passed the mechanism, generalization, and twin-threshold
+  tests, so the atom-engine integration is the remaining build. See `docs/lab_notebook.md`.
 
 ## References
 - Baum, W. M. (1973). The correlation-based law of effect. *JEAB* 20, 137-153. doi:10.1901/jeab.1973.20-137

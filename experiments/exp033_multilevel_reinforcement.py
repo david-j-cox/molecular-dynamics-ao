@@ -118,7 +118,8 @@ def run_multilevel(*, n_org=4000, n_cycles=400, seed=0, cap=1.0, e_init=0.5,
 
 def run_survival_signal(*, n_org=4000, n_cycles=400, seed=0, cap=1.0, e_init=0.5,
                         day_steps=12, night_steps=6, day_cost=0.05, night_cost=0.05,
-                        ebins=10, tbins=3, lr=0.15, decay=0.9, T=0.05, measure_last=80):
+                        ebins=10, tbins=3, lr=0.15, decay=0.9, T=0.05, measure_last=80,
+                        predation_threshold=None, predation_prob=0.0):
     """Approach B: survival is a DAILY-scale signal that scales down into the day's choices.
 
     Within the day, the molecular reinforcer (food contact) builds the energy reserve. At the
@@ -154,6 +155,13 @@ def run_survival_signal(*, n_org=4000, n_cycles=400, seed=0, cap=1.0, e_init=0.5
             V[mask] += lr * day_elig[mask] * (target - V[mask])
             day_elig[mask] = 0.0
 
+    def predation(e):
+        # Optional second death source: a heavier reserve is slower/more visible, so predation
+        # strikes above an upper threshold. Off by default (then dead = starvation only).
+        if predation_threshold is None or predation_prob <= 0.0:
+            return np.zeros(len(e), bool)
+        return (e > predation_threshold) & (rng.random(len(e)) < predation_prob)
+
     for cyc in range(n_cycles):
         measuring = cyc >= n_cycles - measure_last
         for ds in range(day_steps):
@@ -173,13 +181,13 @@ def run_survival_signal(*, n_org=4000, n_cycles=400, seed=0, cap=1.0, e_init=0.5
 
             delta = np.where(choose_risky, draw(rp, rd), draw(sp, sd))
             E = np.clip(E + delta - day_cost, 0.0, cap)
-            dead = E <= 0.0
+            dead = (E <= 0.0) | predation(E)  # starvation below, predation when too high
             credit(dead, 0.0)                 # died -> the cycle's choices credited toward 0
             E[dead] = e_init
 
         for _ in range(night_steps):
             E = np.clip(E - night_cost, 0.0, cap)
-            dead = E <= 0.0
+            dead = (E <= 0.0) | predation(E)
             credit(dead, 0.0)
             E[dead] = e_init
 
