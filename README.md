@@ -21,9 +21,20 @@ behavioral ecology.
 
 *A trained organism foraging in the gridworld (left): its position and recent trail, the
 food/danger/light/cue sources, and the current action and most-active atom each step; the energy
-reserve (right) dips toward starvation on the trek to food, then the organism reaches the patch and
-sustains a full reserve by foraging it. Nothing here is scripted, the path is read out from the
-coupled atom dynamics. Regenerate with `python scripts/run_animation_demo.py`.*
+reserve (purple, right) dips toward starvation on the trek to food, then the organism reaches the
+patch and sustains itself by foraging it (the food marker and the green biomass trace show the patch
+state). Nothing here is scripted, the path is read out from the coupled atom dynamics. Regenerate
+with `python scripts/run_animation_demo.py`.*
+
+**Variable-interval foraging.** The patch follows logistic depletion/regrowth, which acts like a
+variable-interval (VI) schedule: a spent patch only pays again after it has regrown.
+
+![VI-schedule foraging](docs/media/organism_vi_foraging.gif)
+
+*Same engine, slower-regrowing patch with a low floor: the food marker shrinks as the patch is eaten
+and grows back as it regrows, and the green biomass trace (right) is a clean sawtooth against the
+energy reserve (purple). The organism harvests the patch, leaves as it depletes and its food signal
+fades, and returns once it has regrown. Regenerate with `python scripts/run_vi_foraging_demo.py`.*
 
 ---
 

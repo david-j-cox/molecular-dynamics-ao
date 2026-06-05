@@ -865,6 +865,9 @@ def animate_life(df: pd.DataFrame, path, grid_size: int = 10, fps: int = 12, tra
     action = g["action"].first().to_numpy()
     top_rows = df.loc[df.groupby("timestep")["atom_activation"].idxmax()]
     top_atom = top_rows.set_index("timestep")["atom_name"].reindex(steps).to_numpy()
+    has_bm = "food_biomass" in df.columns
+    bm = g["food_biomass"].first().to_numpy() if has_bm else None
+    bm_k = float(bm.max()) if has_bm and bm.max() > 0 else 1.0
     r0 = df.iloc[0]
     sources = {n: (float(r0[f"{n}_x"]), float(r0[f"{n}_y"]))
                for n in _ANIM_SOURCE_STYLE if f"{n}_x" in df.columns}
@@ -879,10 +882,13 @@ def animate_life(df: pd.DataFrame, path, grid_size: int = 10, fps: int = 12, tra
     ax.set_yticks(range(grid_size))
     ax.grid(True, color="0.9", lw=0.6)
     ax.set_axisbelow(True)
+    food_scat = None
     for name, (sx, sy) in sources.items():
         color, marker, label = _ANIM_SOURCE_STYLE[name]
-        ax.scatter([sx], [sy], s=180, c=color, marker=marker, edgecolors="k",
-                   linewidths=0.6, label=label, zorder=3)
+        sc = ax.scatter([sx], [sy], s=180, c=color, marker=marker, edgecolors="k",
+                        linewidths=0.6, label=label, zorder=3)
+        if name == "food":
+            food_scat = sc   # resized each frame to show the patch depleting/regrowing (VI)
     # legend in a horizontal row ABOVE the arena so it never overlaps the behavior
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=4, fontsize=9,
               frameon=False, handletextpad=0.3, columnspacing=1.2)
@@ -893,21 +899,33 @@ def animate_life(df: pd.DataFrame, path, grid_size: int = 10, fps: int = 12, tra
     axe.set_xlim(0, len(steps))
     axe.set_ylim(0, 1.02)
     axe.set_xlabel("timestep")
-    axe.set_ylabel("energy reserve")
+    axe.set_ylabel("level (0-1)")
     axe.axhline(0, color="tab:red", lw=1, ls="--", alpha=0.6)
     for sp in ("top", "right"):
         axe.spines[sp].set_visible(False)
-    (eline,) = axe.plot([], [], "-", color="tab:purple", lw=2)
+    (eline,) = axe.plot([], [], "-", color="tab:purple", lw=2, label="energy reserve")
+    bmline = None
+    if has_bm:
+        (bmline,) = axe.plot([], [], "-", color="tab:green", lw=2, alpha=0.85,
+                             label="food biomass (VI patch)")
+    axe.legend(loc="lower right", fontsize=8, frameon=False)
 
     def update(i):
         dot.set_data([xs[i]], [ys[i]])
         lo = max(0, i - trail)
         trail_line.set_data(xs[lo:i + 1], ys[lo:i + 1])
         a = int(action[i])
+        bm_txt = f"   biomass: {bm[i]:.2f}" if has_bm else ""
         overlay.set_text(f"step {steps[i]}   action: {_ACTION_NAMES.get(a, a)}   "
-                         f"top atom: {top_atom[i]}   energy: {energy[i]:.2f}")
+                         f"top atom: {top_atom[i]}   energy: {energy[i]:.2f}{bm_txt}")
         eline.set_data(range(i + 1), energy[:i + 1])
-        return dot, trail_line, overlay, eline
+        artists = [dot, trail_line, overlay, eline]
+        if has_bm:
+            bmline.set_data(range(i + 1), bm[:i + 1])
+            if food_scat is not None:
+                food_scat.set_sizes([180.0 * (0.18 + 0.82 * bm[i] / bm_k)])
+            artists.append(bmline)
+        return artists
 
     anim = animation.FuncAnimation(fig, update, frames=len(steps),
                                    interval=1000 / fps, blit=False)
