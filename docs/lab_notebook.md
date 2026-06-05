@@ -1902,3 +1902,29 @@ STATUS: the tabular prototype has passed mechanism (exp033), generalization (exp
 twin-threshold (exp035). Remaining: port B into the atom engine as a hierarchical operant level
 (daily survival reinforcer modulating the molecular history weights). Writeup:
 studies/molecular_molar_bridge/README.md.
+
+---
+
+## 2026-06-05 -- exp036: atom-substrate port splits credit (works) from expression (needs timescale sep)
+
+Ported approach B onto the engine's own dynamics: choice = force decomposition -> verlet_update ->
+softmax, with energy-state-conditioned history weights credited by the period-scale survival signal.
+Two outcomes:
+- LEARNING ports cleanly: W(risky)-W(safe) = +0.06 below R, -0.06 just above -- the survival-credit
+  mechanism shapes the atom history weights exactly as in the tabular prototype.
+- EXPRESSION fails in a per-step choice: P(risky) flat ~0.50 (reversal -0.00). The damped-Verlet
+  activation needs SUSTAINED drive to build magnitude (constant drive settles to weight-ordered
+  activations, 0.72 vs 0.60 -> softmax 0.92/0.08), but the energy state changes every step here, so
+  the activation never reflects the current state and the softmax smears to indifference. (First
+  guessed saturation/clipping -- WRONG; verified the dynamics discriminate when weights differ.)
+
+So there are TWO molar->molecular problems: (1) CREDIT (molar outcome -> molecular weights), solved
+by survival-eligibility; (2) EXPRESSION (molecular dynamics enacting a molar state-dependent policy),
+which needs TIMESCALE SEPARATION -- molecular fast vs molar state slow, i.e. commit to an option over
+a stretch of ~constant state. The spatial foraging loop supplies this; an abstract per-step choice
+does not. exp036 prints the learned-weight structure next to the flat choice to make this explicit.
+
+NEXT: spatial gridworld integration (the faithful demonstration) -- two food patches (safe constant,
+risky variable, matched mean), energy as an interoceptive cue, a day/night period, survival-credit
+learning on the real Organism. The commit-to-a-patch loop gives the timescale separation exp036
+shows is required. exp036 in the tree, ruff-clean (runs as a module: python -m experiments.exp036...).

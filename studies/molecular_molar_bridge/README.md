@@ -158,16 +158,42 @@ driven by a real cost of being fat, not a utility. (Above x_r the policy is nois
 are being eaten regardless of choice, so the bin is rarely and unstably visited.) Figure:
 `outputs/figures/exp035_upper_boundary.png`.
 
+## Atom-substrate port (exp036): learning ports, expression needs timescale separation
+
+Putting approach B onto the engine's own dynamics -- the choice produced by the force decomposition
+-> `verlet_update` -> softmax, with energy-state-conditioned history weights credited by the
+period-scale survival signal -- splits into two outcomes:
+
+- **The learning ports cleanly.** The state-conditioned history weights acquire the rule:
+  W(risky)-W(safe) = +0.06 below R and -0.06 just above. The survival-credit mechanism works on the
+  atom history weights exactly as in the tabular prototype.
+- **The expression does not, in a per-step choice.** P(risky) stays flat (~0.50). The damped-Verlet
+  activation needs \emph{sustained} drive to build magnitude (a constant drive settles to a
+  weight-ordered activation, e.g.\ 0.72 vs 0.60 -> softmax 0.92/0.08), but in an abstract one-shot
+  choice the energy state changes every step, so the activation never reflects the current state and
+  the softmax smears to indifference.
+
+This isolates a second molar->molecular problem distinct from credit assignment:
+
+1. **Credit** (molar outcome -> molecular weights): solved by survival-eligibility (B). Works here.
+2. **Expression** (molecular dynamics enacting a molar state-dependent policy): requires
+   **timescale separation** -- the molecular dynamics must be fast relative to the molar state, or
+   the organism must commit to an option over a stretch where the state is ~constant. The spatial
+   foraging loop supplies exactly this (approach a patch over many steps; reserve changes slowly); an
+   abstract per-step choice does not. So the faithful atom-engine demonstration must be **spatial**.
+
 ## Status
 
 - exp032: negative baseline (the rule does not emerge from per-step atom dynamics).
 - exp033: A vs B -- **A insufficient, B reproduces the rule with an emergent requirement.**
 - exp034: **B generalizes** -- the reversal tracks R with no retuning (corr 1.0).
 - exp035: **a predation upper boundary yields risk-aversion above R** (twin-threshold rule).
-- Next: port B into the real atom engine as a hierarchical operant level (a daily survival
-  reinforcer modulating the molecular history weights), since exp033--035 are a tabular prototype of
-  the mechanism. The prototype has now passed the mechanism, generalization, and twin-threshold
-  tests, so the atom-engine integration is the remaining build. See `docs/lab_notebook.md`.
+- exp036: **B's learning ports to the atom history weights, but a per-step choice cannot express it**
+  (timescale mismatch). The credit-assignment piece is solved; expression needs timescale separation.
+- Next: the **spatial gridworld integration** -- two food patches (safe constant, risky variable),
+  energy as an interoceptive cue, a day/night period, and the survival-credit learning rule on the
+  real `Organism`. The commit-to-a-patch spatial loop supplies the timescale separation exp036 shows
+  is required. See `docs/lab_notebook.md`.
 
 ## References
 - Baum, W. M. (1973). The correlation-based law of effect. *JEAB* 20, 137-153. doi:10.1901/jeab.1973.20-137
