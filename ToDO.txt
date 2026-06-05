@@ -40,8 +40,12 @@ TUNING / QUALITY (current foraging model)
     softmax_temperature=0.3 (matching), deficit_exponent=2.0 (risk), move_cost=0.005.
     85/85 tests pass; reproduce baseline regenerated. (Global lambda=2.0 remains a
     candidate iff a full battery re-baseline is wanted later.)
-[ ] Revisit whether learning signal should be graded by energy (vs normalized
-    per-event) while keeping objectivism.  [still open -- not investigated in exp031]
+[x] Revisit whether learning signal should be graded by energy vs normalized per-event
+    (exp038): NORMALIZED is correct. Grading the appetitive signal by amount eaten
+    (intake/food_intake_rate, still objective) COLLAPSES acquisition (drop +73 -> -110,
+    late reach 0.90 -> 0.18, death 0.70 -> 0.94), because intake is biomass-limited and the
+    patch depletes, so the graded signal shrinks toward 0 as the patch is eaten and the
+    approach weight never builds. DeltaEnergy(graded=True) is kept as an opt-in (default off).
 
 PHENOMENA ZOO (validation battery; runs on the JAX engine)
 ----------------------------------------------------------
@@ -147,6 +151,18 @@ PHASE 5 -- DAY/NIGHT (global ambient sun)
 [ ] Next: evolve the multi-patch / depleting policies as heritable traits (evolve_risk_policy
     currently evolves only the binary threshold). Other open: matching/concurrent-schedule threads.
 [ ] Day/night activity + mortality metrics (deferred with the risk redesign).
+
+MOLECULAR-MOLAR BRIDGE (exp032-037; studies/molecular_molar_bridge/)
+-------------------------------------------------------------------
+[x] The energy-budget rule does NOT emerge from per-step atom dynamics (exp032); a bare
+    period-scale survival fact credited by eligibility (approach B) reproduces it with an
+    EMERGENT requirement, no utility (exp033); it generalizes (exp034, corr 1.0); predation
+    upper boundary gives the twin-threshold rule (exp035); learning ports to the atom weights
+    but per-step expression needs timescale separation (exp036); with a drive-readout emission
+    the atom dynamics express it, and spatial travel-cost concentration INVERTS it (exp037).
+[ ] Full BehavioralFieldEnv (multi-patch, real Organism) integration of approach B.
+[ ] Spatial travel-cost inversion as a standalone study: when does spatial risk-sensitivity
+    match vs invert the non-spatial energy-budget rule? (travel-cost concentration is the lever.)
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 -------------------------------------------
@@ -380,7 +396,10 @@ VISUALIZATION (visualization.py)
 [x] Generalization gradient (response vs cue value, 95% CI).
 [x] Matching plots: plot_matching (GML log-log), plot_matching_cod, peak shift.
 [x] Death-pattern plots: survival curve, time-to-death, mortality-by-life.
-[ ] Optional pygame render (arena, organism, food, danger, sun, top atom, action).
+[x] Animated GIF of a life so people can SEE the engine run (visualization.animate_life +
+    scripts/run_animation_demo.py): arena with organism + trail, sources, current action +
+    top atom, energy reserve over time. Committed to docs/media/ and embedded in the README.
+[ ] Optional pygame (interactive) render -- the GIF covers the "see it" need for now.
 
 DEMOS (scripts/)
 ----------------
@@ -463,5 +482,6 @@ COMPUTE / INFRA
 
 REPO HYGIENE
 ------------
-[ ] Open PR from dev -> main once Phase 5/6 land (currently working on dev).
-[ ] Tag a v0.1 once tests + demos pass.
+[x] Merge dev -> main (2026-06-05): risk arc + acquisition tuning + molecular-molar bridge
+    (exp030-037). Merge commit on main; ruff + full suite green on push.
+[x] Tag a v0.1 (2026-06-05): annotated tag on the main merge commit; 85 tests + reproduce 37/37 pass.
