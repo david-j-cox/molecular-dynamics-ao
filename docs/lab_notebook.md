@@ -1806,3 +1806,70 @@ DECISION (final defaults):
 STILL OPEN: (a) whether the learning signal should be graded by energy vs normalized per-event
 (ToDo item, not yet investigated); (b) global-default promotion of the asymptote remains a candidate
 if a battery re-baseline is wanted later.
+
+---
+
+## 2026-06-05 -- Mechanistic energy-budget test (exp032): the rule does NOT emerge (molecular/molar)
+
+Question: does the real atom engine (force + convex motivational gain + damped Verlet + eligibility-RW
++ energy/death) reproduce the energy-budget rule on a matched-mean safe-vs-risky choice, without an
+imposed survival utility? NO. exp032 compares three curves of P(risky) vs current energy:
+  imposed utility (exp030 ref, U(E) installed): clean reversal, below R 0.70 / above 0.30 (+0.21).
+  mechanistic, energy teaching: flat/low ~0.15, no reversal.
+  mechanistic, single-step survival teaching: flat ~0.5, no reversal.
+
+WHY (three reasons): (1) the convex gain mu*deficit^p scales BOTH options equally -> cancels in the
+choice, cannot create a variance preference; (2) per-step Rescorla-Wagner on matched means -> equal
+learned values -> no preference (small asymmetry runs toward safe, a death/selection artifact);
+(3) single-step survival is trivial (a draw almost never crosses 0 at these reserves), so post>0 is
+~always 1 -> no signal. The survival contingency only bites over a HORIZON (surviving the night).
+
+MOLECULAR/MOLAR reading (full writeup: studies/molecular_molar_bridge/README.md). The atom engine is
+MOLECULAR (momentary forces, per-step credit); it reproduces molar AGGREGATES (matching, demand,
+momentum) but not the energy-budget rule, whose contingency is an extended-horizon terminal event
+(survive the period; the death boundary after the fast). This is the molecular vs molar scaling debate
+(Baum 2002) made concrete. The missing ingredient is HORIZON credit assignment, not anything specific
+to risk -- proven by the model-free survival learner, which recovers the rule from cycle survival.
+
+DESIGN PROBLEM (open, for the next build): restore the molar influence WITHOUT hard-coding the answer
+(the imposed U(E) is question-begging). Litmus tests for non-question-begging: inject only
+environmental FACTS (death over a period; passage of time), never U(E)/R/the policy; use a GENERAL
+mechanism (temporal credit assignment or selection), not a bespoke variance term; and it must
+GENERALIZE (shift R / the distributions and the policy tracks with no retuning). Candidate mechanisms:
+(1) within-life horizon-survival TD/eligibility (the eligibility trace is the molecular implement of
+molar credit; lengthen the horizon, terminal signal = survived the period); (2) time-to-deadline as a
+sensed channel (env already has the day/night cycle), so the policy can condition on (energy, time);
+(3) selection across lives on atom params (installs nothing; molar fact enters only via who
+reproduces). Recommendation: (1)+(2) within-life, validated by generalization; (3) as independent
+confirmation. exp032 is in the tree; mechanism build not yet started.
+
+---
+
+## 2026-06-05 -- exp033: contact-only (A) fails, daily-survival signal (B) reproduces the rule
+
+Tested two molar->molecular bridges on a day/night economy (energy + death), state-conditioned by
+(energy bin x day-phase), measured at the EMERGENT requirement R = night_cost*night_steps = 0.30
+(reserve needed to outlast the fast; not a free parameter). Figure
+outputs/figures/exp033_multilevel_reinforcement.png.
+
+  imposed utility (ref): reversal +0.20 (built in).
+  A -- reinforcer-as-only-currency (contact is the only signal; survival implicit; death = truncation;
+       choice value = "followed by contacts"): reversal -0.07. FAILS. The safe option's higher contact
+       RATE (feeds every step; risky only on its good draw) dominates and the value saturates without a
+       sharp boundary differential. Long eligibility (decay up to 0.995) does not rescue it.
+  B -- daily survival signal scales down (alive-at-dawn=1 / died=0, credited onto the day's choices via
+       the eligibility trace; survival is a bare 0/1 FACT at the day scale, not a utility): reversal
+       +0.17. SUCCEEDS, tracks the imposed reference below R, with an EMERGENT requirement and no U(E).
+
+CONCLUSION (answers the no-hard-coding question): the molar consequence (survival) must enter as an
+explicit signal, but only as a bare period-scale FACT scaled down onto molecular choices by temporal
+credit -- not a value function. Pure reinforcer-currency (A) is too weak; an imposed utility (exp030)
+too strong; the daily survival fact (B) is the minimal faithful bridge. Convexity and the requirement
+are emergent. This is approach B from the design chat (survival has value at a daily level that scales
+down to the many-per-day food contacts). Writeup: studies/molecular_molar_bridge/README.md.
+
+exp033 is a TABULAR prototype of the mechanism (state = energy x time bins), not yet the atom engine.
+NEXT: (1) port B into the atom engine as a hierarchical operant level (daily survival reinforcer
+modulating the molecular history weights); (2) validate by GENERALIZATION (shift night length / option
+distributions -> reversal must track with no retuning); (3) add an upper (reproduction/predation)
+boundary for risk-aversion above. exp032/exp033 in the tree, uncommitted.
