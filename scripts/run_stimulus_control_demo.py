@@ -3,12 +3,16 @@
 The three-term contingency S: R -> C. A response is reinforced in the presence of S+ (a cue value)
 and not in S-delta. Over training, responding comes under stimulus control: the organism emits the
 response under S+ and withholds it under S-delta, and to a novel/neutral cue it responds at an
-intermediate level (a generalization decrement). This is the OPERANT counterpart to the Pavlovian
-cue-gradient demos (run_generalization_demo, run_peak_shift_demo): here we measure the emitted
-RESPONSE, and reinforcement is contingent on responding.
+intermediate level (a generalization decrement).
 
-Mechanism: the engine's CueReceptorField (Shepard-tuned receptors, summed-error Rescorla-Wagner)
-supplies the cue->response drive; the response is emitted by a logistic (Luce) rule over that drive.
+This is the SAME associative mechanism as the generalization / peak-shift demos, not a separate
+"operant" process. Stimulus-consequence (respondent) and response-consequence (operant) relations
+are inseparable, as in real organisms: there is one cue->drive association (the CueReceptorField:
+Shepard-tuned receptors, summed-error Rescorla-Wagner), updated by the three-term contingency -- it
+changes only when a response meets a reinforcer in the presence of the cue. The demos differ only in
+PROCEDURE (here reinforcement is response-contingent) and READOUT (here the emitted response, via a
+logistic/Luce rule over the cue drive), not in kind.
+
 On each presentation the response is reinforced only under S+; the credited (emitted) response then
 strengthens the cue association under S+ and extinguishes it under S-delta. A controlled procedure
 (balanced S+/S-delta exposure) is used, as in run_peak_shift_demo, because survival foraging cannot

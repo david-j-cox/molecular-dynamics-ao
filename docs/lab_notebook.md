@@ -2085,9 +2085,13 @@ too (exp005/exp006/exp044).
 ## 2026-06-06 -- operant stimulus control (run_stimulus_control_demo + test)
 
 The three-term contingency S: R -> C. A response reinforced under S+ (a cue value) but not S-delta
-comes under stimulus control. The OPERANT counterpart to the Pavlovian cue-gradient demos: here the
-response is EMITTED (logistic/Luce emission over the CueReceptorField drive) and reinforcement is
-contingent on responding under S+ (mag=1 iff S+ and responded; the emitted response is credited).
+comes under stimulus control. NOT a separate operant process from the generalization/peak-shift demos
+-- it is the SAME cue-association mechanism; respondent (S-C) and operant (R-C) relations are
+inseparable here, as in real organisms (the one cue->drive association updates only when a response
+meets a reinforcer in the presence of the cue -- the three-term contingency). These demos differ only
+in procedure (reinforcement made response-contingent) and readout (the emitted response, logistic/Luce
+over the cue drive), not in kind. (Conceptual correction per DC: do not frame operant vs respondent as
+separable counterparts.)
 Controlled, balanced S+/S-delta procedure (like run_peak_shift_demo) -- chosen because the gridworld
 cue field learns only on REINFORCED contact (at_food = intake>0), so it cannot accrue S-delta
 inhibition without an engine change; the controlled prep drives learn() with mag per trial.
