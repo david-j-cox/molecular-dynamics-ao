@@ -1,0 +1,13 @@
+{
+  "night_requirement": 0.72,
+  "variance_reversal_vs_threshold_meanabsdiff": 0.005173611111111114,
+  "variance_reversal_vs_threshold_corr": 0.9999754203643618,
+  "variance_below": 0.010788994896829794,
+  "variance_above": -0.007480039788141522,
+  "skew_below": -0.0004470013378688324,
+  "skew_above": 0.0034721843058966428,
+  "kurtosis_below": -0.001541742094225514,
+  "kurtosis_above": -0.001093996258574712,
+  "dusk_variance_reversal": 0.7000000000000001,
+  "dusk_threshold": 0.7000000000000001
+}

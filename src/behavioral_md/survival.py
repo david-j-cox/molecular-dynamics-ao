@@ -53,7 +53,9 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
 
     q_safe = np.zeros((day_steps, n_egrid))
     q_risky = np.zeros((day_steps, n_egrid))
+    cont = np.zeros((day_steps, n_egrid))           # continuation value V_{t+1} per day-step
     for t in range(day_steps - 1, -1, -1):          # dusk -> dawn
+        cont[t] = value                             # value currently holds V_{t+1}
         qs = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in safe_outcomes)
         qr = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in risky_outcomes)
         q_safe[t] = qs
@@ -61,7 +63,7 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
         value = np.maximum(qs, qr)                  # optimal: take the better option
 
     policy_risky = (q_risky > q_safe + 1e-12).astype(float)
-    return {"energy": e, "q_safe": q_safe, "q_risky": q_risky,
+    return {"energy": e, "q_safe": q_safe, "q_risky": q_risky, "cont": cont,
             "policy_risky": policy_risky, "value": value,
             "night_requirement": float(night_steps * metabolism),
             "day_steps": day_steps, "night_steps": night_steps, "metabolism": metabolism}
@@ -524,6 +526,101 @@ def outcome_moments(outcomes):
     sd = np.sqrt(var)
     skew = float((p * ((x - m) / sd) ** 3).sum()) if sd > 0 else 0.0
     return m, var, skew
+
+
+def central_moments(outcomes):
+    """Mean and the 2nd/3rd/4th CENTRAL moments ``(mean, mu2, mu3, mu4)`` of a discrete
+    ``[(probability, value), ...]`` distribution. ``mu2`` is the variance, ``mu3 = skew*sigma^3``
+    the (signed) third central moment, ``mu4 = kurtosis*sigma^4`` the fourth -- the quantities
+    that enter the moment expansion of the survival value (:func:`moment_dominance`)."""
+    p = np.array([pi for pi, _ in outcomes])
+    x = np.array([xi for _, xi in outcomes])
+    m = float((p * x).sum())
+    d = x - m
+    return m, float((p * d ** 2).sum()), float((p * d ** 3).sum()), float((p * d ** 4).sum())
+
+
+def _symmetric_three_point(mean: float, var: float, tail_prob: float):
+    """Symmetric 3-point gamble ``{mean +/- a, mean}`` with given variance and tail probability.
+
+    Outcomes ``mean +/- a`` each occur with probability ``tail_prob`` and ``mean`` with the rest;
+    ``a = sqrt(var / (2*tail_prob))`` fixes the variance, so its (excess) kurtosis ``= 1/(2 q) - 3``
+    is set by ``tail_prob`` ALONE at fixed mean and variance (skew stays 0). Small ``tail_prob`` ->
+    leptokurtic (rare fat tails); large ``tail_prob`` -> platykurtic (a near-two-point spread)."""
+    a = np.sqrt(var / (2.0 * tail_prob))
+    return [(tail_prob, mean - a), (1.0 - 2.0 * tail_prob, mean), (tail_prob, mean + a)]
+
+
+def mean_preserving_spread_advantage(mean: float, gamble, day_steps: int, night_steps: int,
+                                     metabolism: float, **dp_kw):
+    """Survival advantage ``adv(t, e) = q_risky - q_safe`` of ``gamble`` over the SAFE (degenerate-
+    at-``mean``) option: the value change a mean-preserving spread buys at each (day-step, reserve).
+
+    Because the safe option lands deterministically at ``e* = e + mean - metabolism``, the advantage
+    is exactly the moment expansion of the emergent continuation value ``V`` about ``e*``::
+
+        adv ~ (1/2) V''(e*) mu2 + (1/6) V'''(e*) mu3 + (1/24) V''''(e*) mu4 + ...
+
+    Returns ``(advantage [day_steps, n_egrid], dp_result)``."""
+    res = survival_dp([(1.0, mean)], gamble, day_steps, night_steps, metabolism, **dp_kw)
+    return res["q_risky"] - res["q_safe"], res
+
+
+def moment_preference_fields(day_steps: int, night_steps: int, metabolism: float,
+                             mean: float = 0.05, sigma: float = 0.04, skew: float = 0.9,
+                             kurt_tail=(0.08, 0.40), **dp_kw) -> dict:
+    """Variance, skew, and kurtosis preference fields of the EMERGENT survival value, each isolated
+    by a mean-preserving spread of the DP itself (no finite differencing of a gridded value).
+
+    For a common foraging mean and variance ``sigma**2``:
+      - ``variance`` field = advantage of a symmetric gamble        (sign = sign of V'', curvature)
+      - ``skew`` field = half-difference of ``+skew`` and ``-skew`` gambles  (sign = sign of V''',
+        prudence), matched in mean and variance
+      - ``kurtosis`` field = high-kurtosis minus low-kurtosis 3-point gamble (sign = sign of
+        V'''', temperance), matched in mean, variance, and skew (``kurt_tail`` = the tail probs)
+
+    Each field is ``[day_steps, n_egrid]`` over the reserve grid. The variance field reverses sign
+    (risk-prone below -> risk-averse above) exactly at the optimal ``threshold`` (the value
+    sigmoid's inflection, where V'' = 0); the skew field reverses there too. This is the energy-
+    budget rule generalized: a survival/ruin objective is a whole-distribution functional, so the
+    optimal policy is sensitive to ALL moments, each governed by a successive derivative of one
+    emergent value function -- and the reversals are those derivatives' sign changes across the
+    requirement. Returns the three fields, ``energy``, the per-day-step ``threshold``, and ``R``.
+    """
+    var = sigma ** 2
+    sym = skewed_outcomes(mean, sigma, 0.0)
+    pos = skewed_outcomes(mean, sigma, skew)
+    neg = skewed_outcomes(mean, sigma, -skew)
+    hi = _symmetric_three_point(mean, var, kurt_tail[0])
+    lo = _symmetric_three_point(mean, var, kurt_tail[1])
+    a_var, res = mean_preserving_spread_advantage(mean, sym, day_steps, night_steps, metabolism,
+                                                  **dp_kw)
+    a_pos = mean_preserving_spread_advantage(mean, pos, day_steps, night_steps, metabolism,
+                                             **dp_kw)[0]
+    a_neg = mean_preserving_spread_advantage(mean, neg, day_steps, night_steps, metabolism,
+                                             **dp_kw)[0]
+    a_hi = mean_preserving_spread_advantage(mean, hi, day_steps, night_steps, metabolism,
+                                            **dp_kw)[0]
+    a_lo = mean_preserving_spread_advantage(mean, lo, day_steps, night_steps, metabolism,
+                                            **dp_kw)[0]
+    return {"energy": res["energy"], "variance": a_var, "skew": 0.5 * (a_pos - a_neg),
+            "kurtosis": a_hi - a_lo, "threshold": risk_threshold(res),
+            "night_requirement": res["night_requirement"], "day_steps": day_steps}
+
+
+def field_zero_crossing(field: np.ndarray, energy: np.ndarray, lo: float = 0.04,
+                        hi: float = 0.95, smooth: int = 15) -> np.ndarray:
+    """Per day-step, the reserve of a field's primary positive->negative zero-crossing in
+    ``(lo, hi)`` (lightly box-smoothed first). For the variance preference field this is the risk
+    threshold (the value's inflection, V'' = 0); NaN where the field never crosses down."""
+    out = np.full(field.shape[0], np.nan)
+    k = np.ones(smooth) / smooth
+    for t in range(field.shape[0]):
+        s = np.convolve(field[t], k, mode="same")
+        idx = np.where((s[:-1] > 0) & (s[1:] <= 0) & (energy[:-1] > lo) & (energy[:-1] < hi))[0]
+        if len(idx):
+            out[t] = energy[idx[0]]
+    return out
 
 
 def survival_dp_patches(patches, day_steps: int, night_steps: int, metabolism: float,

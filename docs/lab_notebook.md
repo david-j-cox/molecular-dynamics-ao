@@ -2192,3 +2192,42 @@ So the molecular substrate gives VR>VI only weakly (~1.0-1.2x); the strong effec
 feedback term -- it is necessary, not an arbitrary hard-code. This reproduces the molar-vs-molecular
 debate about VR>VI, and parallels the molecular-molar bridge (the energy-budget rule also needs an
 explicit molar signal). Reframed exp047/README/ToDo accordingly: "requires" not "emerges".
+
+---
+
+## 2026-06-06 — Moment dominance: survival is sensitive to ALL moments (roadmap 1.1)
+
+- **Q**: The energy-budget rule (variance reversal) and the skew reversal (richer_worlds) -- are
+  they two ad hoc results, or two cases of one fact about the emergent survival value? Roadmap 1.1:
+  decompose a gamble's value change into moment contributions and state the general theorem.
+- **M**: Foraging chooses an outcome distribution; the safe option lands deterministically at
+  e* = reserve + mean - metabolism, so a mean-preserving spread's survival advantage over safe is
+  exactly the Taylor (moment) expansion of the DP continuation value V about e*:
+  adv ~ (1/2)V''mu2 + (1/6)V'''mu3 + (1/24)V''''mu4 + ... So variance is governed by V'' (curvature),
+  skew by V''' (prudence), kurtosis by V'''' (temperance). FIRST TRIED finite-differencing the
+  gridded V with Savitzky-Golay (4 orders): FAILED -- _survive_next uses piecewise-linear np.interp,
+  so V's high derivatives are a reachability comb; correlation to the exact advantage was negative
+  and got worse with finer grids. FIX: measure each moment's preference field directly from the
+  trusted DP by an ISOLATED mean-preserving spread (no differencing), matched in all lower moments
+  -- variance (symmetric gamble), skew (half-difference of +/-skew gambles), kurtosis (high- minus
+  low-kurtosis symmetric 3-point gamble at fixed mean/var/skew, kurtosis set by the tail prob q via
+  excess kurtosis = 1/(2q) - 3). Added survival.moment_preference_fields, central_moments,
+  mean_preserving_spread_advantage, field_zero_crossing; survival_dp now also returns the per-step
+  continuation value cont. Study: studies/risk_sensitivity/moment_dominance.py.
+- **R**: (1) The variance field reverses sign EXACTLY at the optimal policy threshold: zero-crossing
+  vs DP risk_threshold corr 1.00, mean|diff| 0.0052 (one grid cell), rising to R=0.72 at dusk.
+  Regime means below R +10.8e-3 (risk-prone) -> above R -7.5e-3 (risk-averse). (2) The skew field
+  reverses across the same threshold: below R -0.45e-3 (prefers NEGATIVE skew), above R +3.47e-3
+  (prefers POSITIVE skew) -- recovers richer_worlds from the derivative picture. (3) The kurtosis
+  field is weak and does not cleanly reverse (-1.54e-3 -> -1.09e-3): highest-order/smallest signal,
+  and the 3-point spread is only approximately local.
+- **I**: A survival/ruin objective is a whole-distribution functional, so the optimal policy is
+  sensitive to ALL moments; which one governs a state is set by a successive derivative of one
+  emergent value function. The energy-budget rule IS the inflection (V''=0) of V. The variance and
+  skew reversals are not separate phenomena -- they are V'' and V''' changing sign across the
+  requirement. The foraging <-> ruin theory <-> prudence/temperance bridge appears unstated in the
+  literature; that bridge is the theorem (cite Eeckhoudt & Schlesinger 2006; Menezes et al. 1980;
+  ruin theory). 
+- **D**: 3 tests added (107 pass), 0 reproduce drift. Kurtosis/temperance needs the controlled
+  >=5-point moment-matching generator and the temperance literature -- that is roadmap 1.3, the next
+  natural step. Figure: figures/moment_dominance.png.

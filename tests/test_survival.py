@@ -214,6 +214,62 @@ def test_skew_preference_reverses_at_the_requirement():
     assert (below_left - below_right) * (above_left - above_right) < 0
 
 
+def test_central_moments_match_outcome_moments():
+    """central_moments returns the raw 2nd/3rd/4th central moments consistent with the
+    normalized skewness reported by outcome_moments."""
+    from behavioral_md.survival import central_moments, outcome_moments, skewed_outcomes
+    g = skewed_outcomes(0.05, 0.06, 0.8)
+    m, var, skew = outcome_moments(g)
+    cm, mu2, mu3, mu4 = central_moments(g)
+    assert abs(cm - m) < 1e-12
+    assert abs(mu2 - var) < 1e-12
+    assert abs(mu3 - skew * var ** 1.5) < 1e-9            # mu3 = skew * sigma^3
+    assert mu4 > 0
+
+
+def test_variance_preference_reversal_is_the_optimal_threshold():
+    """The MECHANISM behind the energy-budget rule: the variance-preference field (a mean-
+    preserving spread's survival advantage, ~ (1/2) V'' var) reverses sign EXACTLY at the optimal
+    policy threshold -- i.e. the rule is the inflection (V'' = 0) of the emergent survival value,
+    not an imposed utility. The reversal point tracks the DP threshold across the whole day."""
+    from behavioral_md.survival import field_zero_crossing, moment_preference_fields
+    f = moment_preference_fields(24, 24, 0.03, n_egrid=1201)
+    e, thr = f["energy"], f["threshold"]
+    zc = field_zero_crossing(f["variance"], e)
+    ok = ~np.isnan(thr) & ~np.isnan(zc)
+    assert ok.sum() >= 20
+    assert np.corrcoef(zc[ok], thr[ok])[0, 1] > 0.95          # reversal sits on the threshold
+    assert np.nanmean(np.abs(zc[ok] - thr[ok])) < 0.02       # to within ~a few grid cells
+    # convex below (risk-prone), concave above (risk-averse): the sign of V''.
+    assert f["variance"][:, (e > 0.05) & (e < 0.2)].mean() > 0
+    assert f["variance"][:, e > 0.95].mean() <= 1e-6
+
+
+def test_moment_fields_reverse_across_the_requirement():
+    """All three measured preference fields are derivatives of one emergent value: the variance
+    (V'') and skew (V''') preferences reverse sign across the requirement (the skew reversal
+    reproduces richer_worlds: negative-skew below, positive-skew above)."""
+    from behavioral_md.survival import moment_preference_fields
+    f = moment_preference_fields(24, 24, 0.03, n_egrid=1201)
+    e, thr = f["energy"], f["threshold"]
+    R = f["night_requirement"]
+
+    def regime(field):
+        below, above = [], []
+        for t in range(field.shape[0]):
+            th = thr[t] if not np.isnan(thr[t]) else R
+            b = (e > 0.05) & (e < th - 0.02)
+            a = (e > th + 0.02) & (e < 0.95)
+            below.append(field[t, b].mean() if b.sum() else np.nan)
+            above.append(field[t, a].mean() if a.sum() else np.nan)
+        return np.nanmean(below), np.nanmean(above)
+
+    v_bl, v_ab = regime(f["variance"])
+    s_bl, s_ab = regime(f["skew"])
+    assert v_bl > 0 > v_ab                                    # variance: risk-prone -> averse
+    assert s_bl < 0 < s_ab                                    # skew: neg-skew -> pos-skew
+
+
 def test_patch_choice_is_a_three_way_energy_budget_rule():
     """With a menu of safe (low-variance), rich (high-mean), and wild (high-variance) patches,
     the survival-optimal choice is the safe patch when comfortable, the rich (rate-maximizing)

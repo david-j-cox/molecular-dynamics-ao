@@ -21,7 +21,18 @@ is the credibility gap.
 
 ## TIER 1 -- cheap, high-value, deepens the novel result (do first)
 
-### 1.1 Moment-dominance phase diagram + a general "survival => all-moments" theorem
+### 1.1 Moment-dominance phase diagram + a general "survival => all-moments" theorem  -- DONE (2026-06-06)
+Built in `moment_dominance.py` (+ `survival.moment_preference_fields` / `central_moments` /
+`mean_preserving_spread_advantage` / `field_zero_crossing`; `survival_dp` now also returns the
+per-step continuation value `cont`). Rather than finite-differencing the gridded value (the
+piecewise-linear `np.interp` makes high derivatives a reachability comb), each moment's preference
+field is measured directly from the trusted DP by an isolated mean-preserving spread. RESULT: the
+variance field reverses sign EXACTLY at the optimal threshold (corr 1.00, mean|diff| 0.005, rising
+to R) -- the energy-budget rule IS the inflection (V''=0) of the emergent value; the skew field
+reverses across the same threshold (prudence, sign of V'''); the kurtosis/temperance term is weak
+here and deferred to 1.3 (needs the controlled moment-matched generator). 3 tests; 0 reproduce
+drift. Figure: `figures/moment_dominance.png`.
+
 - **What:** At each (reserve, time) cell, decompose the gamble's value change into moment
   contributions. The exact form: a mean-preserving spread changes the option's survival value by
   `(1/2)V''(e*)·var + (1/6)V'''(e*)·skew·sigma^3 + (1/24)V''''(e*)·kurt·sigma^4 + ...`, where `V` is

@@ -263,6 +263,49 @@ cross near the symmetric gamble — a genuine reversal, not the flat response me
 win — but that is the *variance* lifeline of the sun-variance study, and here variance is held
 fixed, isolating the pure skew effect.)
 
+## Moment dominance: survival is sensitive to all moments (`moment_dominance.py`)
+
+The variance reversal (energy-budget rule) and the skew reversal above are two cases of one fact
+about the *emergent* survival value. Foraging is choosing an outcome distribution; the safe option
+lands the organism deterministically at the post-decision energy `e* = reserve + mean − metabolism`,
+so a mean-preserving spread's survival advantage over safe is exactly the Taylor (moment) expansion
+of the DP's continuation value `V` about `e*`:
+
+```
+adv  ~  (1/2) V″(e*)·mu2  +  (1/6) V‴(e*)·mu3  +  (1/24) V⁗(e*)·mu4  + ...
+        \____ variance ___/    \_____ skew _____/    \___ kurtosis ___/
+            curvature             prudence              temperance
+```
+
+So variance preference is governed by `V″`, skew preference by `V‴` (**prudence**), kurtosis
+preference by `V⁗` (**temperance**). A survival/ruin-minimization objective is a *whole-distribution*
+functional: the optimal policy is therefore sensitive to **all** moments, and which one governs a
+state is set by a successive derivative of one emergent value function. The energy-budget rule, the
+skew reversal, and a (preliminary) temperance reversal are the same phenomenon — successive
+derivatives of `V` changing sign across the requirement.
+
+We measure each moment's preference *field* directly from the trusted DP by an **isolated
+mean-preserving spread** (no finite differencing of a gridded value), matched in all lower moments:
+variance from a symmetric gamble, skew from the half-difference of `±skew` gambles, kurtosis from a
+high- minus low-kurtosis symmetric 3-point gamble. Results (`figures/moment_dominance.png`):
+
+1. **The variance field reverses sign exactly at the optimal policy threshold** — corr **1.00**,
+   mean |diff| **0.005** (one grid cell), rising through the day to the night requirement `R`. The
+   energy-budget rule *is* the inflection (`V″ = 0`) of the emergent survival value, not an imposed
+   utility curvature.
+2. **The skew field reverses across the same threshold**: below `R`, +10.8 → negative skew preferred
+   (−0.45×10⁻³); above `R`, positive skew preferred (+3.47×10⁻³). Prudence is the sign of `V‴`.
+   This recovers `richer_worlds.py` from the derivative picture.
+3. **The kurtosis field carries the temperance term**, but here it is weak and does not cleanly
+   reverse (−1.54 → −1.09×10⁻³): it is the highest-order, smallest-signal term, and the 3-point
+   spread is only approximately local. The controlled moment-matched treatment (a ≥5-point
+   moment-matching gamble generator, deriving the sign of temperance) is roadmap item 1.3.
+
+The bridge **foraging ↔ ruin theory ↔ prudence/temperance** appears unstated in the literature;
+that bridge is the general theorem. Must-cite: Eeckhoudt & Schlesinger (2006) for prudence/temperance
+as moment preferences via utility derivatives; Menezes, Geiss & Tressler (1980) for downside risk =
+skewness; ruin-theory framing (Lundberg; Bayraktar).
+
 ## Multi-patch foraging: risk-sensitive patch choice and MVT (`multi_patch.py`)
 
 The arc so far was a binary safe-vs-risky choice. A real forager faces a *menu* of patches and
