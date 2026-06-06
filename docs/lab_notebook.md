@@ -1996,3 +1996,31 @@ energy is free, via shared deprivation (worse B -> less intake -> more motivatio
 molar/motivational route, not the canonical relative-rate or Pavlovian-additivity mechanism.
 test_behavioral_contrast.py locks this in. Open extension: add a relative-reinforcement-rate /
 contextual term to produce associative contrast (flagged, not built -- a modeling decision).
+
+---
+
+## 2026-06-06 -- behavioral contrast reframed: energy budget, not an installed relative-rate term
+
+DC pushback on the 2026-06-05 plan: a relative-rate term (ctx_c - mean ctx) would just BAKE IN the
+matching law -- the same move we rejected in the molecular-molar work. Lean into the energy budget
+instead: components share one body's reserve and the drive already has the convex hunger term, so
+contrast follows from one shared survival economy, nothing relative computed. Two further DC points
+sharpened it: (a) the energy budget is MOMENTARY, not session-total, so it handles "held-constant
+total" designs that redistribute reinforcement in time (the energy trajectory still moves); (b)
+anticipatory contrast is LEARNED, not foreseen -- the context comes to signal what follows -- so it is
+reachable by temporal credit, and the energy framing fixes the SIGN that plain conditioned value gets
+backwards (a feast coming lowers present urgency).
+
+Stage 1 -- current reserve (exp040 reworked + test_behavioral_contrast): worsen B -> hungrier -> A up
+(positive contrast x1.32 at a sated baseline, classic A-up/B-down); enrich B -> sated -> A down
+(negative contrast x0.55 at a hungry baseline). Both vanish at motiv_strength=0 (convex-hunger
+knockout). The asymmetry (positive needs sated, negative needs hungry baseline) is the convex g(E)
+signature -- near satiation g(E) is flat, so only worsening moves behavior.
+
+Stage 2 -- anticipatory (exp041 + test_anticipatory_contrast; chamber antic_lr/antic_discount, both
+default 0 = off). Each component learns by temporal credit the income of the component that FOLLOWS it
+(antic[prev] EMAs toward the next component's context value); predicted upcoming income discounts
+present hunger. With energy CLAMPED (local route off, isolating anticipation): lean component coming
+-> A x1.18 (respond more), rich coming -> A x0.92 (respond less) -- correct anticipatory sign, learned
+from the experienced sequence, knocked out by antic_discount=0. Chamber changes are additive and
+default-off, so momentum/PREE/resurgence and the v0.1 baseline are unchanged (96 tests pass).

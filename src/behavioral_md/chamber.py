@@ -80,6 +80,16 @@ class ChamberConfig:
     ctx_omission_rate: float = 0.002   # context value decay per non-reinforced step
     ctx_asymptote: float = 2.0         # lambda for the context->reinforcer value
     ctx_drive_gain: float = 0.5        # how much context value adds to the press drive
+    # --- Anticipatory contrast (learned predicted upcoming income) ---------------
+    # Each component learns, by temporal credit over the experienced component sequence, the income
+    # of the component that FOLLOWS it (antic[c] EMAs toward the next component's context value).
+    # That predicted upcoming income then DISCOUNTS the current effective hunger deficit: if a rich
+    # component is coming, present urgency falls (work less now); if a lean one is coming, urgency
+    # stays high (stock up). This yields anticipatory contrast with the correct (negative) sign --
+    # respond less before a rich one -- which a plain conditioned-value term gets backwards.
+    # Both default 0 (off): no anticipatory learning or discount, so existing runs are unchanged.
+    antic_lr: float = 0.0          # EMA rate of a component's value toward the next one's income
+    antic_discount: float = 0.0    # predicted upcoming income discounts the current deficit
     # Behavioral momentum = MASS = resistance to CHANGE (the project's core Verlet
     # metaphor). The context->reinforcer association confers inertia: it divides
     # the rate at which the response value extinguishes, so mass_c = 1 +
@@ -442,6 +452,8 @@ def run_contrast(vi_baseline, cfg: ChamberConfig, n_org: int, comp_steps: int,
     alpha = 1.0 / cfg.act_tau
     press_rate = np.zeros((n_sessions, k))
     reinf_rate = np.zeros((n_sessions, k))
+    antic = np.zeros((n_org, k))   # learned predicted income of the component that FOLLOWS each
+    prev = None                    # the component presented just before the current one
 
     for s in range(n_sessions):
         phase2 = s >= n_baseline
@@ -460,6 +472,10 @@ def run_contrast(vi_baseline, cfg: ChamberConfig, n_org: int, comp_steps: int,
                     energy = np.full(n_org, cfg.energy_init)
                 deficit = np.clip(1.0 - energy / cfg.energy_capacity, 0.0, None)
                 deficit = deficit**cfg.deficit_exponent
+                # Anticipated upcoming income discounts present urgency (a rich component coming ->
+                # work less now). Off when antic_discount == 0.
+                if cfg.antic_discount > 0.0:
+                    deficit = deficit * (1.0 - np.clip(cfg.antic_discount * antic[:, c], 0.0, 0.95))
                 drive = cfg.approach_gain * (
                     v[:, c] + cfg.ctx_drive_gain * ctx[:, c] + cfg.motiv_strength * deficit
                 )
@@ -489,6 +505,11 @@ def run_contrast(vi_baseline, cfg: ChamberConfig, n_org: int, comp_steps: int,
                 reinfs += reinforced
             press_rate[s, c] = (presses / comp_steps).mean()
             reinf_rate[s, c] = (reinfs / comp_steps).mean()
+            # Temporal credit over the experienced sequence: the component that PRECEDED c learns
+            # the income c just produced (its context value), so antic[prev] -> "what follows me".
+            if prev is not None and cfg.antic_lr > 0.0:
+                antic[:, prev] += cfg.antic_lr * (ctx[:, c] - antic[:, prev])
+            prev = c
 
     return {"press_rate": press_rate, "reinf_rate": reinf_rate, "n_baseline": n_baseline,
             "n_phase2": n_phase2, "changed": changed, "other": other}
