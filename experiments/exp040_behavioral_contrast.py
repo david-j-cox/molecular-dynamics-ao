@@ -1,19 +1,22 @@
-"""exp040 -- behavioral contrast: does responding in an unchanged component shift?
+"""exp040 -- behavioral contrast from the shared energy budget (no relative-rate term installed).
 
 In a two-component multiple schedule, behavioral contrast is a change in responding in one component
-when the OTHER component's schedule changes, in the opposite direction (positive contrast: rate in
-the unchanged component rises when the other component is worsened, e.g. extinguished).
+when the OTHER component's schedule changes. Here it is NOT installed as a relative-rate term; it
+emerges because both components feed one body's energy reserve and the drive carries a CONVEX hunger
+term, motiv_strength * (1 - E/E_cap)**deficit_exponent (the energy-budget marginal value of energy).
+Worsen one component, total intake falls, the organism gets hungrier and works harder in the
+still-paying component (positive contrast). Enrich one component, the organism is sated and works
+less elsewhere (negative contrast). Nothing relative is computed; it follows from one shared body.
 
-This tests whether the engine produces it, and isolates the route. The chamber's per-component
-response value and Pavlovian context are LOCAL (each updates only while its component is present,
-from its own reinforcement) -- there is no relative-rate or cross-component term -- so
-contrast is not expected. The one channel shared across components is energy (deprivation): a
-worsened component lowers total intake and raises motivation, lifting responding everywhere.
-We separate them by clamping energy (motivation fixed -> associative route) versus leaving it
-free (shared-deprivation route).
+The convexity makes a prediction: g(E) rises steeply toward starvation but flattens near satiation,
+so WHERE the baseline sits matters. Near satiation only worsening moves behavior (positive contrast
+is robust); a hungry baseline is needed for enriching to bite (negative contrast). We show each at
+the baseline that exposes it, and knock the effect out with motiv_strength = 0 -- with the convex
+hunger term removed, the per-component value/context is purely local and there is no contrast. That
+knockout is the evidence the effect is the shared hunger term, not anything installed.
 
-Protocol: both components on VI baseline, then component B is extinguished while A is unchanged.
-Report A's rate (the contrast measure) and B's rate, baseline vs phase 2.
+Scope: this is the molar/energy account (current reserve). Anticipatory contrast, where responding
+depends on the value of the UPCOMING component, is a learned sequential association -- see exp041.
 
 Run:  python experiments/exp040_behavioral_contrast.py
 """
@@ -31,63 +34,53 @@ import numpy as np
 from behavioral_md.chamber import ChamberConfig, run_contrast
 
 FIG = Path("outputs/figures")
-VI_BASELINE = 10.0
-N_ORG = 400
-COMP_STEPS = 300
-N_BASELINE = 15
-N_PHASE2 = 12
-SEED = 0
+ARGS = dict(n_org=400, comp_steps=300, n_baseline=15, n_phase2=12, changed=1,
+            clamp_energy=False, seed=0)
 
 
-def _config() -> ChamberConfig:
-    return ChamberConfig(
-        motiv_strength=2.0, energy_init=0.5, emission_bias=1.2, temperature=0.5,
-        ctx_drive_gain=0.8, momentum_mass_gain=0.0, reinf_asymptote=1.0,
-    )
+def _cfg(motiv_strength: float, food_energy: float) -> ChamberConfig:
+    return ChamberConfig(motiv_strength=motiv_strength, energy_init=0.5, emission_bias=1.2,
+                         temperature=0.5, ctx_drive_gain=0.8, food_energy=food_energy,
+                         deficit_exponent=2.0)
 
 
-def _rates(res: dict) -> dict:
-    """Mean press rate over the last 3 sessions of each phase, per component."""
-    pr = res["press_rate"]
-    nb = res["n_baseline"]
-    a, b = res["other"], res["changed"]
-    return {
-        "A_base": pr[nb - 3:nb, a].mean(), "A_phase2": pr[nb:, a][-3:].mean(),
-        "B_base": pr[nb - 3:nb, b].mean(), "B_phase2": pr[nb:, b][-3:].mean(),
-    }
+def _a_rates(res: dict) -> tuple[float, float]:
+    """Press rate in the UNCHANGED component A, last 3 sessions of baseline vs phase 2."""
+    pr, nb, a = res["press_rate"], res["n_baseline"], res["other"]
+    return pr[nb - 3:nb, a].mean(), pr[nb:, a][-3:].mean()
 
 
 def main() -> None:
-    cfg = _config()
-    rows = {}
-    for clamp in (True, False):
-        res = run_contrast(VI_BASELINE, cfg, N_ORG, COMP_STEPS, N_BASELINE, N_PHASE2,
-                           changed=1, manipulation="extinction", clamp_energy=clamp, seed=SEED)
-        rows[clamp] = _rates(res)
+    # Positive contrast at a sated baseline (worsen B); negative at a hungry baseline (enrich B).
+    pos = {ms: _a_rates(run_contrast(14.0, _cfg(ms, 0.15), manipulation="extinction", **ARGS))
+           for ms in (1.5, 0.0)}
+    neg = {ms: _a_rates(run_contrast(20.0, _cfg(ms, 0.06), manipulation="enrich",
+                                     vi_phase2=4.0, **ARGS))
+           for ms in (1.5, 0.0)}
 
-    print("Behavioral contrast: extinguish component B after baseline; does A shift?\n")
-    print(f"{'condition':28s} A_base  A_phase2  A_ratio   B_base  B_phase2")
-    for clamp, label in [(True, "energy clamped (associative)"),
-                         (False, "energy free (deprivation)")]:
-        r = rows[clamp]
-        ratio = r["A_phase2"] / r["A_base"] if r["A_base"] > 0 else float("nan")
-        print(f"  {label:26s} {r['A_base']:.3f}   {r['A_phase2']:.3f}    {ratio:.2f}     "
-              f"{r['B_base']:.3f}   {r['B_phase2']:.3f}")
-    print("\n  A_ratio > 1 = positive contrast in the unchanged component.")
-    print("  Associative route (clamped) is expected ~1.0 (no cross-component term);")
-    print("  any contrast comes from the shared-deprivation route (energy free).")
+    print("Behavioral contrast in component A (unchanged) from the shared energy budget.\n")
+    print(f"{'condition':34s} A_base  A_phase2  ratio")
+    for label, (b, p) in [("positive (worsen B), hunger on", pos[1.5]),
+                          ("positive (worsen B), hunger OFF", pos[0.0]),
+                          ("negative (enrich B), hunger on", neg[1.5]),
+                          ("negative (enrich B), hunger OFF", neg[0.0])]:
+        print(f"  {label:32s} {b:.3f}   {p:.3f}    {p / b:.2f}")
+    print("\n  Positive contrast (ratio > 1) at a sated baseline; negative (ratio < 1) at a hungry")
+    print("  one; both vanish with hunger off -> the convex shared-hunger term carries it, not a")
+    print("  relative-rate term. The asymmetry is the convex marginal value of energy.")
 
-    fig, ax = plt.subplots(figsize=(7.5, 4.2))
+    fig, ax = plt.subplots(figsize=(8, 4.3))
+    groups = ["positive contrast\n(worsen B, sated)", "negative contrast\n(enrich B, hungry)"]
+    on = [pos[1.5][1] / pos[1.5][0], neg[1.5][1] / neg[1.5][0]]
+    off = [pos[0.0][1] / pos[0.0][0], neg[0.0][1] / neg[0.0][0]]
     x = np.arange(2)
-    w = 0.35
-    for off, clamp, lab, col in [(-w / 2, True, "energy clamped (associative)", "0.6"),
-                                 (w / 2, False, "energy free (deprivation)", "tab:red")]:
-        r = rows[clamp]
-        ax.bar(x + off, [r["A_base"], r["A_phase2"]], w, color=col, label=lab)
+    ax.bar(x - 0.18, on, 0.36, color="tab:red", label="hunger on")
+    ax.bar(x + 0.18, off, 0.36, color="0.7", label="hunger off (knockout)")
+    ax.axhline(1.0, color="0.5", ls="--", lw=1)
     ax.set_xticks(x)
-    ax.set_xticklabels(["A baseline", "A after B extinguished"])
-    ax.set_ylabel("press rate in component A (unchanged)")
-    ax.set_title("exp040: behavioral contrast only via shared deprivation, not the local mechanism")
+    ax.set_xticklabels(groups, fontsize=9)
+    ax.set_ylabel("A rate ratio (phase 2 / baseline)")
+    ax.set_title("exp040: behavioral contrast from convex shared hunger, not an installed term")
     ax.legend(fontsize=9)
     fig.tight_layout()
     FIG.mkdir(parents=True, exist_ok=True)
