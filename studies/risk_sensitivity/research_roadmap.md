@@ -50,7 +50,17 @@ drift. Figure: `figures/moment_dominance.png`.
   value function). Headline figure.
 - **Novelty:** High. Generalizes the skew result; produces the memorable figure.
 
-### 1.2 Predation as a second death source (the must-do robustness panel)
+### 1.2 Predation as a second death source (the must-do robustness panel)  -- DONE (2026-06-06)
+Built in exp050 + survival_dp predation_threshold/predation_prob (default off; 0 reproduce drift). On
+a moderate winter economy (day 14 < night 16, R=0.48, which also defuses the R=0.72 critique) a
+predation death boundary above x_r makes the value function develop a bounded safe band; BOTH the
+variance (energy-budget) and skew reversals SURVIVE and the rule SPLITS into a band: risk-prone /
+neg-skew below R, strongly risk-averse / pos-skew in the band R..x_r, and a risk-prone / neg-skew
+escape regime above x_r. The reversal at R is robust; predation adds a second reversal at x_r (not an
+inversion). 3 tests; figure exp050_predation_panel.png; manuscript sec:predation. (Used the
+threshold-boundary form, not the linear mass-dependent form, which on a forced forager gives geometric
+convex decay = escape-when-fat rather than the McNamara-Houston reserve target.)
+
 - **What:** daily survival = `(1 - P_starve) * (1 - P_predation(foraging_effort))`, with
   mass-dependent predation (heavier reserve = slower = higher predation). Two-boundary survival
   problem (starve below, too-fat-predation above). Re-run the skew-matched gambles: does the skew

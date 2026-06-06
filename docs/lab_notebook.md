@@ -2260,3 +2260,36 @@ returned unanimous MAJOR REVISION with convergent items. Acted on the decisive o
   degrees-of-freedom + falsifiability paragraph (boundary results = the real test). (5) exp048/049
   folded into the integration and matching subsections. Citation fixes: Shahan & Craig 2017 DOI
   corrected; McDevitt 2014 flagged unverified.
+
+---
+
+## 2026-06-06 -- Peer-review revision round 2 (predation, Charnov, RL baselines, autodiff, manuscript)
+
+Worked the remaining convergent reviewer items. New experiments (exp050-053), all defaulting off /
+standalone so reproduce stays 0-drift; 113 tests pass.
+
+- exp050 predation panel (roadmap 1.2): survival_dp gains an optional predation upper boundary
+  (predation_threshold/predation_prob, default None). Moderate winter economy (day14<night16, R=0.48,
+  also answering the R=0.72-is-extreme critique). BOTH reversals survive a second death source and the
+  rule SPLITS into a band (risk-prone below R; risk-averse + pos-skew in band R..x_r; risk-prone +
+  neg-skew escape above x_r). Twin-threshold reserve target as risk/skew preferences. 3 tests.
+  NOTE: linear mass-dependent predation on a forced forager gives geometric (convex) V decay =
+  escape-when-fat, NOT the reserve target; the threshold-boundary form is the faithful one.
+- exp051 Charnov check (honest correction): survival_dp_depleting does NOT quantitatively reduce to
+  Charnov MVT. It tracks the MVT direction (give-up biomass falls with travel cost) but leaves at
+  LOWER biomass than rate-maximizing b* and only at low reserve (desperation), because survival != rate
+  maximizing once safe. The clean rate-MVT reduction is the rate engine (exp020/021). Manuscript
+  sec:risk corrected (was "reduces to Charnov MVT").
+- exp052 acquisition RL baseline: tabular Q-learner on the real gridworld acquisition task drops
+  latency 226->7; acquisition is generic to value learning. Companion to exp049 (matching).
+- exp053 autodiff diagnostic: reverse-mode grad vs finite-difference by back-prop horizon on the real
+  soft rollout. Reliable n<=400 (~1-2x), explodes at n=1500 (~240x) and n=3000 (~1e6x, sign-flipped),
+  sign-unstable across seeds; FD stays bounded. Substantiates the BPTT-explosion claim (was
+  unquantified) and shows TBPTT (n<=400) / derivative-free are the fixes. config.integrator leaky
+  ablation (exp048) and matching baseline (exp049) from round 1.
+- Manuscript (now 33pp): folded all of the above in; added an EMERGENCE AUDIT table (emergent /
+  configured / module / generic / derived), a degrees-of-freedom + falsifiability paragraph, an
+  epistemic-status paragraph (how-possibly vs how-actually; response-strength latent named honestly;
+  seeds/CIs), the predation subsection + figure, corrected Charnov + quantified autodiff, the
+  Kacelnik-Bateson amount-delay confound scope point, re-sorted the failures intro
+  (constraints/surprises/corrections), and demoted the level-vi collapse to match its "open" status.
