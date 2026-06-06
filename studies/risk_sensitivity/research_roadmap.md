@@ -96,7 +96,9 @@ drift. Figure: `figures/moment_dominance.png`.
   shows a magnitude-dependent reversal). AIC / cross-validated comparison showing the survival-DP
   captures skew effects the second-moment rivals structurally cannot.
 - **Must-cite:** Kacelnik & Bateson 1996 (Scalar Utility Theory -- the rival); McDevitt & Kacelnik
-  2014 (prospect theory vs RSF); Stephens 1981 (z-score). Datasets: Caraco & Chasin 1984; Genest et
+  2014 (prospect theory vs RSF) [CITATION UNVERIFIED -- the DOI below resolves to an unrelated paper
+  and the title conflated a 2021 TiCS article; re-identify the intended work before citing];
+  Stephens 1981 (z-score). Datasets: Caraco & Chasin 1984; Genest et
   al. 2016.
 - **Tractability:** Medium; gated by digitizing legacy data (WebPlotDigitizer); recovers proportions,
   not sequences (which reinforces 2.1's point).
@@ -218,6 +220,7 @@ plus, new to this roadmap:
 - Olsson & Holmgren (1998) Behav. Ecol. 9:345-353. doi:10.1093/beheco/9.4.345
 - Dall et al. (2005) TREE 20:187-193. doi:10.1016/j.tree.2005.01.010
 - Bautista et al. (2005) J. Exp. Biol. doi:10.1242/jeb.01910
-- McDevitt & Kacelnik (2014) Evol. Hum. Behav. doi:10.1016/j.evolhumbehav.2014.06.003
+- McDevitt & Kacelnik (2014) Evol. Hum. Behav. doi:10.1016/j.evolhumbehav.2014.06.003 [UNVERIFIED:
+  DOI resolves to an unrelated paper; title belongs to a 2021 TiCS article. Re-identify before citing.]
 - Cartar & Dill (1990) Behav. Ecol. Sociobiol. 26:121-127. doi:10.1007/BF00171581
 - Caraco & Giraldeau (1991) J. Theor. Biol. 153:559-583. doi:10.1016/S0022-5193(05)80156-0
