@@ -33,7 +33,8 @@ def _survive_next(energy_grid: np.ndarray, e_next: np.ndarray, value: np.ndarray
 
 
 def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
-                metabolism: float, cap: float = 1.0, n_egrid: int = 401) -> dict:
+                metabolism: float, cap: float = 1.0, n_egrid: int = 401,
+                predation_threshold: float | None = None, predation_prob: float = 0.0) -> dict:
     """Exact survival DP over one day/night cycle; derive the optimal risk policy.
 
     ``safe_outcomes`` / ``risky_outcomes`` are lists of ``(probability, intake)`` for the
@@ -43,9 +44,23 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
     ``policy_risky`` (1 where the risky option strictly maximizes survival), the survival
     probability ``value`` = max of the two, and the emergent ``night_requirement`` =
     ``night_steps * metabolism``.
+
+    Optional PREDATION as a second death source above an upper reserve boundary (the starvation-
+    predation trade-off; McNamara & Houston 1990): if ``predation_threshold`` is set, each DAY step
+    spent with a reserve above it incurs a per-step death probability ``predation_prob`` (a heavier,
+    slower, more visible animal is killed more often). Default ``None`` is starvation-only and
+    byte-identical to the single-boundary DP. With predation on, carrying a high reserve is costly,
+    so the value function turns concave just below the upper boundary: the optimal policy becomes a
+    twin-threshold rule, risk-prone below the night requirement and risk-averse as it approaches the
+    predation boundary, targeting a reserve band between the two.
     """
     e = np.linspace(0.0, cap, n_egrid)
     value = (e > 0.0).astype(float)                 # end of cycle: survived iff alive
+    # Per-step predation survival vs reserve: 1.0 below the boundary, 1 - predation_prob above it.
+    if predation_threshold is None:
+        pred_survive = np.ones_like(e)
+    else:
+        pred_survive = np.where(e > predation_threshold, 1.0 - predation_prob, 1.0)
 
     # Night, worked backward: forced drain, no choice, die if it takes you to <= 0.
     for _ in range(night_steps):
@@ -58,6 +73,8 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
         cont[t] = value                             # value currently holds V_{t+1}
         qs = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in safe_outcomes)
         qr = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in risky_outcomes)
+        qs = pred_survive * qs                      # pay mass-dependent predation while foraging
+        qr = pred_survive * qr
         q_safe[t] = qs
         q_risky[t] = qr
         value = np.maximum(qs, qr)                  # optimal: take the better option

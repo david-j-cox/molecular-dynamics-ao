@@ -270,6 +270,48 @@ def test_moment_fields_reverse_across_the_requirement():
     assert s_bl < 0 < s_ab                                    # skew: neg-skew -> pos-skew
 
 
+def test_predation_off_is_byte_identical():
+    """The predation arguments default to off and must not change the starvation-only DP."""
+    from behavioral_md.survival import survival_dp
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    a = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=401)
+    b = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=401, predation_threshold=None)
+    assert np.array_equal(a["value"], b["value"])
+    assert np.array_equal(a["policy_risky"], b["policy_risky"])
+
+
+def test_predation_makes_a_bounded_reserve_band():
+    """A predation upper boundary turns the saturating survival value into a humped one: V stays
+    high in the band between the night requirement and the boundary and falls above it (the
+    starvation-predation reserve target; McNamara & Houston 1990)."""
+    from behavioral_md.survival import survival_dp
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    res = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=801,
+                      predation_threshold=0.8, predation_prob=0.2)
+    e, v = res["energy"], res["value"]
+    in_band = np.interp(0.6, e, v)
+    above = np.interp(0.95, e, v)
+    assert in_band > above + 0.3                  # high in the band, low above the boundary
+    assert above < 0.2                            # being fat is nearly lethal
+
+
+def test_reversals_survive_predation_and_split_into_a_band():
+    """Both the variance (energy-budget) and skew reversals survive a second death source: still
+    risk-prone / negative-skew below R, and the safe band R..x_r becomes risk-averse / positive-
+    skew, with predation sharpening in-band aversion (the rule splits into a band, not inverts)."""
+    from behavioral_md.survival import moment_preference_fields
+    day, night, metab, xr = 14, 16, 0.03, 0.8
+    R = night * metab
+    f = moment_preference_fields(day, night, metab, n_egrid=1201,
+                                 predation_threshold=xr, predation_prob=0.2)
+    e = f["energy"]
+    below = (e > 0.05) & (e < R - 0.02)
+    band = (e > R + 0.02) & (e < xr - 0.04)
+    assert f["variance"][:, below].mean() > 0          # risk-prone below R survives
+    assert f["variance"][:, band].mean() < 0           # band is risk-averse
+    assert f["skew"][:, below].mean() < 0 < f["skew"][:, band].mean()   # skew reversal survives
+
+
 def test_patch_choice_is_a_three_way_energy_budget_rule():
     """With a menu of safe (low-variance), rich (high-mean), and wild (high-variance) patches,
     the survival-optimal choice is the safe patch when comfortable, the rich (rate-maximizing)
