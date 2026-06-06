@@ -130,6 +130,17 @@ class SimulationConfig(BaseModel):
     damping_coef: float = Field(
         10.0, ge=0.0, description="Velocity-damping coefficient c in force -= c*velocity."
     )
+    # Integrator form. "verlet" is the damped second-order (default; baseline). "leaky" is a
+    # first-order leaky integrator x <- x + dt*(force/m - leak*x), i.e. the leaky competing
+    # accumulator the overdamped Verlet limit reduces to. Used only for the ablation that asks
+    # whether the second-order/inertial term earns its keep (Exp 048). Default keeps Verlet so the
+    # reproduce baseline is byte-identical.
+    integrator: Literal["verlet", "leaky"] = Field(
+        "verlet", description="Activation integrator: damped Verlet (default) or first-order leaky."
+    )
+    leak_coef: float = Field(
+        1.0, ge=0.0, description="Leak rate for the first-order leaky integrator."
+    )
 
     # --- Action emission ---------------------------------------------------
     emission: Literal["softmax", "argmax"] = Field(

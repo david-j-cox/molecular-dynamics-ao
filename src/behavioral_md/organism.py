@@ -104,11 +104,21 @@ class Organism:
 
         cfg = self.config
         for i, atom in enumerate(self.atoms):
-            # Velocity damping (-c * v); v is the Verlet velocity (x - x_prev)/dt.
-            # c=0 recovers literal pure Verlet.
-            velocity = (atom.state[0] - atom.previous_state[0]) / cfg.dt
-            net_force = force[i] - cfg.damping_coef * velocity
-            atom.integrate(net_force, cfg.dt, cfg.activation_min, cfg.activation_max)
+            if cfg.integrator == "leaky":
+                # First-order leaky competing accumulator (the overdamped Verlet limit):
+                # x <- x + dt*(force/m - leak*x). No inertial/second-order term. Used by the
+                # Exp 048 ablation to test whether the second-order term earns its keep.
+                x = atom.state[0]
+                new_x = x + cfg.dt * (force[i] / atom.mass - cfg.leak_coef * x)
+                new_state = np.clip(np.atleast_1d(new_x), cfg.activation_min, cfg.activation_max)
+                atom.previous_state = atom.state
+                atom.state = new_state
+            else:
+                # Velocity damping (-c * v); v is the Verlet velocity (x - x_prev)/dt.
+                # c=0 recovers literal pure Verlet.
+                velocity = (atom.state[0] - atom.previous_state[0]) / cfg.dt
+                net_force = force[i] - cfg.damping_coef * velocity
+                atom.integrate(net_force, cfg.dt, cfg.activation_min, cfg.activation_max)
 
         self._update_fatigue()
         # Eligibility reflects the activations that just produced behavior.
