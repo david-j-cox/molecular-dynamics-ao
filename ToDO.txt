@@ -74,12 +74,13 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
     current hunger (antic_discount); with energy clamped (local route off) a lean component coming
     raises responding (x1.18), a rich one coming lowers it (x0.92), correct sign, knocked out by
     antic_discount=0. Learned via temporal credit over the sequence; defaults off, baseline unchanged.
-[~] Run the battery across parameter ranges as standing model-validity evidence. DONE for the new
-    phenomena (exp042 + test_zoo_robustness): blocking w_B~0 and overshadowing w_B~0.5 across
-    learning rate; reserve contrast ratio grows monotonically with motiv_strength (1.24->1.45),
-    knockout flat; anticipatory ratio grows with antic_discount (lean 1.08->1.24, rich 0.97->0.89),
-    knockout flat. Remaining: extend the sweep to the older phenomena (acquisition/extinction/
-    matching/momentum/risk) as one standing battery.
+[x] Run the battery across parameter ranges as standing model-validity evidence.
+    - New phenomena (exp042 + test_zoo_robustness): blocking w_B~0, overshadowing w_B~0.5 across
+      learning rate; reserve contrast grows with motiv_strength (1.24->1.45); anticipatory grows with
+      antic_discount; mechanism knockouts flat.
+    - Core phenomena (exp043): acquisition latency-drop positive across lr (52->31; honest boundary --
+      destabilises above lr~0.1); matching slope 0.94 across VI splits; momentum rich>lean resistance
+      across lean VIs; risk reversal ~+0.32 across e_req. All on the current engine.
 
 PHASE 5 -- DAY/NIGHT (global ambient sun)
 -----------------------------------------

@@ -2041,3 +2041,24 @@ The monotone scaling of both contrast effects with their mechanism parameter is 
 single tuned coincidence but a graded dependence on the mechanism. test_zoo_robustness locks the
 (cheap, tabular) blocking/overshadowing robustness; the contrast sweeps live in exp042. Remaining zoo
 work: a full battery over the older phenomena, and generalization/peak shift on the JAX engine.
+
+---
+
+## 2026-06-06 -- exp043: standing robustness battery for the core phenomena (current engine)
+
+Extends the battery to the older phenomena, each driven through its validated path and swept across
+its key parameter on the engine as it currently sits (a robustness check + a freshness check after
+the recent additions). First pass surfaced harness mistakes (using the unvalidated concurrent chamber
+at too-high temperature -> matching slope ~0; using extinction+guessed mass_gain for momentum ->
+backwards); fixed by matching the validated regimes. Results (4-panel figure
+outputs/figures/exp043_core_robustness.png):
+- Acquisition: latency drop positive across lr 0.02-0.08 (52.7 -> 31.4). Honest boundary: it
+  DESTABILISES above lr~0.1 (weight update overshoots) -- so the safe operating range is ~<=0.06.
+- Matching: log response ratio tracks log reinforcement ratio with slope 0.94 across VI splits
+  (run_concurrent_chamber at temperature 0.1; flattens at high temperature).
+- Momentum: under satiation (exp022's regime), the rich component resists more than the lean across
+  lean VIs (rich ~1.0 vs lean 0.96/0.90/0.76, gap widening as the lean component leans out).
+- Risk: reversal ~+0.32 (risk-prone below the requirement) across e_req 0.3-0.6.
+All four signatures hold across their ranges. Reproduce harness still guards the fixed points; this
+adds the parameter-range dimension. No new test (heavy sims; covered by the point tests + harness).
+Remaining zoo item: generalization + peak shift on the JAX engine.
