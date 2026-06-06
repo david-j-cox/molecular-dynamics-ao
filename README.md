@@ -384,11 +384,13 @@ separate food channels):
 | Behavioral contrast (anticipatory) | `exp041` | a learned predicted-income term discounts current hunger → respond *less* before a rich component, *more* before a lean one (the correct anticipatory sign) |
 | Robustness battery | `exp042`/`exp043` | the new and core phenomena hold across parameter ranges, with mechanism knockouts flat — standing model-validity evidence |
 
-**Molecular ↔ molar bridge** (`exp032`–`exp037`, `studies/molecular_molar_bridge/`): the
+**Molecular ↔ molar bridge** (`exp032`–`exp037`, `exp045`, `studies/molecular_molar_bridge/`): the
 energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale **survival**
 fact, credited by an eligibility trace, reproduces it with an *emergent* requirement (no utility),
 generalizes, and gives the twin-threshold rule. The learning ports to the atom weights; expression
-needs timescale separation, and spatial travel cost can invert the rule.
+needs timescale separation, and spatial travel cost can invert the rule. A real **2D forager**
+(`exp045`) reproduces the rule end-to-end on the engine's own primitives (reversal +0.23, drive-readout
+emission; travel weakens it; the raw per-step Verlet+softmax emission under-builds).
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -617,11 +619,13 @@ pre-commit install --hook-type pre-push     # pytest on push
   S: R → C over the cue dimension: a response reinforced under S+ but not S-delta comes under
   stimulus control (responding diverges to S+ ~0.88 vs S-delta ~0.50 over training), is graded by
   cue similarity, and shows a generalization decrement to a novel neutral cue.
-- [x] **Molecular ↔ molar bridge** (`exp032`–`exp037`, `studies/molecular_molar_bridge/`) — the
-  energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale **survival**
-  fact, credited by an eligibility trace, reproduces it with an *emergent* requirement (no utility),
-  generalizes, and yields the twin-threshold rule. The learning ports to the atom weights; expression
-  needs timescale separation, and spatial travel cost can invert the rule.
+- [x] **Molecular ↔ molar bridge** (`exp032`–`exp037`, `exp045`, `studies/molecular_molar_bridge/`)
+  — the energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale
+  **survival** fact, credited by an eligibility trace, reproduces it with an *emergent* requirement
+  (no utility), generalizes, and yields the twin-threshold rule. The learning ports to the atom
+  weights; expression needs timescale separation, and spatial travel cost can invert the rule. A real
+  **2D forager** (`exp045`) reproduces it end-to-end on the engine's own primitives (drive-readout
+  emission; the raw per-step Verlet+softmax emission under-builds, the exp036 limit).
 - [x] **Robustness battery** (`exp042`/`exp043`) — the new and core phenomena hold across parameter
   ranges on the current engine (signatures flat, or scaling monotonically with the mechanism
   parameter; knockouts flat) as standing model-validity evidence. Generalization and peak shift also

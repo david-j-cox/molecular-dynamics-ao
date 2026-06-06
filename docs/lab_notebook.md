@@ -2103,3 +2103,33 @@ settles at chance rather than below it -- a self-limiting operant equilibrium (w
 fewer responses are emitted to extinguish, balanced by generalization from S+). Two-panel figure
 outputs/figures/stimulus_control.png. test_stimulus_control locks discrimination + gradient peak.
 Closes the stimulus-control ToDo item.
+
+---
+
+## 2026-06-06 -- exp045: approach B in a real 2D arena (the flagship spatial integration)
+
+Scope decision (DC, AskUserQuestion): faithful self-contained prep using the engine's real primitives
+(force decomposition + convex hunger g(E), verlet_update, drive-readout/softmax emission, eligibility
+survival credit) rather than refactoring the shared BehavioralFieldEnv/RescorlaWagner -- keeps the
+102-test + reproduce baseline safe, and matches how exp032-037 were built.
+
+A 2D forager: SAFE patch (constant intake) + RISKY patch (variable, matched mean) at fixed locations;
+drives pull the organism toward each patch with a Shepard distance falloff; a day of foraging then an
+overnight fast sets R = night drain; energy/death (starvation + predation); learning from a
+period-scale survival signal (1 survived / 0 died) credited via an eligibility trace conditioned on
+energy x time-of-day. Three conditions (reversal = P(feed risky) below - above R):
+- drive readout, no travel  -> RULE reproduced, +0.23 (risk-prone below R), tracks the imposed ref.
+- drive readout, with travel -> WEAKENED, +0.12 (travel-cost effect flattens the risk-proneness;
+  milder than exp037's full 1D inversion at these 2D params -- inversion magnitude is geometry/economy
+  dependent).
+- raw verlet_update+softmax, no travel -> UNDER-BUILDS, +0.05. The exp036 dt^2 limit persists even in
+  the spatial loop: the per-step damped-Verlet activation is tiny and 4-way navigation re-adds noise
+  faster than commitment builds it. So the drive readout (the movement atom's steady state) is the
+  faithful emission, as established in exp037.
+
+Headline: the molecular-molar bridge runs end-to-end in a real 2D spatial forager on the engine's own
+primitives -- approach B reproduces the energy-budget rule. Figure
+outputs/figures/exp045_spatial_survival_2d.png. No per-experiment unit test (consistent with the
+exp032-037 study experiments); documented in studies/molecular_molar_bridge/. The literal shared-core
+integration (BehavioralFieldEnv + SurvivalCredit rule + state-conditioned history weights) is deferred
+as higher-risk.

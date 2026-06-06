@@ -179,7 +179,20 @@ MOLECULAR-MOLAR BRIDGE (exp032-037; studies/molecular_molar_bridge/)
     upper boundary gives the twin-threshold rule (exp035); learning ports to the atom weights
     but per-step expression needs timescale separation (exp036); with a drive-readout emission
     the atom dynamics express it, and spatial travel-cost concentration INVERTS it (exp037).
-[ ] Full BehavioralFieldEnv (multi-patch, real Organism) integration of approach B.
+[x] Approach B in the real spatial engine (exp045). Scope decision (DC): faithful self-contained 2D
+    prep using the engine's real primitives (force decomposition + convex hunger, verlet_update,
+    drive-readout/softmax emission, eligibility survival credit) rather than refactoring the shared
+    BehavioralFieldEnv/RescorlaWagner (keeps the 102-test + reproduce baseline safe). A 2D forager
+    (SAFE + RISKY patches, day/night requirement, energy/death+predation) learns the energy-budget
+    rule from period-scale survival credit conditioned on energy x time-of-day:
+      - drive readout, no travel  -> RULE reproduced (reversal +0.23, risk-prone below R)
+      - drive readout, with travel -> WEAKENED (+0.12; the travel-cost effect, milder than the full
+        1D inversion of exp037 at these 2D params)
+      - raw verlet_update+softmax  -> UNDER-BUILDS (+0.05): the exp036 dt^2 limit persists even with
+        spatial commitment + 4-way navigation noise; the drive readout (movement-atom steady state)
+        is the faithful emission.
+[ ] (Open) literal shared-core integration (extend BehavioralFieldEnv + a SurvivalCredit LearningRule
+    + state-conditioned history weights) -- deferred as higher-risk; the prep above is the result.
 [ ] Spatial travel-cost inversion as a standalone study: when does spatial risk-sensitivity
     match vs invert the non-spatial energy-budget rule? (travel-cost concentration is the lever.)
 

@@ -216,9 +216,16 @@ policy depends on the foraging structure (per-step vs per-encounter cost).
   (timescale mismatch). Credit solved; expression needs timescale separation.
 - exp037: **the atom dynamics + survival credit reproduce the rule (drive-readout emission), but
   spatial travel-cost concentration inverts it** -- a structural limit on the energy-budget rule.
-- Open: a full `BehavioralFieldEnv` integration; and the travel-cost result deserves its own writeup
-  (when does spatial risk-sensitivity match vs invert the non-spatial rule?). See
-  `docs/lab_notebook.md`.
+- exp045: **approach B in a real 2D arena** (faithful self-contained prep; engine primitives, no
+  shared-core refactor). A 2D forager (SAFE + RISKY patches, day/night requirement, energy/death +
+  predation) learns from period-scale survival credit conditioned on energy x time. With the
+  drive-readout emission the **energy-budget rule is reproduced** (reversal +0.23); spatial travel
+  **weakens** it (+0.12; milder than exp037's full 1D inversion at these 2D params); the raw
+  `verlet_update`+softmax emission **under-builds** (+0.05) -- the exp036 dt^2 limit persists even
+  with spatial commitment, so the drive readout (movement-atom steady state) is the faithful emission.
+- Open: the travel-cost result deserves its own writeup (when does spatial risk-sensitivity match vs
+  invert the non-spatial rule?); a literal shared-core `BehavioralFieldEnv` + `SurvivalCredit`
+  integration is deferred as higher-risk. See `docs/lab_notebook.md`.
 
 ## References
 - Baum, W. M. (1973). The correlation-based law of effect. *JEAB* 20, 137-153. doi:10.1901/jeab.1973.20-137
