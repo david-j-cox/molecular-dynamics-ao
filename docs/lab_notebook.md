@@ -2231,3 +2231,32 @@ explicit molar signal). Reframed exp047/README/ToDo accordingly: "requires" not 
 - **D**: 3 tests added (107 pass), 0 reproduce drift. Kurtosis/temperance needs the controlled
   >=5-point moment-matching generator and the temperance literature -- that is roadmap 1.3, the next
   natural step. Figure: figures/moment_dominance.png.
+
+---
+
+## 2026-06-06 -- Peer-review revision pass (exp048, exp049 + manuscript reframe)
+
+Four-perspective peer review (EAB, behavioral ecology, AI/RL, philosophy of science; saved to Dropbox)
+returned unanimous MAJOR REVISION with convergent items. Acted on the decisive ones.
+
+- **exp048 (integrator ablation).** Added config.integrator ("verlet" default / "leaky") + leak_coef.
+  Leaky = first-order LCA x <- x + dt*(force/m - leak*x). At matched params the first-order integrator
+  does NOT reproduce the graded acquisition curve: fast leak -> latency ~10 from life 1 (nothing to
+  learn), slow leak -> degrades across lives; the inertial term creates the slow build that leaves
+  room for learning. So the second-order term is not idle, but the engine is LCA-family -> demote MD
+  to a motivating analogy (not drop it). Default verlet -> reproduce 0 drift, 107 tests pass.
+- **exp049 (RL matching baseline).** Plain tabular value + softmax on concurrent VI-VI (no atoms, no
+  Verlet) reproduces generalized-matching undermatching (R^2~1.0); sensitivity climbs with beta
+  (0.10 at beta=4 -> 0.65 at beta=160), reaching canonical a~0.69. => matching is generic to Boltzmann
+  allocation over learned values; the undermatching MAGNITUDE is a temperature artifact in both
+  baseline and engine. The engine's value is unification + transparency, not a unique derivation.
+- **Manuscript reframe (now 30pp, in Dropbox).** (1) "theorem" -> "decomposition" throughout; cite
+  the standard derivative ladder incl. risk-sensitive RL (Howard & Matheson 1972) and distributional
+  RL (Bellemare et al. 2017); corr-1.00 reframed as a consistency check, not a finding; kurtosis
+  removed from the headline. (2) "not RL / nothing maximizes reward" -> policy-as-attractor vs
+  argmax-of-value, acknowledging the value-based components (chamber, DP, Q-learner). (3) Abstract/
+  conclusion reconciled with the bridge; added an explicit emergence criterion (generalization-
+  without-retuning) + audit of which headline relations are configured vs emergent. (4) Added a
+  degrees-of-freedom + falsifiability paragraph (boundary results = the real test). (5) exp048/049
+  folded into the integration and matching subsections. Citation fixes: Shahan & Craig 2017 DOI
+  corrected; McDevitt 2014 flagged unverified.
