@@ -2062,3 +2062,20 @@ outputs/figures/exp043_core_robustness.png):
 All four signatures hold across their ranges. Reproduce harness still guards the fixed points; this
 adds the parameter-range dimension. No new test (heavy sims; covered by the point tests + harness).
 Remaining zoo item: generalization + peak shift on the JAX engine.
+
+---
+
+## 2026-06-06 -- exp044: generalization + peak shift on the JAX fast path (final zoo gap)
+
+Closes the last zoo gap. The JAX engine already carries the cue mechanism (jax_engine.learn_with_cue:
+Shepard tuning exp(-beta*|value-center|) + summed-error elemental Rescorla-Wagner); exp044 exercises
+the same math in a controlled cue-conditioning prep, vectorized over a population as one jitted
+lax.scan (mirrors the NumPy run_generalization_demo / run_peak_shift_demo). Results match the NumPy
+demos: generalization gradient peaks at S+=0.40; with S+ reinforced vs S-=0.55 not, the peak shifts to
+0.30 -- below S+, away from S- (classic peak shift), with responding collapsing toward S-. 200 agents
+x 400 blocks in ~0.14s (jit+run). test_generalization_jax (importorskip jax) locks both signatures.
+
+ZOO COMPLETE: blocking, overshadowing, behavioral contrast (current-reserve + anticipatory),
+robustness battery (new exp042 + core exp043), and generalization + peak shift on JAX. The earlier
+NumPy-only phenomena (acquisition, extinction, generalization, peak shift) now all have JAX coverage
+too (exp005/exp006/exp044).

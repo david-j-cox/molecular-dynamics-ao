@@ -57,8 +57,10 @@ PHENOMENA ZOO (validation battery; runs on the JAX engine)
       - extinction (exp006): hw_food 1.0 -> ~0, steps-at-food 67 -> 5.
 [x] Matching / undermatching done extensively (matching.py: 2-alt, multi-alt, COD
     curve, full concatenated GML rate/amount/prob/delay). See PHASE 6 below.
-[ ] Generalization + peak shift on JAX (still only NumPy demos; cue field is in
-    the JAX engine, so this is mostly wiring a probe).
+[x] Generalization + peak shift on JAX (exp044 + test_generalization_jax): the JAX cue mechanism
+    (Shepard tuning + summed-error RW, one jitted lax.scan over a population) reproduces both --
+    generalization peaks at S+ (0.40); peak shift displaces the peak to 0.30 (below S+, away from
+    S-=0.55). 200 agents x 400 blocks in ~0.14s (jit+run).
 [x] Resistance-to-change (momentum, exp026); PREE (exp027); demand curves (exp016);
     FR/VR/FI/VI signatures (exp017-019). Resurgence + 4-mechanism mimicry study
     (exp028 + studies/resurgence_mechanisms/).
