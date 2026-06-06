@@ -193,8 +193,13 @@ MOLECULAR-MOLAR BRIDGE (exp032-037; studies/molecular_molar_bridge/)
         is the faithful emission.
 [ ] (Open) literal shared-core integration (extend BehavioralFieldEnv + a SurvivalCredit LearningRule
     + state-conditioned history weights) -- deferred as higher-risk; the prep above is the result.
-[ ] Spatial travel-cost inversion as a standalone study: when does spatial risk-sensitivity
-    match vs invert the non-spatial energy-budget rule? (travel-cost concentration is the lever.)
+[x] Spatial travel-cost inversion study (exp046 + studies/spatial_travel_cost/): the per-trip travel
+    cost t (energy a failed risky trip wastes) is the lever. t=0 -> rule (+0.18); small t -> INVERSION
+    (-0.07, risk-averse below R, exp037's effect); large t -> starvation-desperation regime, so the
+    realized reversal is NON-MONOTONIC. Honest conclusion: any travel cost flips the rule toward
+    inversion, but the magnitude is economy-dependent (travel cost is inseparable from the economy and
+    the energy-state distribution) -- no clean single-parameter phase boundary. Reconciles exp037
+    (full inversion) and exp045 (weakening) as two points in that economy-coupled space.
 
 PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
 -------------------------------------------

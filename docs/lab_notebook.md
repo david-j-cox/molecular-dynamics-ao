@@ -2133,3 +2133,25 @@ outputs/figures/exp045_spatial_survival_2d.png. No per-experiment unit test (con
 exp032-037 study experiments); documented in studies/molecular_molar_bridge/. The literal shared-core
 integration (BehavioralFieldEnv + SurvivalCredit rule + state-conditioned history weights) is deferred
 as higher-risk.
+
+---
+
+## 2026-06-06 -- exp046: spatial travel-cost study (reconciling exp037 inversion vs exp045 weakening)
+
+Standalone study of when spatial travel inverts the energy-budget rule. Isolated the lever -- the
+per-trip travel cost t (energy a failed risky trip wastes) -- in a fast trip-based survival-credit
+forager (no spatial pathing): each encounter, choose safe/risky, pay t (round trip), then intake
+(safe S; risky 0 or 2S, matched mean). Same net mean (S - t); the difference is the downside (risky
+0-draw nets -t, a wasted trip; safe nets S - t, recouped). Sweep t:
+  t=0 -> rule +0.18 (risk-prone below R); t=0.02 -> INVERSION -0.07; t=0.04 -> -0.04; t=0.06 -> +0.02;
+  t=0.08 -> +0.13 (desperation). NON-MONOTONIC.
+
+Honest conclusion: any travel cost flips the rule TOWARD inversion (the asymmetric risky-downside
+loss), but the realized magnitude is economy-dependent -- travel cost cannot be varied independently
+of the overall economy or the organism's self-selected energy distribution (it shifts both). At large
+t the harsh economy forces desperation gambling (rule-like again). So there is NO clean
+single-parameter phase boundary; exp037 (full inversion) and exp045 (weakening) are two points in this
+economy-coupled space. Multiple readouts tried (realized rate, learned-value policy, uniform-restart
+sampling) each have artifacts (visitation; unvisited bins at 0.5; restart breaks the credit signal) --
+documented as a genuine limitation: spatial risk-sensitivity is not a clean function of travel cost
+alone. Writeup: studies/spatial_travel_cost/README.md; figure exp046_travel_cost_study.png.
