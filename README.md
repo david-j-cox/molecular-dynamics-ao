@@ -165,6 +165,7 @@ flowchart LR
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
 | Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error); also on the JAX engine (`exp044`) | implemented |
 | Cue competition: blocking & overshadowing | shared (competitive) prediction error in `learning.RescorlaWagner` (`credit_assignment="rw_competitive"`); `exp039` | implemented |
+| Operant stimulus control (S+/S-delta/neutral) | three-term contingency over the cue dimension; differential responding + generalization decrement (`run_stimulus_control_demo.py`) | implemented |
 | Behavioral contrast | from the shared energy budget (convex hunger): current-reserve and learned-anticipatory routes (`chamber.run_contrast`, `exp040`/`exp041`) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
@@ -344,6 +345,7 @@ engine, parameter fitting, and parameter-range robustness.
 | Extinction | `run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 when food stops reinforcing |
 | Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value (also on JAX: `exp044`) |
 | Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− (also on JAX: `exp044`) |
+| Operant stimulus control | `run_stimulus_control_demo.py` | a response reinforced under S+ but not S-delta comes under stimulus control: responding diverges (S+ ~0.88 vs S-delta ~0.50), graded by cue similarity, with a generalization decrement to a novel neutral cue |
 | Rapid reacquisition | `run_reacquisition_demo.py` | dual exc/inhib rule reacquires far faster than original acquisition (and than RW) — w+ preserved |
 | Spontaneous recovery | `run_spontaneous_recovery_demo.py` | net recovers over a rest interval (inhibition decays, excitation preserved), then re-extinguishes |
 | Renewal (ABA vs ABB) | `run_renewal_demo.py` | extinguished responding returns in the acquisition context (A), not the extinction context (B) |
@@ -472,9 +474,10 @@ src/behavioral_md/
   environments/
     gridworld.py         # BehavioralFieldEnv (Gymnasium); stimulus fields, energy, death
 scripts/                 # run_demo, run_extinction_demo, run_generalization_demo,
-                         #   run_peak_shift_demo, run_reacquisition_demo,
-                         #   run_spontaneous_recovery_demo, run_renewal_demo,
-                         #   make_figures  (each takes --agents N)
+                         #   run_peak_shift_demo, run_stimulus_control_demo,
+                         #   run_reacquisition_demo, run_spontaneous_recovery_demo,
+                         #   run_renewal_demo, run_animation_demo, run_vi_foraging_demo,
+                         #   make_figures, reproduce  (demos take --agents N)
 experiments/             # reproducible sweeps/benchmarks (exp001-044) + parallel helper
 studies/                 # focused write-ups (risk_sensitivity, resurgence_mechanisms,
                          #   punishment_asymmetry, molecular_molar_bridge, ...)
@@ -610,6 +613,10 @@ pre-commit install --hook-type pre-push     # pytest on push
   current-reserve route (worsen/enrich one component → more/less responding in the other) and a
   learned **anticipatory** route (predicted upcoming income discounts current urgency, giving the
   correct sign), each with a mechanism knockout.
+- [x] **Operant stimulus control** (`run_stimulus_control_demo.py`) — the three-term contingency
+  S: R → C over the cue dimension: a response reinforced under S+ but not S-delta comes under
+  stimulus control (responding diverges to S+ ~0.88 vs S-delta ~0.50 over training), is graded by
+  cue similarity, and shows a generalization decrement to a novel neutral cue.
 - [x] **Molecular ↔ molar bridge** (`exp032`–`exp037`, `studies/molecular_molar_bridge/`) — the
   energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale **survival**
   fact, credited by an eligibility trace, reproduces it with an *emergent* requirement (no utility),

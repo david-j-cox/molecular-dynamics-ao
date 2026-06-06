@@ -2079,3 +2079,23 @@ ZOO COMPLETE: blocking, overshadowing, behavioral contrast (current-reserve + an
 robustness battery (new exp042 + core exp043), and generalization + peak shift on JAX. The earlier
 NumPy-only phenomena (acquisition, extinction, generalization, peak shift) now all have JAX coverage
 too (exp005/exp006/exp044).
+
+---
+
+## 2026-06-06 -- operant stimulus control (run_stimulus_control_demo + test)
+
+The three-term contingency S: R -> C. A response reinforced under S+ (a cue value) but not S-delta
+comes under stimulus control. The OPERANT counterpart to the Pavlovian cue-gradient demos: here the
+response is EMITTED (logistic/Luce emission over the CueReceptorField drive) and reinforcement is
+contingent on responding under S+ (mag=1 iff S+ and responded; the emitted response is credited).
+Controlled, balanced S+/S-delta procedure (like run_peak_shift_demo) -- chosen because the gridworld
+cue field learns only on REINFORCED contact (at_food = intake>0), so it cannot accrue S-delta
+inhibition without an engine change; the controlled prep drives learn() with mag per trial.
+
+Results (200 agents, 300 blocks): responding diverges over training -- S+ -> 0.88, S-delta -> 0.50
+(discrimination index +0.37); the post-training gradient is graded by cue similarity (peak near S+,
+slightly shifted), with a generalization decrement at a novel neutral cue (0.85 -> 0.41). S-delta
+settles at chance rather than below it -- a self-limiting operant equilibrium (when responding falls,
+fewer responses are emitted to extinguish, balanced by generalization from S+). Two-panel figure
+outputs/figures/stimulus_control.png. test_stimulus_control locks discrimination + gradient peak.
+Closes the stimulus-control ToDo item.

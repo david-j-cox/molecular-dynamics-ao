@@ -397,8 +397,14 @@ CONSEQUENCE MODELS (reinforcement/punishment asymmetry)
 
 DISCRIMINATIVE STIMULI (separate from ambient sun)
 --------------------------------------------------
-[ ] S+ / S-delta / neutral discriminative stimuli (the localized light/cue slots);
-    stimulus control over reinforcement availability. Design TBD.
+[x] S+ / S-delta / neutral discriminative stimuli -- operant stimulus control
+    (run_stimulus_control_demo + test_stimulus_control). Three-term contingency over the cue
+    dimension: a response reinforced under S+ but not S-delta comes under stimulus control --
+    responding diverges (S+ ~0.88 vs S-delta ~0.50 over training), is graded by cue similarity, and
+    shows a generalization decrement to a novel neutral cue. Controlled prep (like run_peak_shift_demo)
+    measuring the EMITTED operant (logistic emission over the CueReceptorField drive); the gridworld
+    route would need cue-field learning on non-reinforced contact (currently learns only on reinforced
+    contact), so the controlled prep is the faithful path.
 
 VISUALIZATION (visualization.py)
 --------------------------------
