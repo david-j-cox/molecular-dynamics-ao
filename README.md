@@ -163,7 +163,9 @@ flowchart LR
 | Risk-sensitive foraging (energy-budget rule) | `chamber.run_risk_choice` (energy-budget rule given a survival utility) and `survival.survival_dp` (the rule *derived* from energy + death dynamics, no imposed utility); risk-prone below the requirement, risk-averse above (Caraco); exp030 + `studies/risk_sensitivity/` | implemented |
 | Rescorla-Wagner + extinction | `learning.RescorlaWagner` (omission decay, asymmetric rates) | implemented |
 | Dual excitatory/inhibitory extinction | `learning.DualExcitatoryInhibitory` (separate w+/w-, context-gated); spontaneous recovery, renewal, rapid reacquisition | implemented |
-| Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error) | implemented |
+| Stimulus generalization & peak shift | `generalization.CueReceptorField` (tuned receptors, summed error); also on the JAX engine (`exp044`) | implemented |
+| Cue competition: blocking & overshadowing | shared (competitive) prediction error in `learning.RescorlaWagner` (`credit_assignment="rw_competitive"`); `exp039` | implemented |
+| Behavioral contrast | from the shared energy budget (convex hunger): current-reserve and learned-anticipatory routes (`chamber.run_contrast`, `exp040`/`exp041`) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
 | Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
@@ -331,7 +333,8 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
 A range of classic behavior-analytic phenomena are reproduced from the same
 mechanism. The `scripts/` demos run agent populations (use `--agents N`) and write
 figures with 95% CI bands; the `experiments/` sweeps (`exp0NN`) cover matching,
-schedules, timing, the JAX engine, and parameter fitting.
+schedules, timing, cue competition, behavioral contrast, risk sensitivity, the JAX
+engine, parameter fitting, and parameter-range robustness.
 
 **Foraging / learning** (`scripts/`):
 
@@ -339,8 +342,8 @@ schedules, timing, the JAX engine, and parameter fitting.
 |---|---|---|
 | Acquisition | `run_demo.py` | latency to food falls (~185 → ~78 steps) across lives |
 | Extinction | `run_extinction_demo.py` | trained food weight decays ~1.0 → ~0 when food stops reinforcing |
-| Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value |
-| Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− |
+| Generalization | `run_generalization_demo.py` | response gradient peaked at the trained cue value (also on JAX: `exp044`) |
+| Peak shift | `run_peak_shift_demo.py` | after S+/S− discrimination, the peak shifts *past* S+ away from S− (also on JAX: `exp044`) |
 | Rapid reacquisition | `run_reacquisition_demo.py` | dual exc/inhib rule reacquires far faster than original acquisition (and than RW) — w+ preserved |
 | Spontaneous recovery | `run_spontaneous_recovery_demo.py` | net recovers over a rest interval (inhibition decays, excitation preserved), then re-extinguishes |
 | Renewal (ABA vs ABB) | `run_renewal_demo.py` | extinguished responding returns in the acquisition context (A), not the extinction context (B) |
@@ -369,6 +372,21 @@ separate food channels):
 | Resurgence | `exp028` | extinguished R1 recovers when the alternative R2 is extinguished — emergent from choice reallocation; control (R2 kept reinforced) abolishes it |
 | Punishment asymmetry | `exp029` | three accounts all suppress the punished response, but subtractive (de Villiers) and competitive (Deluty) suppression depend on the alternative's reinforcement with opposite slopes; concatenated `a_p` recovered log-linearly |
 | Risk-sensitive foraging | `exp030` | the energy-budget rule: risk-prone below the energy requirement, risk-averse above; emerges from a survival-shaped utility; flat under a linear-utility control |
+
+**Cue competition & behavioral contrast** (`exp039`–`exp043`):
+
+| Phenomenon | Experiment | Result |
+|---|---|---|
+| Blocking & overshadowing | `exp039` | shared (competitive) prediction error blocks/overshadows the redundant cue (w_B 0.00 / 0.50); independent credit shows neither |
+| Behavioral contrast (current reserve) | `exp040` | worsening a component makes the organism hungrier → more responding in the other (positive); enriching → less (negative); from the convex shared energy budget, knocked out by removing hunger |
+| Behavioral contrast (anticipatory) | `exp041` | a learned predicted-income term discounts current hunger → respond *less* before a rich component, *more* before a lean one (the correct anticipatory sign) |
+| Robustness battery | `exp042`/`exp043` | the new and core phenomena hold across parameter ranges, with mechanism knockouts flat — standing model-validity evidence |
+
+**Molecular ↔ molar bridge** (`exp032`–`exp037`, `studies/molecular_molar_bridge/`): the
+energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale **survival**
+fact, credited by an eligibility trace, reproduces it with an *emergent* requirement (no utility),
+generalizes, and gives the twin-threshold rule. The learning ports to the atom weights; expression
+needs timescale separation, and spatial travel cost can invert the rule.
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
@@ -431,13 +449,19 @@ src/behavioral_md/
   config.py              # SimulationConfig (all parameters, pydantic)
   atoms.py               # BehavioralAtom, verlet_update, default_atom_set (two-tier)
   forces.py              # ForceCalculator (drives + movement expression), coupling
-  consequence.py         # ConsequenceModel (DeltaEnergy default; asymmetry stubs)
-  learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner / linear)
+  consequence.py         # ConsequenceModel (DeltaEnergy default + optional graded teaching;
+                         #   Subtractive / ConcatenatedAsymmetric punishment asymmetry)
+  learning.py            # EligibilityTrace + pluggable LearningRule (Rescorla-Wagner w/ competitive
+                         #   credit -> blocking/overshadowing; linear; dual exc/inhib extinction)
   generalization.py      # CueReceptorField (tuned receptors; generalization & peak shift)
   matching.py            # concurrent VI-VI via discriminative cues; concatenated matching law
   matching_diff.py       # differentiable Gumbel-softmax surrogate of the matching rollout
   fit.py                 # search organism params to target matching sensitivities (derivative-free)
-  chamber.py             # operant chamber: press response, FR/VR/FI/VI, effort/unit-price
+  chamber.py             # operant chamber + populations: schedules (FR/VR/FI/VI), concurrent
+                         #   matching, multiple schedule (momentum), contrast, PREE, resurgence,
+                         #   punishment choice, risk choice
+  survival.py            # survival DP + evolved/learned/model-free risk policies (energy-budget rule)
+  forage.py              # multi-patch foraging, give-up density, Charnov functional response (MVT)
   timing.py              # pluggable interval-timing models (none/SET/BeT/LeT)
   metrics.py             # death patterns: time-to-death, cause breakdown, survival curve
   organism.py            # Organism: sense -> force -> damped Verlet -> emit -> learn; energy/death
@@ -451,9 +475,12 @@ scripts/                 # run_demo, run_extinction_demo, run_generalization_dem
                          #   run_peak_shift_demo, run_reacquisition_demo,
                          #   run_spontaneous_recovery_demo, run_renewal_demo,
                          #   make_figures  (each takes --agents N)
-experiments/             # reproducible sweeps/benchmarks (exp001-025) + parallel helper
+experiments/             # reproducible sweeps/benchmarks (exp001-044) + parallel helper
+studies/                 # focused write-ups (risk_sensitivity, resurgence_mechanisms,
+                         #   punishment_asymmetry, molecular_molar_bridge, ...)
 docs/lab_notebook.md     # running record of every experiment and decision
 docs/architecture/       # the original design sketch
+docs/media/              # demo GIFs embedded in this README
 outputs/                 # logs/ and figures/ (generated; gitignored)
 ```
 
@@ -577,7 +604,22 @@ pre-commit install --hook-type pre-push     # pytest on push
   three-way energy-budget rule (safe / rich-rate-maximizing / wild-variance by energy and
   time-of-day), and the giving-up rule is finite-horizon (leaving stops near dusk, cutoff tracking
   the travel cost). Survival refines the risk-neutral MVT of `exp020`; MVT is its not-desperate limit.
-- [x] **Tests + CI** — 87-test pytest suite, GitHub Actions (ruff + pytest).
+- [x] **Cue competition & behavioral contrast** (`exp039`–`exp041`) — blocking and overshadowing
+  from a shared (competitive) prediction error (`credit_assignment="rw_competitive"`), absent under
+  independent credit; behavioral contrast from the shared energy budget (convex hunger), both the
+  current-reserve route (worsen/enrich one component → more/less responding in the other) and a
+  learned **anticipatory** route (predicted upcoming income discounts current urgency, giving the
+  correct sign), each with a mechanism knockout.
+- [x] **Molecular ↔ molar bridge** (`exp032`–`exp037`, `studies/molecular_molar_bridge/`) — the
+  energy-budget rule does not emerge from per-step atom dynamics; a bare period-scale **survival**
+  fact, credited by an eligibility trace, reproduces it with an *emergent* requirement (no utility),
+  generalizes, and yields the twin-threshold rule. The learning ports to the atom weights; expression
+  needs timescale separation, and spatial travel cost can invert the rule.
+- [x] **Robustness battery** (`exp042`/`exp043`) — the new and core phenomena hold across parameter
+  ranges on the current engine (signatures flat, or scaling monotonically with the mechanism
+  parameter; knockouts flat) as standing model-validity evidence. Generalization and peak shift also
+  run on the JAX engine (`exp044`).
+- [x] **Tests + CI** — 100-test pytest suite, GitHub Actions (ruff + pytest).
 - [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
   `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
   `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
