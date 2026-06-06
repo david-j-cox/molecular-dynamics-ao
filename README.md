@@ -537,9 +537,11 @@ pre-commit install --hook-type pre-push     # pytest on push
   law (rate / amount / probability / delay).
 - [x] **Operant chamber & schedules** — FI scallop, FR break-and-run, FR>VR pause
   (cumulative records); pluggable interval-timing models (SET / BeT / LeT);
-  effort-based / unit-price consumption; the **VR > VI rate difference** from molar feedback
-  sensitivity (the response-reinforcer correlation, Baum's correlation-based law; `exp047`,
-  opt-in `feedback_gain`) — VR/VI ~1.7 with it vs ~1.0 without, at matched reinforcement rate.
+  effort-based / unit-price consumption; the **VR > VI rate difference**, which *requires* molar
+  feedback sensitivity (the response-reinforcer correlation, Baum's correlation-based law; `exp047`,
+  opt-in `feedback_gain`) — molecular per-step routes (per-press value, response cost, IRT) give only
+  ~1.0–1.2×; the molar term gives ~1.7×. VR>VI is irreducibly marginal (average per-press quantities
+  equalize at matched reinforcement rate), reproducing the molar-vs-molecular tension in the literature.
 - [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster. (Autodiff is
   exposed, but gradients through the long recurrent matching rollout explode and are
   unusable for fitting; fitting instead searches the differentiable forward surrogate

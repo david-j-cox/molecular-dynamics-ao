@@ -317,6 +317,12 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     ~0/negative (rate-independent + the homeostatic feed-pause cycle) -> no boost -> low rate. Result:
     VR/VI ~1.0 with feedback off, ~1.7-2.0 with it on, at matched reinforcement rate. Opt-in
     (feedback_gain default 0), so the reproduce baseline is unchanged.
+    NECESSITY (DC asked if a more emergent route exists): VR>VI is irreducibly MARGINAL -- molecular
+    routes provably give only ~1.0-1.2x. Response cost -> ~1.0 (drains energy -> raises deficit ->
+    wrong sign); net-payoff value -> ~1.0 (both act on the AVERAGE per-press return, which equalizes
+    at matched reinforcement rate); molecular IRT differential reinforcement -> ~1.1 (organism rarely
+    samples long IRTs). So the molar feedback term is NECESSARY, not an arbitrary hard-code -- the
+    molar-vs-molecular tension in the literature, paralleling the molecular-molar bridge.
 
 DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
 ---------------------------------------------------------

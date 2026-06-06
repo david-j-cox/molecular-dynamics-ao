@@ -2176,3 +2176,19 @@ max(0, slope). New ChamberConfig fields feedback_gain (0), feedback_window (40),
 Result (exp047): VR/VI press rate at matched reinforcement rate is ~1.0 with feedback off and ~1.7-2.0
 with it on; the VR press-rate-vs-reinforcement-rate curve lies well above the VI curve only with
 feedback on. test_vr_vi_feedback locks it (VR-30 / VI-60 are reinforcement-matched). 104 tests pass.
+
+Follow-up (DC: "this is hard-coded, not emergent -- is there another route?"). Conceded and tested
+the alternatives:
+- Response cost (the natural unit-price idea): increasing press_cost -> VR/VI ~1.0. It drains energy,
+  which RAISES the deficit motivation (wrong sign), canceling the diminishing-returns effect.
+- Net-payoff value (press value = reinforcement minus effort): also ~1.0.
+- Reason (the key insight): both act on the AVERAGE per-press return = reinforcement_rate/press_rate,
+  which EQUALIZES for VR and VI at matched reinforcement rate. VR>VI is a MARGINAL phenomenon
+  (d reinforcement / d rate: VR +1/n, VI ~0); local average learning can't capture the marginal.
+- Molecular IRT differential reinforcement (long IRTs reinforced on VI): directionally right but weak
+  (~1.1x even with the deficit motivation removed -- the organism rarely samples long IRTs to learn
+  the contingency).
+So the molecular substrate gives VR>VI only weakly (~1.0-1.2x); the strong effect REQUIRES the molar
+feedback term -- it is necessary, not an arbitrary hard-code. This reproduces the molar-vs-molecular
+debate about VR>VI, and parallels the molecular-molar bridge (the energy-budget rule also needs an
+explicit molar signal). Reframed exp047/README/ToDo accordingly: "requires" not "emerges".

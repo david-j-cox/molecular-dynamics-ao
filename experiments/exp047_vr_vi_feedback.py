@@ -14,6 +14,17 @@ reinforcement is rate-independent and the homeostatic feed-pause cycle even make
 correlation negative, so the clipped slope gives no boost -> lower rate. With the feedback term on,
 the VR press-rate curve lies well above the VI curve at matched reinforcement rate (~1.7x vs ~1.0x).
 
+This molar term is NECESSARY, not an arbitrary hard-code -- VR>VI is irreducibly a MARGINAL
+phenomenon (how reinforcement changes with rate), and molecular per-step mechanisms provably can't
+deliver it strongly: any AVERAGE per-press quantity (reinforcers-per-press, net payoff after a
+response cost) is reinforcement_rate / press_rate, which EQUALIZES for VR and VI at matched
+reinforcement rate. Tested directly: a (larger) response cost -> ~1.0x (it drains energy, raising
+the deficit motivation -- wrong sign), and a net-payoff value rule -> ~1.0x. The molecular IRT
+account (long inter-response times are differentially reinforced on VI) is directionally right but
+weak here (~1.1x even with the deficit removed -- the organism rarely samples long IRTs). So the
+molecular substrate gives VR>VI only weakly (~1.0-1.2x); the strong difference needs the molar
+feedback term. This reproduces the molar-vs-molecular tension in the VR>VI literature.
+
 Run:  python experiments/exp047_vr_vi_feedback.py
 """
 
@@ -85,7 +96,7 @@ def main() -> None:
         ax.set_title(title, fontsize=10)
         ax.legend(fontsize=9)
     axes[0].set_ylabel("press rate (per step)")
-    fig.suptitle("exp047: VR >> VI emerges from molar feedback sensitivity", fontsize=13)
+    fig.suptitle("exp047: VR >> VI requires molar feedback sensitivity", fontsize=13)
     fig.tight_layout()
     FIG.mkdir(parents=True, exist_ok=True)
     out = FIG / "exp047_vr_vi_feedback.png"
