@@ -2155,3 +2155,24 @@ economy-coupled space. Multiple readouts tried (realized rate, learned-value pol
 sampling) each have artifacts (visitation; unvisited bins at 0.5; restart breaks the credit signal) --
 documented as a genuine limitation: spatial risk-sensitivity is not a clean function of travel cost
 alone. Writeup: studies/spatial_travel_cost/README.md; figure exp046_travel_cost_study.png.
+
+---
+
+## 2026-06-06 -- exp047: VR >> VI from molar feedback sensitivity (Baum's correlation-based law)
+
+The VR>VI rate difference was weak (ToDo). Diagnosed: at matched reinforcement rate the per-press
+value rule gives VR/VI ~1.0 -- response rate is dominated by the energy deficit, and the average
+per-press return equalizes when rates equalize. The missing ingredient is sensitivity to the molar
+FEEDBACK FUNCTION (marginal, not average). Prototyped two fixes: average reinforcers-per-press (fails,
+equalizes) and a windowed response-reinforcer regression slope (works). Key insight: the homeostatic
+feed-pause cycle makes the raw rate-reinforcement correlation baseline-NEGATIVE; on VR the
+response-dependent reinforcement pushes the slope positive, on VI it stays negative. So the POSITIVE
+PART of the slope (clipped) boosts the press drive only on VR -- Baum's correlation-based law of
+effect (already cited in the README).
+
+Implemented in chamber.run_chamber (opt-in, default off so the reproduce baseline is unchanged):
+windowed cov(window rate, window reinf)/var(window rate), EMA-smoothed; drive += feedback_gain *
+max(0, slope). New ChamberConfig fields feedback_gain (0), feedback_window (40), feedback_ema (0.02).
+Result (exp047): VR/VI press rate at matched reinforcement rate is ~1.0 with feedback off and ~1.7-2.0
+with it on; the VR press-rate-vs-reinforcement-rate curve lies well above the VI curve only with
+feedback on. test_vr_vi_feedback locks it (VR-30 / VI-60 are reinforcement-matched). 104 tests pass.

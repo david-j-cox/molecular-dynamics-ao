@@ -308,7 +308,15 @@ PHASE 6 -- FOOD PATCHES + OPERANT SCHEDULES
     FR>VR post-reinforcement pause (4.06 vs 1.36), VR>FR rate. exp018.
 [x] Cumulative records (exp019): FI scallops, FR break-and-run staircase with
     reinforcer pips -- the classic operant visualization.
-[ ] VR>>VI molar rate difference: still weak; needs feedback-function sensitivity.
+[x] VR>>VI molar rate difference (exp047 + test_vr_vi_feedback; chamber feedback_gain). The per-press
+    value rule alone gives VR/VI ~1.0 at matched reinforcement rate (rate is deprivation-dominated;
+    average per-press return equalizes). Added molar FEEDBACK SENSITIVITY (Baum's correlation-based
+    law of effect, which the README already cites): the press drive is boosted by the positive part
+    of the recent response->reinforcer regression slope (cov(window rate, window reinf)/var, EMA). On
+    VR the slope is positive (pressing yields proportionally more) -> boost -> high rate; on VI it is
+    ~0/negative (rate-independent + the homeostatic feed-pause cycle) -> no boost -> low rate. Result:
+    VR/VI ~1.0 with feedback off, ~1.7-2.0 with it on, at matched reinforcement rate. Opt-in
+    (feedback_gain default 0), so the reproduce baseline is unchanged.
 
 DECREMENTAL LEARNING / EXTINCTION (pluggable LearningRule)
 ---------------------------------------------------------

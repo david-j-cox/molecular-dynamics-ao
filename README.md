@@ -168,6 +168,7 @@ flowchart LR
 | Operant stimulus control (S+/S-delta/neutral) | three-term contingency over the cue dimension; differential responding + generalization decrement (`run_stimulus_control_demo.py`) | implemented |
 | Behavioral contrast | from the shared energy budget (convex hunger): current-reserve and learned-anticipatory routes (`chamber.run_contrast`, `exp040`/`exp041`) | implemented |
 | Schedule performance | `chamber.py`: FI scallop, FR break-and-run, FR>VR pause | implemented |
+| VR > VI rate difference | molar feedback sensitivity (response-reinforcer correlation; `chamber.feedback_gain`, Baum's correlation-based law); `exp047` | implemented |
 | Interval timing (SET / BeT / LeT) | `timing.py` pluggable timing models (toggleable) | implemented |
 | Behavioral economics (effort / unit price) | `chamber.py`: consumption falls with response cost | implemented |
 | Temporal weighting | eligibility trace (`EligibilityTrace`) | implemented (related) |
@@ -367,6 +368,7 @@ separate food channels):
 |---|---|---|
 | FI scallop | `exp017` | flat-then-accelerating; toggleable timing models (SET/BeT/LeT) |
 | FR break-and-run, FR>VR pause | `exp018`/`exp019` | post-reinforcement pause larger on FR; cumulative records |
+| VR > VI rate difference | `exp047` | VR press rate exceeds VI at matched reinforcement rate (VR/VI ~1.7 with molar feedback sensitivity vs ~1.0 without) |
 | Behavioral economics | `exp016` | consumption falls as response cost (unit price) rises |
 | Death patterns | `exp007` | survival curves, time-to-death, cause breakdown |
 | Behavioral momentum (extinction) | `exp026` | mass-modulated value decay → richly-reinforced response resists extinction; gain=0 control shows none |
@@ -535,7 +537,9 @@ pre-commit install --hook-type pre-push     # pytest on push
   law (rate / amount / probability / delay).
 - [x] **Operant chamber & schedules** — FI scallop, FR break-and-run, FR>VR pause
   (cumulative records); pluggable interval-timing models (SET / BeT / LeT);
-  effort-based / unit-price consumption.
+  effort-based / unit-price consumption; the **VR > VI rate difference** from molar feedback
+  sensitivity (the response-reinforcer correlation, Baum's correlation-based law; `exp047`,
+  opt-in `feedback_gain`) — VR/VI ~1.7 with it vs ~1.0 without, at matched reinforcement rate.
 - [x] **JAX-vectorized engine** — validated vs NumPy, ~84× faster. (Autodiff is
   exposed, but gradients through the long recurrent matching rollout explode and are
   unusable for fitting; fitting instead searches the differentiable forward surrogate
@@ -630,8 +634,7 @@ pre-commit install --hook-type pre-push     # pytest on push
   ranges on the current engine (signatures flat, or scaling monotonically with the mechanism
   parameter; knockouts flat) as standing model-validity evidence. Generalization and peak shift also
   run on the JAX engine (`exp044`).
-- [x] **Tests + CI** — 100-test pytest suite, GitHub Actions (ruff + pytest).
-- [ ] **Next** — molar VR≫VI rate difference; day/night ambient sun;
-  `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
-  `LearningRule`; a genuine autodiff fit via truncated backprop → evolution → model
-  comparison → real data (see `ToDO.txt`).
+- [x] **Tests + CI** — 104-test pytest suite, GitHub Actions (ruff + pytest).
+- [ ] **Next** — `InjuryHealing` consequence model; Pearce-Hall as a pluggable foraging
+  `LearningRule`; combined-dimension GML; a genuine autodiff fit via truncated backprop →
+  evolution → model comparison → real data (see `ToDO.txt`).

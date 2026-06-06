@@ -14,9 +14,11 @@ The energy budget is included on purpose: a reinforcer raises energy, lowering t
 deficit motivation (a post-reinforcement pause); energy then drains (basal
 metabolism + press effort), raising motivation again and accelerating responding.
 This is the ground-up bet that within-schedule patterns (FR break-and-run, FI
-scallop) and the VR>VI rate difference emerge from energy-driven motivation +
-value learning, rather than being imposed. Vectorized over organisms (NumPy);
-the per-step loop is sequential because schedules carry state.
+scallop) emerge from energy-driven motivation + value learning, rather than being
+imposed. The VR>VI rate difference needs one more ingredient -- molar feedback
+sensitivity (the response-reinforcer correlation; opt-in via feedback_gain, see
+ChamberConfig); the per-press value rule alone underproduces it. Vectorized over
+organisms (NumPy); the per-step loop is sequential because schedules carry state.
 """
 
 from __future__ import annotations
@@ -90,6 +92,18 @@ class ChamberConfig:
     # Both default 0 (off): no anticipatory learning or discount, so existing runs are unchanged.
     antic_lr: float = 0.0          # EMA rate of a component's value toward the next one's income
     antic_discount: float = 0.0    # predicted upcoming income discounts the current deficit
+    # --- Molar feedback sensitivity (Baum's correlation-based law of effect): VR >> VI ----------
+    # The press drive is boosted by the recent response->reinforcer CORRELATION: over windows of
+    # feedback_window steps, estimate the regression slope of reinforcement rate on the organism's
+    # own response rate (cov / var, EMA-smoothed). On RATIO schedules pressing more yields
+    # proportionally more reinforcement (positive slope -> boost), so rates run high; on INTERVAL
+    # schedules reinforcement is rate-independent (the homeostatic feed-pause cycle even makes the
+    # raw correlation negative), so the clipped slope gives no boost and rates stay low -- which
+    # makes VR rates exceed VI rates at matched reinforcement rate, a molar feedback effect the
+    # per-press value rule alone underproduces. Default 0 (off): drive unchanged.
+    feedback_gain: float = 0.0     # strength of the positive response-reinforcer slope boost
+    feedback_window: int = 40      # steps per rate-estimation window
+    feedback_ema: float = 0.02     # EMA rate for the windowed cov/var/means
     # Behavioral momentum = MASS = resistance to CHANGE (the project's core Verlet
     # metaphor). The context->reinforcer association confers inertia: it divides
     # the rate at which the response value extinguishes, so mass_c = 1 +
@@ -175,6 +189,15 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
     timer = np.zeros(n_org)                   # steps since last reinf (FI)
     armed = np.zeros(n_org, bool)             # VI
     tsr = np.zeros(n_org)                     # time since reinforcement
+    # Molar feedback (response-reinforcer correlation); inert unless feedback_gain > 0.
+    fb_on = cfg.feedback_gain > 0.0
+    pacc = np.zeros(n_org)                    # presses accumulated in the current window
+    racc = np.zeros(n_org)                    # reinforcers accumulated in the current window
+    rbar = np.full(n_org, 0.3)               # EMA of window response rate
+    fbar = np.zeros(n_org)                   # EMA of window reinforcement rate
+    cov = np.zeros(n_org)                    # EMA cov(window rate, window reinf)
+    var = np.full(n_org, 1e-3)               # EMA var(window rate)
+    slope = np.zeros(n_org)                  # regression slope = marginal feedback
 
     presses = np.zeros((n_steps, n_org))
     reinforced_rec = np.zeros((n_steps, n_org))
@@ -190,6 +213,7 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         # Press drive = learned value + energy-deficit motivation + timing signal.
         drive = cfg.approach_gain * (
             w + cfg.motiv_strength * deficit + cfg.timing_gain * timing.contribution()
+            + cfg.feedback_gain * np.clip(slope, 0.0, None)
         )
         # Leaky integrator (overdamped limit): tracks the drive with time constant
         # act_tau, fast enough to follow a within-interval timing ramp.
@@ -237,6 +261,24 @@ def run_chamber(schedule: str, param: float, cfg: ChamberConfig,
         # resets, so a new interval starts from a low rate (clean scallop / PRP).
         act = np.where(reinforced, 0.0, act)
         count = np.where(reinforced, 0.0, count)   # reset count-since-reinforcer
+
+        # Molar feedback: accumulate this window's rate/reinf; at the boundary update the EMA
+        # regression slope of reinforcement rate on the organism's own response rate.
+        if fb_on:
+            pacc += press
+            racc += reinforced
+            if (t + 1) % cfg.feedback_window == 0:
+                rw = pacc / cfg.feedback_window
+                fw = racc / cfg.feedback_window
+                e = cfg.feedback_ema
+                dr = rw - rbar
+                cov = (1.0 - e) * cov + e * dr * (fw - fbar)
+                var = (1.0 - e) * var + e * dr * dr
+                rbar = (1.0 - e) * rbar + e * rw
+                fbar = (1.0 - e) * fbar + e * fw
+                slope = cov / (var + 1e-4)
+                pacc[:] = 0.0
+                racc[:] = 0.0
 
         tsr_rec[t] = tsr
         presses[t] = press
