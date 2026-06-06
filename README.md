@@ -392,7 +392,9 @@ fact, credited by an eligibility trace, reproduces it with an *emergent* require
 generalizes, and gives the twin-threshold rule. The learning ports to the atom weights; expression
 needs timescale separation, and spatial travel cost can invert the rule. A real **2D forager**
 (`exp045`) reproduces the rule end-to-end on the engine's own primitives (reversal +0.23, drive-readout
-emission; travel weakens it; the raw per-step Verlet+softmax emission under-builds).
+emission; travel weakens it; the raw per-step Verlet+softmax emission under-builds). A travel-cost
+study (`exp046`, `studies/spatial_travel_cost/`) maps the rule→inversion transition and finds it is
+economy-coupled, not a clean single-parameter boundary.
 
 **Parameter fitting** (`fit.py`, `matching_diff.py`): search organism parameters so
 the *emergent* matching sensitivities hit chosen targets (`exp023`). The stochastic
