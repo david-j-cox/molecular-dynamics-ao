@@ -2024,3 +2024,20 @@ present hunger. With energy CLAMPED (local route off, isolating anticipation): l
 -> A x1.18 (respond more), rich coming -> A x0.92 (respond less) -- correct anticipatory sign, learned
 from the experienced sequence, knocked out by antic_discount=0. Chamber changes are additive and
 default-off, so momentum/PREE/resurgence and the v0.1 baseline are unchanged (96 tests pass).
+
+---
+
+## 2026-06-06 -- exp042: robustness battery for the new zoo phenomena (standing validity)
+
+Answers the "was it tuned?" worry by sweeping each new phenomenon across its key parameter and showing
+the signature holds throughout (4-panel figure outputs/figures/exp042_zoo_robustness.png):
+- Blocking: w_B(competitive) ~ 0 and w_B(independent) ~ 1 flat across learning rate 0.1-0.5.
+- Overshadowing: w_B(competitive) ~ 0.5 flat across learning rate.
+- Reserve contrast: positive ratio grows MONOTONICALLY with motiv_strength (1.24 -> 1.45), knockout
+  (ms=0) flat at 1.0.
+- Anticipatory: lean-coming ratio grows with antic_discount (1.08 -> 1.24), rich-coming falls
+  (0.97 -> 0.89), knockout (0) flat.
+The monotone scaling of both contrast effects with their mechanism parameter is the key point: not a
+single tuned coincidence but a graded dependence on the mechanism. test_zoo_robustness locks the
+(cheap, tabular) blocking/overshadowing robustness; the contrast sweeps live in exp042. Remaining zoo
+work: a full battery over the older phenomena, and generalization/peak shift on the JAX engine.
