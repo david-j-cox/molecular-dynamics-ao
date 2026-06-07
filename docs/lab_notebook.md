@@ -2538,3 +2538,28 @@ the engine survey's "JAX covers only force+integration" read the stale module do
   effort->energy / load-bearing fatigue terms (exp059) and multi-dimensional / oscillator atoms
   (exp061; the ModelSpec assumes a scalar state per atom). Porting multi-dim atoms would be the larger
   next step (the spec + force kernels are written for scalar activations). 148 tests; ruff clean.
+
+---
+
+## 2026-06-07 -- Wiring multi-dim atoms through the organism pipeline (exp062)
+
+Follow-on to exp061: made multi-dimensional / oscillator atoms first-class in the real Organism, not
+just standalone. Two minimal, byte-identical changes:
+- organism.step: a `if atom.dims > 1` branch -- the scalar drive enters the atom's OUTPUT dimension,
+  the atom's internal_coupling defines its intrinsic dynamics, and the global velocity damping is NOT
+  applied (so a passive pacemaker free-runs; damping, if wanted, goes in the coupling). Scalar atoms
+  take the existing verlet/leaky paths verbatim.
+- atoms.BehavioralAtom: __post_init__ captures the constructed initial (state, previous_state); reset()
+  restores it for multi-dim/oscillator atoms (so a CPG resumes its designed phase) while scalar atoms
+  still reset to baseline+zero-velocity (unchanged). Without this, org.reset() collapsed the CPG to
+  rest and it never oscillated -- the bug the prototype caught.
+- exp062: drop a CPG (oscillator_atom) into default_atom_set + one coupling entry CPG->consume, run
+  with NO eliciting stimulus. The CPG free-runs inside the full force->Verlet->coupling->integrate
+  pipeline (period ~30, amp 3.0) and consume oscillates at the SAME period (amp 0.58, phase-lagged --
+  the action atom integrates the rhythmic drive); with the coupling removed consume is flat (std 0).
+  = spontaneous periodic responding from an internal pacemaker (adjunctive / interim behavior),
+  emitted through the engine's own dynamics. 2-panel figure exp062_cpg_in_organism.png.
+- 3 tests (CPG oscillates in organism; reset restores oscillator phase; existing reset test updated).
+  152 pass; ruff clean; reproduce exp001/006/030 byte-identical. Remaining: per-dimension external
+  force from the force calculator (a true 2-D motor atom driven on both dims) is the larger refactor
+  not done here -- the current wiring drives the output dim + internal coupling, sufficient for CPGs.

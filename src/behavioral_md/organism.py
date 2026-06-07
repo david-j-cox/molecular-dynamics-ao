@@ -108,6 +108,16 @@ class Organism:
 
         cfg = self.config
         for i, atom in enumerate(self.atoms):
+            if atom.dims > 1:
+                # Multi-dimensional atom (e.g. an oscillator / central pattern generator): the
+                # scalar drive enters the OUTPUT dimension and the atom's internal coupling (applied
+                # inside integrate) defines its intrinsic dynamics -- so the global velocity damping
+                # is NOT applied here (any damping belongs in internal_coupling, e.g. complex
+                # eigenvalues), letting a pacemaker free-run. (The leaky integrator is scalar-only.)
+                f = np.zeros(atom.dims)
+                f[0] = force[i]
+                atom.integrate(f, cfg.dt, cfg.activation_min, cfg.activation_max)
+                continue
             if cfg.integrator == "leaky":
                 # First-order leaky competing accumulator (the overdamped Verlet limit):
                 # x <- x + dt*(force/m - leak*x). No inertial/second-order term. Used by the

@@ -105,6 +105,12 @@ class BehavioralAtom:
     # cannot. None (default) leaves every existing atom byte-identical.
     internal_coupling: np.ndarray | None = None
 
+    def __post_init__(self) -> None:
+        # Capture the constructed initial condition so an oscillator/CPG resets to its designed
+        # phase+velocity (not collapsed to rest); scalar atoms still reset to baseline.
+        self._init_state = np.asarray(self.state, dtype=np.float64).copy()
+        self._init_previous = np.asarray(self.previous_state, dtype=np.float64).copy()
+
     @property
     def activation(self) -> float:
         """Scalar response tendency: the output (first) state component.
@@ -140,9 +146,18 @@ class BehavioralAtom:
         self.state = new_state
 
     def reset(self) -> None:
-        """Return the atom to its baseline activation with zero velocity (dimension preserved)."""
-        self.state = np.full(self.state.shape, self.baseline_activation, dtype=np.float64)
-        self.previous_state = self.state.copy()
+        """Reset the atom for a new life.
+
+        A scalar atom returns to its baseline activation with zero velocity (unchanged). A
+        multi-dimensional / oscillator atom is restored to its CONSTRUCTED initial state + velocity
+        so a pacemaker resumes its designed phase rather than collapsing to rest.
+        """
+        if self.dims > 1 or self.internal_coupling is not None:
+            self.state = self._init_state.copy()
+            self.previous_state = self._init_previous.copy()
+        else:
+            self.state = np.full(self.state.shape, self.baseline_activation, dtype=np.float64)
+            self.previous_state = self.state.copy()
         self.fatigue = 0.0
 
 

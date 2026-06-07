@@ -91,12 +91,15 @@ def test_oscillator_muscles_are_anti_phase():
     assert np.corrcoef(m0, m1)[0, 1] < -0.8          # anti-phase
 
 
-def test_reset_preserves_dimensionality():
-    """reset() returns a multi-dimensional atom to baseline without collapsing its dimension."""
+def test_reset_restores_oscillator_initial_condition():
+    """reset() restores an oscillator atom to its CONSTRUCTED initial state/velocity (so a pacemaker
+    resumes its designed phase), preserving dimensionality -- not collapsing it to baseline rest."""
     from behavioral_md.atoms import oscillator_atom
-    a = oscillator_atom("cpg", period=40.0)
+    a = oscillator_atom("cpg", period=40.0, amplitude=1.0)
+    init = a.state.copy()
     for _ in range(10):
         a.integrate(np.zeros(2), 0.1, -10, 10)
     a.reset()
     assert a.state.shape == (2,)
-    assert np.allclose(a.state, a.baseline_activation)
+    assert np.allclose(a.state, init)          # restored to its initial (oscillating) condition
+    assert not np.allclose(a.state, a.baseline_activation)   # NOT collapsed to baseline rest
