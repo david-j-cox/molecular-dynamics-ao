@@ -182,6 +182,20 @@ class SimulationConfig(BaseModel):
     rest_cost: float = Field(
         0.001, ge=0.0, description="Extra energy per step for no-op/pause/consume."
     )
+    # Effort -> energy coupling (closes the force<->energy loop): on top of the fixed per-action
+    # cost above, vigorous responding costs energy in proportion to behavioral effort = the summed
+    # POSITIVE activation of the action atoms (motor output intensity). 0.0 = off (byte-identical;
+    # cost is the fixed per-action constant only); >0 makes effort metabolically constrained, so a
+    # strongly driven response (e.g. food-seeking amplified by an energy deficit) is itself costly.
+    effort_cost: float = Field(
+        0.0, ge=0.0, description="Energy per step per unit behavioral effort (summed positive "
+        "action-atom activation). 0 = off."
+    )
+    # Fatigue as a metabolic load (requires fatigue_gain > 0 to accrue any fatigue): each unit of
+    # total atom fatigue costs this much energy per step. 0.0 = off (fatigue only decrements force).
+    fatigue_energy_cost: float = Field(
+        0.0, ge=0.0, description="Energy per step per unit total atom fatigue (0 = off)."
+    )
     food_intake_rate: float = Field(
         0.05,
         ge=0.0,

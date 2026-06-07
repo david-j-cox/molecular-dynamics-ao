@@ -234,8 +234,24 @@ refuge exists (corrects the roadmap's guessed direction, as 1.3 corrected its gu
 
 ---
 
-## Molecular-agent bridge -- does the mechanism realize the optimum? (repo-unifying)
+## Molecular-agent bridge -- does the mechanism realize the optimum? (repo-unifying)  -- DONE (2026-06-07)
+Closed in two parts (exp059 + the engine loop; building on exp032/036/045). (1) THE LOOP: energy now
+flows BOTH ways -- config `effort_cost` makes behavioral effort (summed positive action-atom
+activation) cost energy, and `fatigue_energy_cost` makes fatigue a metabolic load (fatigue_gain>0
+already decremented force); default-off / byte-identical (reproduce exp001-030 unchanged). On the real
+Organism this gives effort->faster depletion and load-bearing fatigue (a homeostatic brake on the
+otherwise-ramping integrator + a post-bout refractory). (2) THE DEMO: exp032/036/045 found the atoms'
+state-conditioned weights ACQUIRE the energy-budget rule but the per-step Verlet+softmax emission
+under-expresses it (needs TIMESCALE SEPARATION). Supplying it -- K molecular Verlet steps per molar
+choice, drive held fixed -- makes the genuine Verlet emission's reversal climb monotonically with K
+(+0.009 at K=1 -> +0.231 at K=inf=drive readout; imposed reference +0.531). So the messy distributed
+mechanism DOES realize the molar optimum given timescale separation, and the rule is robust to the
+now-costly effort. Skew sensitivity not pursued here (the variance/energy-budget rule is the demo).
+Open follow-on: the ramp without fatigue shows the default integrator lacks a restoring term (ties to
+the exp048 "is the second-order term load-bearing" thesis question). 4 tests; 142 pass. Figure
+exp059_molecular_bridge.png.
 
+(original plan:)
 - **What:** The parent project's thesis is behavioral MOLECULAR DYNAMICS -- distributed response
   "atoms", stimulus forces, Verlet integration, learning history (`atoms.py`, `forces.py`,
   `organism.py`, `chamber.py`). The entire risk arc has been pure survival DP, divorced from that

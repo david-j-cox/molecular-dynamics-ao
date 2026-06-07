@@ -54,9 +54,13 @@ class Organism:
             self.config.history_weight_max,
         )
         self._af_index = self.index["approach_food"]
+        # Distinct action-atom names (motor output), for the effort -> energy cost.
+        self._action_atom_names = sorted(set(ACTION_ATOMS.values()))
 
         # Objective physical state.
         self.energy = self.config.energy_init
+        self.last_effort = 0.0
+        self.last_expenditure = 0.0
         self.alive = True
         self.cause_of_death: str | None = None
         # Most-recent step bookkeeping, exposed for logging.
@@ -180,6 +184,16 @@ class Organism:
         expenditure = cfg.basal_metabolism + (
             cfg.move_cost if action in _MOVE_ACTIONS else cfg.rest_cost
         )
+        # Effort -> energy: vigorous responding costs energy in proportion to motor output
+        # (summed positive action-atom activation). Closes the force<->energy loop.
+        if cfg.effort_cost > 0.0:
+            self.last_effort = sum(
+                max(0.0, self.atoms[self.index[n]].activation) for n in self._action_atom_names
+            )
+            expenditure += cfg.effort_cost * self.last_effort
+        if cfg.fatigue_energy_cost > 0.0:
+            expenditure += cfg.fatigue_energy_cost * float(sum(a.fatigue for a in self.atoms))
+        self.last_expenditure = expenditure
         self.energy = float(np.clip(self.energy + intake - expenditure, 0.0, cfg.energy_capacity))
         if self.energy <= 0.0 and self.alive:
             self.alive = False

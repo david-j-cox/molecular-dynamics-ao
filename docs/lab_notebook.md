@@ -2424,3 +2424,36 @@ predict_choice; MLE fit_model + AIC + crossval_loglik; compare_models. 6 tests; 
   rethinking decision-making" (about magnitude sensitivity / the EV-dependent reversal), NOT a
   prospect-theory-vs-RSF paper. Do not cite it for PT-vs-RSF. Cites: Genest et al. 2016, Kacelnik &
   Bateson 1996 (SUT), Eeckhoudt & Schlesinger 2006 (prudence), Wilson & Collins 2019 (recovery).
+
+---
+
+## 2026-06-07 -- Closing the molecular bridge: effort->energy loop + the clean demo (exp059)
+
+Shift from the risk arc back to the core atom/force engine. Closed the force<->energy loop and used it
++ timescale separation to demonstrate the atom engine realizing the molar energy-budget optimum.
+
+- ENGINE LOOP (config + organism, default-off byte-identical; reproduce exp001-030 unchanged). New
+  config: `effort_cost` (energy/step per unit behavioral effort = summed positive action-atom
+  activation) and `fatigue_energy_cost` (energy/step per unit total fatigue). organism.update_history
+  adds `effort_cost*effort + fatigue_energy_cost*total_fatigue` to expenditure; exposes last_effort,
+  last_expenditure. fatigue_gain>0 already decremented force (was dormant). So energy now flows BOTH
+  ways: deficit->force (existing) and force/effort->energy (new).
+- PART A phenomena (real Organism): (A1) effort costs energy -> dies sooner (41 vs 58 steps at
+  effort_cost=0.08). (A2) LOAD-BEARING FATIGUE: without fatigue a sustained drive RAMPS an atom's
+  activation toward the ceiling (the damped-Verlet atom is an integrator, no restoring term -> ramps
+  at velocity F/c); fatigue_gain>0 acts as a homeostatic BRAKE (0.90 -> 0.50) and leaves a post-bout
+  refractory dip (~ -0.06). (Note for later: the ramp shows the default integrator has no leak; the
+  leaky integrator or fatigue supplies the missing restoring force -- relevant to the exp048 thesis
+  question.)
+- PART B -- the bridge closed (vectorized exp045 forager + survival-credit learning). exp032/036/045
+  established: the state-conditioned weights ACQUIRE the rule but the per-step Verlet+softmax EMISSION
+  under-expresses it (one molecular step is tiny); exp036 diagnosed the need for TIMESCALE SEPARATION.
+  Supplied directly: each molar choice runs K molecular Verlet steps with the drive held fixed
+  (molecular fast vs molar slow). RESULT: the genuine Verlet emission's energy-budget reversal climbs
+  MONOTONICALLY with K -- +0.009 (K=1, the exp036 under-build) -> +0.088 (K=5) -> +0.178 (K=15) ->
+  +0.231 (K=inf = drive readout); imposed-utility reference +0.531. So the molecular mechanism DOES
+  realize the molar optimum given timescale separation. The rule is ROBUST to the now-costly effort
+  (+0.175 at K=15, effort_cost=0.15 -- ~unchanged; an earlier sweep at K=20 showed mild sharpening).
+- exp059 4-panel figure (A1 effort-energy, A2 fatigue brake, C K-sweep climb, D P(risky|E) curves:
+  K=1 under-builds, K=15 expresses the rule, +costly-effort, vs imposed). 4 tests (test_effort_energy);
+  142 pass; ruff clean; reproduce byte-identical. Not in reproduce.py (exp031+ convention).

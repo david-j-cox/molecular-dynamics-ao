@@ -249,9 +249,15 @@ with `T = softmax_temperature` (`T → 0` → argmax).
 intake       = food_intake_rate           if in contact with food, else 0
 energy_delta = intake - danger_loss * danger_contact
 expenditure  = basal_metabolism + (move_cost if moved else rest_cost)
+             + effort_cost * effort + fatigue_energy_cost * total_fatigue
 E(t+1)       = clip(E(t) + energy_delta - expenditure, 0, E_cap)
 death (episode ends) when E <= 0     (cause: starvation, or danger if in contact)
 ```
+The last two expenditure terms (default 0) close the **force↔energy loop**: energy drives force (a
+deficit amplifies food-seeking) *and* behavioral effort — `effort` = summed positive action-atom
+activation — costs energy, with fatigue as a load-bearing brake (force decrement + metabolic cost).
+With this loop and timescale separation, the distributed atom engine emergently reproduces the
+energy-budget rule the survival DP prescribes, without an imposed utility (`exp059`).
 
 **Eligibility trace (temporal weighting of credit).** Recency-weighted:
 
