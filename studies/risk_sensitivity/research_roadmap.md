@@ -128,7 +128,24 @@ degeneracy (Comput. Brain Behav. 2022).
 - **Tractability:** High; pure numpy/scipy, no external data.
 - **Novelty:** Strong; directly answers the named review.
 
-### 2.2 Model comparison vs SUT / mean-variance / prospect theory on skew-controlled data
+### 2.2 Model comparison vs SUT / mean-variance / prospect theory on skew-controlled data  -- PARTIAL (2026-06-07)
+Built in `choice_models.py` + exp058 (4 panels). DELIVERED: (1) the structural result -- a pure
+mean-variance model (and SUT, scalar/Weber noise on magnitude) is skew-BLIND, predicting 0.5 for
+matched mean+variance whatever the skew; (2) the fit / AIC / cross-validated / model-recovery harness;
+(3) the Genest 2016 contact -- their monkeys' ~70-80% +skew preference (matched mean+variance) refutes
+the skew-blind model, and a curved-utility EU (their own u=ln(x+1)/0.81) and prospect theory fit it.
+The survival-DP's distinguishing prediction (the skew preference REVERSES across R) is shown, and a
+skew x budget interaction (=0 for EU/PT, +7 for survival-DP) is the design that would discriminate.
+NOT DELIVERED (data-gated): a decisive empirical WIN of survival over curved-utility EU. Caraco &
+Chasin 1984 -- the ideal matched mean+variance x energy-budget x skew set -- is UNAVAILABLE
+(paywalled). Genest is single-budget, and Genest's own logistic test (their Eqs 1/2/3) already found
+variance/skew add nothing beyond their curved utility (P~0.88-0.99), so survival and EU are
+indistinguishable on it. The decisive test needs energy-budget x skew data (Caraco, or the 2.3
+pre-reg). CITATION CORRECTION: McDevitt & Kacelnik 2014 is "Magnitude sensitivity: rethinking
+decision-making" (magnitude sensitivity), NOT a prospect-theory-vs-RSF paper -- do not cite it as such.
+6 tests; 134 pass; ruff clean. Figure exp058_model_comparison.png.
+
+(original plan:)
 - **What:** Refit Caraco & Chasin 1984 (sparrows; matched mean+variance, manipulated skew -- the
   ideal legacy dataset) and Genest, Stauffer & Schultz 2016 (monkeys; machine-readable; already
   shows a magnitude-dependent reversal). AIC / cross-validated comparison showing the survival-DP

@@ -413,6 +413,37 @@ the dominant effect of autocorrelated scarcity here is risk-*proneness*, not the
 one might guess; conservatism wins only where a refuge exists — so this corrects the roadmap's guessed
 direction, just as the temperance result corrected its guessed kurtosis reversal.
 
+## Against the standard accounts: what skew can and cannot decide (`choice_models.py`, exp058)
+
+Does the survival account *win* against the textbook models of risky choice? We set it against a pure
+mean-variance model, expected utility with a flexible (cubic) utility, and prospect theory, on gambles
+matched in mean and variance with only the skew varied — so any choice difference is a pure skew
+effect. Four findings (`figures/exp058_model_comparison.png`):
+
+- **Structural.** A pure mean-variance model — and Scalar Utility Theory, whose risk sensitivity is
+  scalar (Weber) noise on magnitude — is *skew-blind*: for matched mean+variance it predicts
+  indifference whatever the skew. This needs no data.
+- **The data refute the skew-blind model.** Genest, Stauffer & Schultz's (2016) monkeys preferred the
+  positively skewed gamble ~70–80% of the time at matched mean+variance (third-order stochastic
+  dominance) — incompatible with mean-variance, and captured by a curved-utility EU (their own fitted
+  `u(x)=ln(x+1)/0.81`) and by prospect theory.
+- **The distinguishing prediction.** The survival-DP's skew preference *reverses* across the
+  requirement R (prefers −skew when desperate, +skew when safe); a fixed-utility EU and prospect
+  theory predict a single, energy-budget-invariant skew preference.
+- **The design that would settle it.** Within one energy budget the skew-sensitive models are mutually
+  confusable. Choices at *two* budgets expose a skew × budget interaction — essentially zero for
+  EU/prospect theory, strongly non-zero for the survival-DP — which is exactly the matched
+  mean+variance × energy-budget × skew design needed to discriminate them.
+
+Two honest limits. This is a *partial* result: it delivers the structural point, the comparison
+harness, and the demonstration that the survival account is empirically adequate on the best available
+skew data — but not a decisive win over curved-utility EU. The ideal dataset (Caraco & Chasin 1984,
+matched mean+variance × energy budget × skew) is currently unavailable, and Genest's single-budget
+data cannot separate the two — indeed Genest's own logistic-regression test found that adding variance
+or skew terms did not improve on their curved utility. The energy-budget reversal therefore stands as
+exp058's falsifiable prediction, and the two-budget experiment (the pre-registration item) is the way
+to test it.
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the
@@ -443,3 +474,9 @@ direction, just as the temperance result corrected its guessed kurtosis reversal
   empirical evidence and challenges revealed by plants. *Proc. R. Soc. B*, 277, 3055–3064.
 - Philippi, T., & Seger, J. (1989). Hedging one's evolutionary bets, revisited. *Trends Ecol. Evol.*,
   4, 41–44.
+- Genest, W., Stauffer, W. R., & Schultz, W. (2016). Utility functions predict variance and skewness
+  risk preferences in monkeys. *PNAS*, 113, 8402–8407.
+- Eeckhoudt, L., & Schlesinger, H. (2006). Putting risk in its proper place. *Am. Econ. Rev.*, 96,
+  280–289.
+- Tversky, A., & Kahneman, D. (1992). Advances in prospect theory: cumulative representation of
+  uncertainty. *J. Risk Uncertain.*, 5, 297–323.

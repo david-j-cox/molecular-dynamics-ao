@@ -2387,3 +2387,40 @@ selection). 122 tests; ruff clean.
   fecundity variance). Tests: Markov marginal/autocorrelation; phase-diagram corners (refuge->safe,
   no-refuge->gamble); matched-mean geom < arith for gambling; evolution tracks the phase diagram.
   Cites Childs/Metcalf/Rees 2010, Philippi & Seger 1989, Stephens 1981. Not in reproduce.py (exp031+).
+
+---
+
+## 2026-06-07 -- Roadmap 2.2: model comparison on skew-controlled choice (exp058)
+
+Set the survival account against the standard rivals on matched-mean+variance, skew-varied gambles.
+New module src/behavioral_md/choice_models.py: moments(); four choice models (ev; mv = mean-b*var,
+skew-blind; eu = cubic utility x - a x^2 + c x^3 with a=variance aversion, c=skew/prudence; pt =
+prospect theory, rank-dependent weighting); survival_advantage (q_A - q_B off survival_dp); logistic
+predict_choice; MLE fit_model + AIC + crossval_loglik; compare_models. 6 tests; 134 pass; ruff clean.
+
+- DATA SITUATION. Caraco & Chasin 1984 (the ideal matched mean+variance x energy-budget x skew set)
+  is UNAVAILABLE (paywalled stub in molecular-articles/_unavailable). Genest, Stauffer & Schultz 2016
+  IS available (PNAS, machine-readable): monkeys prefer +skew over -skew at matched EV+variance
+  (~70% A, ~80% B; Fig 5D, n=359/500) and show an EV-dependent variance reversal. CRUCIAL: Genest's
+  own Methods ran our exact comparison (logistic Eqs 1/2/3: utility, +variance, +skew) and found
+  adding variance or skew did NOT improve on the curved utility (P~0.88-0.99). So on their single-
+  budget data, curved-utility EU already suffices -- the survival-DP cannot BEAT it there; the two are
+  only separable by manipulating the energy budget.
+- RESULT (exp058, 4 panels): (A) structural -- mv (and SUT) predict P=0.5 for matched mean+variance
+  regardless of skew; Genest's ~70-80% +skew preference refutes the skew-blind model, and a curved
+  EU (their fitted u=ln(x+1)/0.81) fits the data points; pt also skew-sensitive. (B) the distinguishing
+  prediction -- the survival skew preference REVERSES across R (prefers -skew below, +skew above,
+  fading deep-safe); EU/PT are budget-invariant. (C) model recovery within one budget -- mv separable,
+  but eu/pt/survival mutually confusable (single regime). (D) a skew x budget interaction discriminates:
+  ~0 for eu/pt (no state input), +7.1 for survival-DP -- the two-budget design (Caraco/2.3) is what
+  would settle it; mirrors Genest's own logistic-regression methodology.
+- HONEST SCOPE: 2.2 is PARTIAL. Delivered: the structural skew-blindness result, the fit/AIC/recovery
+  harness, and the Genest contact (skew-blind rivals refuted; survival adequate, indistinguishable
+  from curved-utility EU on single-budget data). NOT delivered (data-gated): a decisive empirical WIN
+  of survival-DP over curved-utility EU -- needs energy-budget x skew data (Caraco, unavailable; or
+  the 2.3 pre-reg). The energy-budget reversal stands as exp058's falsifiable prediction + the design
+  to test it.
+- CITATION CORRECTION: the roadmap-flagged McDevitt & Kacelnik 2014 is "Magnitude sensitivity:
+  rethinking decision-making" (about magnitude sensitivity / the EV-dependent reversal), NOT a
+  prospect-theory-vs-RSF paper. Do not cite it for PT-vs-RSF. Cites: Genest et al. 2016, Kacelnik &
+  Bateson 1996 (SUT), Eeckhoudt & Schlesinger 2006 (prudence), Wilson & Collins 2019 (recovery).
