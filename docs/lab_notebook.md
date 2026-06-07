@@ -2563,3 +2563,23 @@ just standalone. Two minimal, byte-identical changes:
   152 pass; ruff clean; reproduce exp001/006/030 byte-identical. Remaining: per-dimension external
   force from the force calculator (a true 2-D motor atom driven on both dims) is the larger refactor
   not done here -- the current wiring drives the output dim + internal coupling, sufficient for CPGs.
+
+---
+
+## 2026-06-07 -- JAX parity: effort/fatigue ported; multi-dim deferred (task 21)
+
+Brought the JAX engine to parity with the current NumPy organism's energy economy.
+- jax_engine + forage: added the effort->energy cost (effort = summed positive action-atom
+  activation) and the load-bearing fatigue subsystem (new SimState/ForageState `fatigue` array;
+  force -= fatigue in drive_integrate_emit; new_fatigue = decay*fatigue + gain*relu(new_act);
+  energy cost += effort_cost*effort + fatigue_energy_cost*sum(fatigue)). Threaded through both JAX
+  worlds (single-patch make_simulate + multi-patch forage) and reset_for_life.
+- Byte-identical when off: fatigue stays 0 at fatigue_gain=0 (force - 0 unchanged), effort/fatigue
+  costs are 0 at the default config -> the 4 existing validators still match NumPy to fp precision and
+  reproduce exp005/006/044 are byte-identical. New test validates the on-path: force-with-fatigue
+  matches the NumPy ForceCalculator, the fatigue update matches organism._update_fatigue, and
+  effort = summed positive action activation. 153 tests; ruff clean.
+- DEFERRED: multi-dimensional / oscillator atoms in JAX. The ModelSpec + force kernels are written
+  for a scalar [O, A] activation; generalizing to [O, A, D] (per-atom internal coupling, etc.) is a
+  substantial refactor, and the multi-dim demos (exp061/062) are tiny standalone runs that do not need
+  the 85x population-scale speed. Noted in the jax_engine docstring as the remaining gap.

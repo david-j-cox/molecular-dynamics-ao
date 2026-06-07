@@ -17,9 +17,10 @@ validated to reproduce the NumPy organism to floating-point precision (`validate
 `validate_learning`, `validate_emission`, `validate_env`), and the population runs ~85x faster
 (exp004). The NumPy engine (`organism.py`, `forces.py`) remains the canonical, readable reference.
 
-Not yet ported (NumPy-only, used in small-scale ablations): the effort->energy / load-bearing
-fatigue terms (exp059) and multi-dimensional / oscillator atoms (exp061; the spec assumes a scalar
-state per atom). The integrator choice (Verlet / leaky) IS supported.
+The integrator choice (Verlet / leaky) and the effort->energy / load-bearing fatigue terms (exp059)
+ARE supported, all validated against NumPy. Not yet ported: multi-dimensional / oscillator atoms
+(exp061; the ModelSpec assumes a scalar state per atom -- a larger refactor, and the multi-dim runs
+are small enough not to need the population-scale speed).
 
 Static model structure (atom sensitivities, valences, directions, coupling) is
 packed once into a :class:`ModelSpec`; per-step state (activations, history,
@@ -293,7 +294,7 @@ _DANGER = STIMULI.index("danger")
 _CUE = STIMULI.index("cue")
 
 
-def drive_integrate_emit(spec, cfg, activation, previous, history, eligibility,
+def drive_integrate_emit(spec, cfg, activation, previous, history, eligibility, fatigue,
                          intensity, direction, contact, energy, cue_weights,
                          cue_value, cue_centers, key):
     """One per-step motor pass, shared by every JAX world (single- and multi-patch).
@@ -306,15 +307,19 @@ def drive_integrate_emit(spec, cfg, activation, previous, history, eligibility,
     """
     dgain = deficit_gain(energy, cfg)
     force = compute_force(spec, activation, history, intensity, direction, contact, dgain)
+    force = force - fatigue                                     # within-bout decrement (0 when off)
     cue_act = intensity[:, _CUE][:, None] * jnp.exp(
         -cfg.cue_generalization_beta * jnp.abs(cue_value[:, None] - cue_centers[None, :])
     )
     cue_drive = jnp.sum(cue_weights * cue_act, axis=1)
     force = force.at[:, spec.approach_food_idx].add(cue_drive)
     new_act, new_prev = integrate(spec, activation, previous, force, cfg)
+    # Fatigue accrues with positive activation and recovers (matches organism._update_fatigue);
+    # stays identically 0 when fatigue_gain == 0, so the default engine is unchanged.
+    new_fatigue = cfg.fatigue_decay * fatigue + cfg.fatigue_gain * jnp.clip(new_act, 0.0, None)
     elig = update_eligibility(eligibility, new_act, cfg)
     action = sample_actions(spec, emission_probs(spec, new_act, cfg), key)
-    return new_act, new_prev, elig, action, cue_act, cue_drive
+    return new_act, new_prev, new_fatigue, elig, action, cue_act, cue_drive
 
 
 def learn_with_cue(spec, cfg, history, eligibility, cue_weights, intensity, contact,
@@ -346,6 +351,7 @@ class SimState(NamedTuple):
     previous: jnp.ndarray    # [O, A]
     history: jnp.ndarray     # [O, A, C]
     eligibility: jnp.ndarray # [O, A]
+    fatigue: jnp.ndarray     # [O, A]  within-bout response decrement (0 when fatigue_gain == 0)
     cue_weights: jnp.ndarray # [O, K]
     cause_of_death: jnp.ndarray  # [O] int: 0 alive, 1 starvation, 2 danger
 
@@ -362,7 +368,8 @@ def initial_state(spec, cfg, n_org, position, n_receptors):
         positions=pos0, biomass=jnp.full(n_org, cfg.food_carrying_capacity),
         energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
         activation=act0, previous=act0, history=jnp.zeros((n_org, a, c)),
-        eligibility=jnp.zeros((n_org, a)), cue_weights=jnp.zeros((n_org, n_receptors)),
+        eligibility=jnp.zeros((n_org, a)), fatigue=jnp.zeros((n_org, a)),
+        cue_weights=jnp.zeros((n_org, n_receptors)),
         cause_of_death=jnp.zeros(n_org, dtype=jnp.int32),
     )
 
@@ -381,9 +388,9 @@ def make_simulate(spec, cfg, sources, cue_centers):
     def step(carry, key_t):
         state, food_reinforces, cue_value = carry
         intensity, direction, contact = observe(state.positions, sources, state.biomass, cfg)
-        new_act, new_prev, elig, action, cue_act, cue_drive = drive_integrate_emit(
+        new_act, new_prev, new_fatigue, elig, action, cue_act, cue_drive = drive_integrate_emit(
             spec, cfg, state.activation, state.previous, state.history, state.eligibility,
-            intensity, direction, contact, state.energy, state.cue_weights,
+            state.fatigue, intensity, direction, contact, state.energy, state.cue_weights,
             cue_value, cue_centers, key_t,
         )
         new_pos, intake, danger_c, new_bio = env_step(
@@ -393,6 +400,10 @@ def make_simulate(spec, cfg, sources, cue_centers):
 
         moved = (action >= 1) & (action <= 4)
         cost = cfg.basal_metabolism + jnp.where(moved, cfg.move_cost, cfg.rest_cost)
+        # Effort -> energy (exp059): summed positive action-atom activation costs energy; fatigue is
+        # a metabolic load. Both default to 0, so the default engine is unchanged.
+        effort = jnp.clip(new_act[:, spec.action_atom_idx], 0.0, None).sum(axis=1)
+        cost = cost + cfg.effort_cost * effort + cfg.fatigue_energy_cost * new_fatigue.sum(axis=1)
         new_energy = jnp.clip(
             state.energy + intake - cfg.danger_energy_loss * danger_c - cost,
             0.0, cfg.energy_capacity,
@@ -420,6 +431,7 @@ def make_simulate(spec, cfg, sources, cue_centers):
             previous=jnp.where(a2, new_prev, state.previous),
             history=jnp.where(a1[:, None, None], new_hist, state.history),
             eligibility=jnp.where(a2, elig, state.eligibility),
+            fatigue=jnp.where(a2, new_fatigue, state.fatigue),
             cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
             cause_of_death=cause,
         )
@@ -449,6 +461,7 @@ def reset_for_life(state: SimState, spec, cfg, position) -> SimState:
         positions=pos0, biomass=jnp.full(n_org, cfg.food_carrying_capacity),
         energy=jnp.full(n_org, cfg.energy_init), alive=jnp.ones(n_org, bool),
         activation=act0, previous=act0, eligibility=jnp.zeros((n_org, a)),
+        fatigue=jnp.zeros((n_org, a)),
         cause_of_death=jnp.zeros(n_org, dtype=jnp.int32),
     )
 

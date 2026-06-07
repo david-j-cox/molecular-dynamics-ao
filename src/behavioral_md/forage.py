@@ -52,6 +52,7 @@ class ForageState(NamedTuple):
     previous: jnp.ndarray     # [O, A]
     history: jnp.ndarray      # [O, A, C]
     eligibility: jnp.ndarray  # [O, A]
+    fatigue: jnp.ndarray      # [O, A]  (0 when fatigue_gain == 0)
     cue_weights: jnp.ndarray  # [O, K]
     on_patch: jnp.ndarray     # [O] int patch in range, -1 if none
     cause_of_death: jnp.ndarray  # [O] int 0 alive / 1 starvation / 2 danger
@@ -70,6 +71,7 @@ def initial_state(spec, cfg, n_org, n_patches, position, n_receptors):
         activation=act0, previous=act0,
         history=jnp.zeros((n_org, a, c)),
         eligibility=jnp.zeros((n_org, a)),
+        fatigue=jnp.zeros((n_org, a)),
         cue_weights=jnp.zeros((n_org, n_receptors)),
         on_patch=jnp.full(n_org, -1, dtype=jnp.int32),
         cause_of_death=jnp.zeros(n_org, dtype=jnp.int32),
@@ -125,9 +127,9 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
     def step(carry, key_t):
         state, food_reinforces, cue_value = carry
         intensity, direction, contact, _on = observe(state.positions, state.biomass)
-        new_act, new_prev, elig, action, cue_act, cue_drive = drive_integrate_emit(
+        new_act, new_prev, new_fatigue, elig, action, cue_act, cue_drive = drive_integrate_emit(
             spec, cfg, state.activation, state.previous, state.history, state.eligibility,
-            intensity, direction, contact, state.energy, state.cue_weights,
+            state.fatigue, intensity, direction, contact, state.energy, state.cue_weights,
             cue_value, cue_centers, key_t,
         )
 
@@ -156,6 +158,8 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
 
         moved = (action >= 1) & (action <= 4)
         cost = cfg.basal_metabolism + jnp.where(moved, cfg.move_cost, cfg.rest_cost)
+        effort = jnp.clip(new_act[:, spec.action_atom_idx], 0.0, None).sum(axis=1)
+        cost = cost + cfg.effort_cost * effort + cfg.fatigue_energy_cost * new_fatigue.sum(axis=1)
         new_energy = jnp.clip(
             state.energy + intake - cfg.danger_energy_loss * danger_c - cost,
             0.0, cfg.energy_capacity,
@@ -181,6 +185,7 @@ def make_forage_sim(spec, cfg, patches, danger_pos, light_pos, cue_pos, cue_cent
             previous=jnp.where(a2, new_prev, state.previous),
             history=jnp.where(a1[:, None, None], new_hist, state.history),
             eligibility=jnp.where(a2, elig, state.eligibility),
+            fatigue=jnp.where(a2, new_fatigue, state.fatigue),
             cue_weights=jnp.where(a2, new_cue_w, state.cue_weights),
             on_patch=jnp.where(state.alive, on_patch, -1),
             cause_of_death=cause,

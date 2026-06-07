@@ -45,3 +45,54 @@ def test_leaky_integrator_matches_numpy():
     ref = np.clip(act + cfg.dt * (force / mass - cfg.leak_coef * act),
                   cfg.activation_min, cfg.activation_max)
     assert np.max(np.abs(np.asarray(new) - ref)) < TOL
+
+
+def test_jax_effort_and_fatigue_match_numpy():
+    """The effort->energy / fatigue terms (exp059) match the NumPy organism: force includes the
+    fatigue decrement, fatigue updates identically, effort = summed positive action activation."""
+    import jax.numpy as jnp
+    import numpy as np
+
+    from behavioral_md.atoms import STIMULI, default_atom_set
+    from behavioral_md.config import SimulationConfig
+    from behavioral_md.forces import ForceCalculator, SensoryField
+
+    cfg = SimulationConfig(effort_cost=0.05, fatigue_gain=0.1, fatigue_energy_cost=0.05,
+                           fatigue_decay=0.9)
+    atoms = default_atom_set()
+    spec = jax_engine.build_spec(atoms, cfg)
+    a, c = len(atoms), len(STIMULI)
+    rng = np.random.default_rng(7)
+    act = rng.normal(size=(1, a))
+    hist = rng.normal(size=(1, a, c)) * 0.5
+    inten = rng.uniform(0.1, 1.0, size=(1, c))
+    ang = rng.uniform(0, 2 * np.pi, size=(1, c))
+    sdir = np.stack([np.cos(ang), np.sin(ang)], axis=-1)
+    contact = rng.uniform(0, 1, size=1)
+    energy = rng.uniform(0, 1, size=1)
+    fatigue = rng.uniform(0, 0.5, size=(1, a))
+
+    # Force WITH fatigue: JAX subtracts the fatigue array (as drive_integrate_emit does).
+    jf = np.asarray(jax_engine.compute_force(
+        spec, jnp.asarray(act), jnp.asarray(hist), jnp.asarray(inten), jnp.asarray(sdir),
+        jnp.asarray(contact), jax_engine.deficit_gain(jnp.asarray(energy), cfg))) - fatigue
+    fc = ForceCalculator(atoms, config=cfg)
+    for i, atom in enumerate(atoms):
+        atom.state = np.array([act[0, i]])
+        atom.history_weights = {s: hist[0, i, j] for j, s in enumerate(STIMULI)}
+        atom.fatigue = float(fatigue[0, i])
+    sensory = {s: SensoryField(direction=sdir[0, j], intensity=float(inten[0, j]),
+                               contact=float(contact[0]) if s == "food" else 0.0)
+               for j, s in enumerate(STIMULI)}
+    nf, _ = fc.compute(sensory, float(energy[0]))
+    assert np.max(np.abs(jf[0] - nf)) < TOL                       # force includes -fatigue
+
+    # Fatigue update matches organism._update_fatigue; effort = summed positive action activation.
+    new_fat = cfg.fatigue_decay * fatigue + cfg.fatigue_gain * np.clip(act, 0.0, None)
+    ref_fat = np.array([[cfg.fatigue_decay * fatigue[0, i]
+                         + cfg.fatigue_gain * max(0.0, act[0, i]) for i in range(a)]])
+    assert np.max(np.abs(new_fat - ref_fat)) < TOL
+    idx = np.asarray(spec.action_atom_idx)
+    jax_effort = float(np.clip(np.asarray(act)[:, idx], 0.0, None).sum())
+    ref_effort = float(sum(max(0.0, act[0, k]) for k in idx))
+    assert abs(jax_effort - ref_effort) < TOL
