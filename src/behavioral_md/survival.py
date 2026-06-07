@@ -739,3 +739,144 @@ def survival_dp_depleting(max_rate: float, cv: float, travel_steps: int, day_ste
     return {"energy": e, "biomass": biomass, "action": action, "value": value,
             "night_requirement": float(night_steps * metabolism), "day_steps": day_steps,
             "night_steps": night_steps, "travel_steps": travel_steps, "metabolism": metabolism}
+
+
+# === Bet-hedging meets the energy-budget rule (roadmap 3.1) ====================================
+# The single-cycle DP above maximizes survival of ONE day/night cycle. Bet-hedging is an across-
+# GENERATION phenomenon: in a fluctuating world, selection maximizes the long-run (geometric-mean)
+# lineage growth, not the arithmetic-mean per-generation fitness, so it can favor a lower-variance
+# strategy even at equal arithmetic mean. We pose both on one substrate. Days are GOOD or BAD via a
+# symmetric 2-state Markov chain with stay-probability ``rho`` (marginal fixed at 50/50, so only the
+# CLUSTERING -- mean run length 1/(1-rho) -- changes); a bad day scales foraging intake by
+# ``bad_scale``. Reserves carry across a season of ``n_days`` (no daily reset); the cap is
+# lifted above the single-cycle 1.0 so end-of-season reserves -- the fecundity / offspring proxy --
+# -- carry the variance bet-hedging acts on). A season's environment is SHARED across the cohort and
+# resampled per season, so the geometric mean of cohort fecundity over seasons is the long-run
+# rate a lineage maximizes.
+#
+# The matched-mean safe/risky options of the arc are kept (safe = sure intake, risky =
+# a mean-preserving spread): the only difference is variance, so any preference is risk preference.
+# The result is a phase diagram over (autocorrelation rho x refuge quality bad_scale): when the safe
+# option is a survivable refuge (bad_scale high) selection is CONSERVATIVE (play safe -- bet-hedge,
+# reduce fitness variance); when no refuge exists (bad_scale low) and bad runs cluster (rho high)
+# selection is RISK-PRONE (gamble -- the energy-budget rule across days: when a long bad run
+# will kill you anyway, variance is the only hope). Autocorrelation flips the optimum,
+# and the two phenomena are two regions of one survival objective.
+
+
+def _markov_day_types(rng: np.random.Generator, n_seasons: int, n_days: int,
+                      rho: float) -> np.ndarray:
+    """``(n_seasons, n_days)`` bool array of day types (True = good), symmetric 2-state Markov.
+
+    Stay-probability ``rho`` sets the autocorrelation; the marginal is 50/50 for any ``rho`` (so a
+    sweep over ``rho`` changes only the clustering / mean run length ``1/(1-rho)``, not the fraction
+    of bad days). Seasons are independent; each row is one shared cohort environment.
+    """
+    good = np.empty((n_seasons, n_days), bool)
+    good[:, 0] = rng.random(n_seasons) < 0.5
+    for d in range(1, n_days):
+        flip = rng.random(n_seasons) >= rho
+        good[:, d] = np.where(flip, ~good[:, d - 1], good[:, d - 1])
+    return good
+
+
+def bethedge_fitness(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
+                     metabolism: float, theta_a: float, theta_b: float = 0.0, n_days: int = 24,
+                     rho: float = 0.0, bad_scale: float = 1.0, n_seasons: int = 120,
+                     cohort: int = 150, e_init: float = 0.5, cap: float = 5.0,
+                     seed: int = 0) -> dict:
+    """Arithmetic- and geometric-mean fitness of a threshold policy under Markov good/bad seasons.
+
+    The policy gambles (risky) when reserve ``E < theta(t) = theta_a + theta_b * (t / day_steps)``,
+    else plays safe; ``theta_b = 0`` is a constant threshold (used for the phase diagram), ``> 0``
+    adds the within-day energy-budget structure. A cohort shares each season's day-type sequence;
+    fecundity is the end-of-season reserve (0 if dead). Returns the arithmetic mean of cohort
+    fecundity over seasons (``arith``), the geometric mean (``geom`` = ``exp(mean log)`` -- the
+    long-run lineage growth selection maximizes), and the ``survival`` fraction. Vectorized over
+    ``n_seasons * cohort`` organisms.
+    """
+    rng = np.random.default_rng(seed)
+    sp = np.cumsum([o[0] for o in safe_outcomes])
+    sv = np.array([o[1] for o in safe_outcomes])
+    rp = np.cumsum([o[0] for o in risky_outcomes])
+    rv = np.array([o[1] for o in risky_outcomes])
+    good = _markov_day_types(rng, n_seasons, n_days, rho)        # (n_seasons, n_days)
+
+    e = np.full((n_seasons, cohort), e_init)
+    alive = np.ones((n_seasons, cohort), bool)
+
+    def draw(cum, val):
+        idx = (rng.random((n_seasons, cohort))[:, :, None] < cum[None, None, :]).argmax(2)
+        return val[idx]
+
+    for d in range(n_days):
+        scale = np.where(good[:, d], 1.0, bad_scale)[:, None]    # (n_seasons, 1)
+        for t in range(day_steps):
+            theta = theta_a + theta_b * (t / day_steps)
+            gamble = (e < theta) & alive
+            intake = np.where(gamble, draw(rp, rv), draw(sp, sv)) * scale
+            e = np.where(alive, np.clip(e + intake - metabolism, 0.0, cap), e)
+            alive &= e > 0.0
+        for _ in range(night_steps):
+            e = np.where(alive, np.clip(e - metabolism, 0.0, cap), e)
+            alive &= e > 0.0
+
+    fecundity = np.where(alive, e, 0.0)
+    w = fecundity.mean(axis=1)                                   # cohort-mean fecundity per season
+    return {"arith": float(w.mean()),
+            "geom": float(np.exp(np.mean(np.log(w + 1e-3)))),
+            "survival": float(alive.mean())}
+
+
+def evolve_bethedge(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
+                    metabolism: float, n_days: int = 24, rho: float = 0.0, bad_scale: float = 1.0,
+                    pop_size: int = 3000, n_generations: int = 150, e_init: float = 0.5,
+                    cap: float = 5.0, mutation: float = 0.03, seed: int = 0) -> dict:
+    """Evolve a constant risk threshold under Markov good/bad seasons -- selection alone, no DP.
+
+    Each generation the population shares ONE freshly sampled Markov season (length ``n_days``);
+    organisms gamble when ``E < theta`` else play safe; survivors of the season reproduce in
+    proportion to end-of-season reserve (fecundity), offspring inheriting ``theta`` with Gaussian
+    mutation. Because a clustered-bad season culls the population in common, selection acts on the
+    geometric-mean lineage growth across the varying seasons -- the bet-hedging regime. Returns the
+    per-generation mean ``theta`` and survival, and the final evolved ``theta`` (which should
+    track ``bethedge_fitness``'s geometric optimum -- the across-generation readout).
+    """
+    rng = np.random.default_rng(seed)
+    theta = rng.uniform(0.0, 1.0, pop_size)
+    sp = np.cumsum([o[0] for o in safe_outcomes])
+    sv = np.array([o[1] for o in safe_outcomes])
+    rp = np.cumsum([o[0] for o in risky_outcomes])
+    rv = np.array([o[1] for o in risky_outcomes])
+
+    def draw(cum, val):
+        return val[(rng.random(pop_size)[:, None] < cum[None, :]).argmax(1)]
+
+    hist_theta, hist_surv = [], []
+    for _ in range(n_generations):
+        good = _markov_day_types(rng, 1, n_days, rho)[0]         # one shared season this generation
+        e = np.full(pop_size, e_init)
+        alive = np.ones(pop_size, bool)
+        for d in range(n_days):
+            scale = 1.0 if good[d] else bad_scale
+            for _t in range(day_steps):
+                gamble = (e < theta) & alive
+                intake = np.where(gamble, draw(rp, rv), draw(sp, sv)) * scale
+                e = np.where(alive, np.clip(e + intake - metabolism, 0.0, cap), e)
+                alive &= e > 0.0
+            for _ in range(night_steps):
+                e = np.where(alive, np.clip(e - metabolism, 0.0, cap), e)
+                alive &= e > 0.0
+        surv = np.where(alive)[0]
+        hist_surv.append(len(surv) / pop_size)
+        hist_theta.append(float(theta[surv].mean()) if len(surv) else np.nan)
+        if len(surv) == 0:                                       # extinction: reseed
+            theta = rng.uniform(0.0, 1.0, pop_size)
+            continue
+        # Fecundity-weighted reproduction (offspring proportional to end-of-season reserve).
+        fec = e[surv]
+        parents = surv[rng.choice(len(surv), pop_size, p=fec / fec.sum())]
+        theta = np.clip(theta[parents] + rng.normal(0, mutation, pop_size), 0.0, 1.0)
+
+    return {"mean_theta": hist_theta, "survival": hist_surv,
+            "evolved_theta": float(np.nanmean(hist_theta[-20:]))}

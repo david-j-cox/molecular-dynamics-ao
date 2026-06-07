@@ -381,6 +381,38 @@ imprecisely (r = 0.81, within-truth CV ≈ 55%; the recovered (α, β) cloud is 
 planner's R was sharp. So "use the sequence" is not the lesson; the lesson is that the survival model's
 *state-dependent* structure is what makes R identifiable at all.
 
+## Bet-hedging meets the energy-budget rule (`bethedge_fitness`/`evolve_bethedge`, exp057)
+
+The arc optimizes survival of a single day/night cycle. Bet-hedging is the across-*generation* cousin:
+in a fluctuating world, selection maximizes long-run *geometric-mean* lineage growth, which (since
+geometric mean ≈ mean − variance/2) can favor a lower-variance strategy even at equal arithmetic-mean
+fitness. We put both on one substrate. Days are good or bad via a symmetric 2-state Markov chain whose
+stay-probability `ρ` sets the autocorrelation — the marginal stays 50/50 for every `ρ`, so a sweep
+changes only the *clustering* (mean bad-run length `1/(1−ρ)`), not the fraction of bad days. A bad day
+scales intake by a refuge-quality factor; reserves carry across an `n_days` season with the cap lifted
+so the end-of-season reserve (fecundity) carries variance; and the options are the arc's matched-mean
+pair, so any preference is a *pure* risk preference.
+
+**The result is a phase diagram** (`figures/exp057_bet_hedging.png`) over (autocorrelation × refuge
+quality):
+
+- **Refuge** (the safe option still sustains you on bad days): selection is **conservative** — play
+  safe, cut fitness variance. Classic bet-hedging; autocorrelation barely matters.
+- **No refuge** with **clustered** bad runs (high `ρ`): selection is **risk-prone** — gamble. This is
+  the energy-budget rule extended across days: when a long bad streak will kill you regardless,
+  variance is the only hope.
+- **Intermediate refuge:** rising autocorrelation *flips* the optimum from safe to gambling — one knob
+  (clustering) moving behavior between the two phenomena.
+
+So bet-hedging and the energy-budget rule are two regions of one survival objective, and the geometric
+optimum (analysis) and the evolved threshold (selection) are two readouts of the same process. Two
+honest corrections came out of building it. First, matched-mean options *do* produce bet-hedging once
+the reserve cap is lifted — the trade-off the canonical theory needs is equal arithmetic mean with
+lower variance, and an earlier "matched means give no trade-off" reading was a cap artifact. Second,
+the dominant effect of autocorrelated scarcity here is risk-*proneness*, not the conservative hedge
+one might guess; conservatism wins only where a refuge exists — so this corrects the roadmap's guessed
+direction, just as the temperance result corrected its guessed kurtosis reversal.
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the
@@ -407,3 +439,7 @@ planner's R was sharp. So "use the sequence" is not the lesson; the lesson is th
   the sequence. *Biological Reviews*.
 - Wilson, R. C., & Collins, A. G. E. (2019). Ten simple rules for the computational modeling of
   behavioral data. *eLife*, 8, e49547.
+- Childs, D. Z., Metcalf, C. J. E., & Rees, M. (2010). Evolutionary bet-hedging in the real world:
+  empirical evidence and challenges revealed by plants. *Proc. R. Soc. B*, 277, 3055–3064.
+- Philippi, T., & Seger, J. (1989). Hedging one's evolutionary bets, revisited. *Trends Ecol. Evol.*,
+  4, 41–44.

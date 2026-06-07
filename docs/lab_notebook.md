@@ -2352,3 +2352,38 @@ identical) so the requirement R = night*m_night decouples from the daytime burn 
   width; RL ridge anticorrelation; RL recovers with enough trials) + 2 survival_dp metabolism_night
   tests; 118 pass; ruff clean. Not added to scripts/reproduce.py (that harness covers exp001-030 only;
   exp031+ rely on tests + their own determinism). Pure numpy/scipy. Cite Wilson & Collins 2019.
+
+---
+
+## 2026-06-07 -- Roadmap 3.1: bet-hedging meets the energy-budget rule (exp057)
+
+Across-generation bet-hedging and the within-life energy-budget rule on one substrate. New
+survival.py functions: `_markov_day_types` (symmetric 2-state good/bad chain, marginal 50/50 for any
+stay-prob rho, so a rho sweep changes ONLY clustering = mean run length 1/(1-rho)), `bethedge_fitness`
+(arith + geometric-mean fitness of a threshold policy under Markov seasons; reserves carry across
+n_days, cap lifted to 5.0, fecundity = end-of-season reserve; fully vectorized over n_seasons*cohort),
+`evolve_bethedge` (shared per-generation season, fecundity-weighted reproduction -> geometric-mean
+selection). 122 tests; ruff clean.
+
+- MODELING CORRECTION (mine, mid-build). I first told the user matched-mean options give "no
+  bet-hedging trade-off". WRONG -- that was an artifact of the reserve CAP (=1.0) flattening fecundity.
+  Canonical bet-hedging is exactly equal-arithmetic-mean + lower-variance (geometric ~ mean - var/2
+  favors low variance). With the cap LIFTED so fecundity carries variance, the arc's own matched-mean
+  options are the cleanest model and produce the phase diagram. Switched to matched-mean.
+- DIRECTION CORRECTION (vs roadmap). Roadmap guessed a one-directional conservative bet-hedge. The
+  model shows the dominant effect of autocorrelated scarcity is RISK-PRONENESS (desperation), with
+  conservatism only where a refuge exists -- so 3.1 corrects the roadmap's guessed direction, as 1.3
+  (temperance) corrected its guessed reversal.
+- RESULT: phase diagram over (autocorrelation rho x refuge quality bad_scale). bad_scale high (safe
+  sustains bad days) -> CONSERVATIVE (play safe; bet-hedge; rho ~irrelevant). bad_scale low + rho high
+  -> RISK-PRONE (gamble; the energy-budget rule across days: a long bad run kills you anyway, variance
+  is the only hope). Intermediate refuge (bad~0.6): rising rho FLIPS the optimum safe->gamble. The
+  geometric optimum (analysis) and the evolved threshold (selection) agree -- two readouts of one
+  process. exp057 panels: (A) phase-diagram heatmap with the flip contour, (B) threshold vs rho at the
+  intermediate refuge (geom*, evolved, arith all shown; geom & evolved rise with rho, arith stays
+  low), (C) bet-hedging signature at a refuge cell -- arithmetic ~flat in theta, geometric decreases
+  (variance penalized). 89s runtime; figure exp057_bet_hedging.png.
+- 6 prototypes to find the regime (the conservative cell is delicate: needs a refuge that still leaves
+  fecundity variance). Tests: Markov marginal/autocorrelation; phase-diagram corners (refuge->safe,
+  no-refuge->gamble); matched-mean geom < arith for gambling; evolution tracks the phase diagram.
+  Cites Childs/Metcalf/Rees 2010, Philippi & Seger 1989, Stephens 1981. Not in reproduce.py (exp031+).

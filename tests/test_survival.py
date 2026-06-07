@@ -415,3 +415,60 @@ def test_giving_up_is_finite_horizon():
     assert pl2[: day // 2].max() > 0.8               # leaves readily through the day (MVT)
     assert pl2[-2:].max() < 0.2                       # stops leaving at the deadline
     assert ll2 > ll6                                  # costlier travel -> stops leaving earlier
+
+
+def test_markov_day_types_marginal_and_autocorrelation():
+    """The 2-state day-type chain keeps a ~50/50 marginal for any rho (only clustering changes),
+    and its lag-1 autocorrelation rises with the stay-probability rho."""
+    from behavioral_md.survival import _markov_day_types
+    rng = np.random.default_rng(0)
+    for rho in (0.5, 0.9):
+        g = _markov_day_types(rng, 400, 60, rho).astype(float)
+        assert abs(g.mean() - 0.5) < 0.05                      # marginal ~50/50 regardless of rho
+    lo = _markov_day_types(np.random.default_rng(1), 600, 80, 0.5).astype(float)
+    hi = _markov_day_types(np.random.default_rng(1), 600, 80, 0.9).astype(float)
+    def ac(x):
+        return np.mean([np.corrcoef(r[:-1], r[1:])[0, 1] for r in x if r.std() > 0])
+    assert ac(hi) > ac(lo) + 0.2                               # more autocorrelated when rho high
+
+
+def test_bethedge_refuge_is_conservative_no_refuge_is_risk_prone():
+    """The phase-diagram corners: with a survivable refuge (high bad_scale) the geometric optimum
+    plays safe (low threshold = bet-hedge); with no refuge and clustered bad runs (low bad_scale,
+    high rho) it gambles (high threshold = energy-budget desperation)."""
+    from behavioral_md.survival import bethedge_fitness
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    kw = dict(n_days=24, n_seasons=80, cohort=100, seed=5)
+
+    def best_theta(rho, bad):
+        ths = np.linspace(0, 1, 9)
+        g = [bethedge_fitness(safe, risky, 12, 4, 0.025, th, rho=rho, bad_scale=bad, **kw)["geom"]
+             for th in ths]
+        return ths[int(np.argmax(g))]
+
+    assert best_theta(0.9, 0.75) < 0.3                         # refuge -> conservative (bet-hedge)
+    assert best_theta(0.95, 0.5) > 0.7                         # no refuge + clustering -> gamble
+
+
+def test_bethedge_matched_mean_geometric_below_arithmetic():
+    """Matched-mean options: the risky spread has the same arithmetic mean as the safe option, so
+    gambling does not raise arithmetic fitness, but it does raise variance -- hence the geometric
+    (long-run) fitness of gambling is below that of playing safe (the bet-hedging penalty)."""
+    from behavioral_md.survival import bethedge_fitness
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    kw = dict(n_days=24, rho=0.85, bad_scale=0.72, n_seasons=120, cohort=150, seed=5)
+    safe_play = bethedge_fitness(safe, risky, 12, 4, 0.025, 0.0, **kw)
+    gamble = bethedge_fitness(safe, risky, 12, 4, 0.025, 1.0, **kw)
+    assert gamble["arith"] <= safe_play["arith"] + 0.05 * safe_play["arith"]   # ~equal arithmetic
+    assert gamble["geom"] < safe_play["geom"]                  # gambling loses on geometric mean
+
+
+def test_evolve_bethedge_tracks_the_phase_diagram():
+    """The across-generation readout agrees with the analysis: selection evolves a lower risk
+    threshold in the refuge regime than in the no-refuge/clustered regime."""
+    from behavioral_md.survival import evolve_bethedge
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    kw = dict(n_days=24, pop_size=1500, n_generations=80, seed=0)
+    refuge = evolve_bethedge(safe, risky, 12, 4, 0.025, rho=0.9, bad_scale=0.72, **kw)
+    harsh = evolve_bethedge(safe, risky, 12, 4, 0.025, rho=0.95, bad_scale=0.5, **kw)
+    assert refuge["evolved_theta"] < harsh["evolved_theta"]

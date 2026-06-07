@@ -157,7 +157,24 @@ degeneracy (Comput. Brain Behav. 2022).
 
 ## TIER 3 -- new biology, bigger builds
 
-### 3.1 Bet-hedging meets the energy-budget rule
+### 3.1 Bet-hedging meets the energy-budget rule  -- DONE (2026-06-07)
+Built in `bethedge_fitness` + `evolve_bethedge` + `_markov_day_types` (survival.py) + exp057. Days are
+a symmetric 2-state Markov good/bad chain (marginal fixed 50/50, stay-prob rho sets clustering); a bad
+day scales intake by `bad_scale` (refuge quality); reserves carry across an `n_days` season with the
+cap LIFTED so end-of-season reserve (fecundity) carries the variance bet-hedging acts on; the
+geometric mean of cohort fecundity over seasons is the long-run growth selection maximizes. RESULT: a
+phase diagram over (rho x bad_scale) -- with a refuge (bad_scale high) selection is CONSERVATIVE (play
+safe, bet-hedge); with no refuge + clustered bad runs (bad_scale low, rho high) it is RISK-PRONE
+(gamble; the energy-budget rule across days). Intermediate refuge: rising autocorrelation FLIPS the
+optimum safe->gamble. The geometric optimum (analysis) and the evolved threshold (selection) agree.
+TWO CORRECTIONS: (1) matched-mean options DO show bet-hedging once the cap is lifted (my earlier
+"no trade-off" claim was a cap artifact); (2) the dominant effect of autocorrelated scarcity is
+risk-PRONENESS, not the conservative bet-hedge this item guessed -- conservatism wins only where a
+refuge exists (corrects the roadmap's guessed direction, as 1.3 corrected its guessed reversal).
+4 tests; 122 pass; ruff clean. Figure exp057_bet_hedging.png. Cites Childs/Metcalf/Rees 2010, Philippi
+& Seger 1989, Stephens 1981.
+
+(original plan:)
 - **What:** Markov good/bad days (tunable autocorrelation) fed into the EXISTING evolution +
   within-life simulators. Show the within-life energy-budget threshold and the across-generation
   bet-hedge are two readouts of one selection process; autocorrelation length shifts the evolved
