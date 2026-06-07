@@ -46,3 +46,57 @@ def test_default_atom_set_two_tier_structure():
     # drive atoms carry a stimulus + valence; movement atoms are topographies
     assert all(a.stimulus is not None for a in drives)
     assert all(a.valence == 0.0 for a in movers)
+
+
+def test_default_atoms_are_scalar_and_uncoupled():
+    """Backward compatibility: every default atom is scalar (dims=1) with no internal coupling."""
+    atoms = default_atom_set()
+    assert all(a.dims == 1 for a in atoms)
+    assert all(a.internal_coupling is None for a in atoms)
+
+
+def test_scalar_atom_with_constant_drive_ramps():
+    """A scalar atom (no restoring term) integrates -> ramps under a constant drive (exp060)."""
+    a = BehavioralAtom("s", np.array([0.0]), np.array([0.0]))
+    for _ in range(40):
+        a.integrate(0.3, 0.1, -10, 10)
+    assert a.activation > 1.0                       # has ramped well above baseline
+
+
+def test_internal_coupling_makes_an_oscillator():
+    """A multi-dimensional atom with a spring internal coupling oscillates (a CPG), where the bare
+    scalar integrator cannot: the activation changes sign repeatedly and stays bounded."""
+    from behavioral_md.atoms import oscillator_atom
+    a = oscillator_atom("cpg", period=40.0, dt=0.1, amplitude=1.0)
+    assert a.dims == 2
+    out = []
+    for _ in range(120):
+        a.integrate(np.zeros(2), 0.1, -10, 10)
+        out.append(a.activation)
+    out = np.array(out)
+    crossings = int((np.diff(np.sign(out)) != 0).sum())
+    assert crossings >= 4                            # multiple cycles -> a rhythm
+    assert np.abs(out).max() < 1.5                   # bounded (restoring force), not ramping
+
+
+def test_oscillator_muscles_are_anti_phase():
+    """The 2-D oscillator's two muscle dimensions run anti-phase (a stepping gait)."""
+    from behavioral_md.atoms import oscillator_atom
+    a = oscillator_atom("gait", period=40.0, dt=0.1, rel_phase=np.pi)
+    m0, m1 = [], []
+    for _ in range(120):
+        a.integrate(np.zeros(2), 0.1, -10, 10)
+        m0.append(a.state[0])
+        m1.append(a.state[1])
+    assert np.corrcoef(m0, m1)[0, 1] < -0.8          # anti-phase
+
+
+def test_reset_preserves_dimensionality():
+    """reset() returns a multi-dimensional atom to baseline without collapsing its dimension."""
+    from behavioral_md.atoms import oscillator_atom
+    a = oscillator_atom("cpg", period=40.0)
+    for _ in range(10):
+        a.integrate(np.zeros(2), 0.1, -10, 10)
+    a.reset()
+    assert a.state.shape == (2,)
+    assert np.allclose(a.state, a.baseline_activation)

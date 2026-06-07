@@ -336,6 +336,12 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
   neither of which a first-order leaky integrator reproduces at any temperature (`exp060`; the
   "overdamped Verlet ≈ leaky accumulator" claim conflates damping with leak). The missing restoring
   force is supplied behaviorally, by fatigue (`exp059`) or coupling inhibition.
+- **Atoms can be multi-dimensional** (opt-in; default is the scalar response atom). A state vector
+  with an internal coupling matrix (`BehavioralAtom.internal_coupling`, `oscillator_atom`) turns the
+  ramping integrator into a harmonic oscillator — a central pattern generator carrying rhythm and
+  phase (pacemakers, gaits, fixed-action patterns), and a muscle→response→operant hierarchy where a
+  slow operant gates a fast muscle rhythm (`exp061`). Supplying the internal spring is exactly the
+  restoring force the scalar atom lacks.
 - **Reproducible**: all randomness is seeded via `SimulationConfig.seed`.
 - See `ToDO.txt` for what is not yet implemented (day/night, operant schedules,
   multiple food patches, the punishment-asymmetry models, tests).

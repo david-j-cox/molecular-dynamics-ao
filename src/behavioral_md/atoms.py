@@ -97,29 +97,51 @@ class BehavioralAtom:
     # geometry. Movement atoms carry no stimulus/valence -- they only express.
     stimulus: str | None = None
     valence: float = 0.0
+    # Optional internal coupling: a (D, D) matrix applied as a linear restoring/rotation force
+    # ``-internal_coupling @ state`` each step. The scalar atom (D=1, coupling None) is a damped
+    # INTEGRATOR (it ramps; see exp060). A positive (spring) or skew (rotation) coupling turns it
+    # into a harmonic OSCILLATOR -- a central pattern generator -- so a multi-dimensional atom can
+    # carry temporal/rhythmic structure (pacemakers, gaits, fixed-action patterns) a scalar atom
+    # cannot. None (default) leaves every existing atom byte-identical.
+    internal_coupling: np.ndarray | None = None
 
     @property
     def activation(self) -> float:
-        """Scalar response tendency (v1: the single state component)."""
+        """Scalar response tendency: the output (first) state component.
+
+        For a multi-dimensional atom the remaining components are internal (e.g. the conjugate
+        dimension of an oscillator); ``activation`` is the value read out for emission and coupling.
+        """
         return float(self.state[0])
+
+    @property
+    def dims(self) -> int:
+        """Dimensionality of the atom's state vector (1 = the scalar response atom)."""
+        return int(self.state.shape[0])
 
     @property
     def is_directional(self) -> bool:
         return self.direction is not None
 
     def integrate(
-        self, force: float, dt: float, activation_min: float, activation_max: float
+        self, force, dt: float, activation_min: float, activation_max: float
     ) -> None:
-        """Advance one Verlet step under a scalar force, clip, and roll state."""
+        """Advance one Verlet step under a (scalar or vector) force, clip, and roll state.
+
+        With ``internal_coupling`` set, a linear restoring/rotation force ``-K @ state`` is added,
+        making a multi-dimensional atom an oscillator; without it, the scalar integrator.
+        """
         f = np.atleast_1d(np.asarray(force, dtype=np.float64))
+        if self.internal_coupling is not None:
+            f = f - self.internal_coupling @ self.state
         new_state = verlet_update(self.state, self.previous_state, f, self.mass, dt)
         new_state = np.clip(new_state, activation_min, activation_max)
         self.previous_state = self.state
         self.state = new_state
 
     def reset(self) -> None:
-        """Return the atom to its baseline activation with zero velocity."""
-        self.state = np.array([self.baseline_activation], dtype=np.float64)
+        """Return the atom to its baseline activation with zero velocity (dimension preserved)."""
+        self.state = np.full(self.state.shape, self.baseline_activation, dtype=np.float64)
         self.previous_state = self.state.copy()
         self.fatigue = 0.0
 
@@ -137,9 +159,18 @@ def _atom(
     consummatory: bool = False,
     stimulus: str | None = None,
     valence: float = 0.0,
+    n_dims: int = 1,
+    internal_coupling: np.ndarray | None = None,
+    state_init: np.ndarray | None = None,
 ) -> BehavioralAtom:
-    """Construct an atom initialized at its baseline activation (zero velocity)."""
-    state = np.array([baseline], dtype=np.float64)
+    """Construct an atom initialized at its baseline activation (zero velocity).
+
+    ``n_dims`` > 1 (or an explicit ``state_init``) makes a multi-dimensional atom; with an
+    ``internal_coupling`` matrix it is an oscillator / pattern generator (see
+    :func:`oscillator_atom`). Defaults reproduce the scalar response atom exactly.
+    """
+    state = (np.full(n_dims, baseline, dtype=np.float64) if state_init is None
+             else np.asarray(state_init, dtype=np.float64))
     return BehavioralAtom(
         name=name,
         state=state.copy(),
@@ -157,7 +188,31 @@ def _atom(
         consummatory=consummatory,
         stimulus=stimulus,
         valence=valence,
+        internal_coupling=(None if internal_coupling is None
+                           else np.asarray(internal_coupling, dtype=np.float64)),
     )
+
+
+def oscillator_atom(name: str, period: float = 40.0, dt: float = 0.1, amplitude: float = 1.0,
+                    rel_phase: float = np.pi) -> BehavioralAtom:
+    """A 2-D central pattern generator: a two-muscle harmonic-oscillator atom.
+
+    The state is two muscles ``[m0, m1]`` each a harmonic oscillator (a diagonal spring
+    ``internal_coupling = w^2 I`` supplies the restoring force), started ``rel_phase`` radians apart
+    (default pi = anti-phase: flexor/extensor stepping). Each muscle oscillates with the given
+    ``period`` (in steps). This is the muscle-level rhythm a scalar atom cannot produce -- a scalar
+    atom integrates/ramps; the internal coupling makes a free-running rhythm. ``activation`` reads
+    muscle 0; the conjugate muscle is the internal second dimension. Gate or drive it from a
+    higher-level atom for a muscle -> response -> operant hierarchy.
+    """
+    w = 2.0 * np.pi / (period * dt)
+    coupling = (w * w) * np.eye(2)
+    phases = np.array([0.0, rel_phase])
+    state = amplitude * np.cos(phases)
+    velocity = -amplitude * w * np.sin(phases)
+    atom = _atom(name, n_dims=2, internal_coupling=coupling, state_init=state)
+    atom.previous_state = (state - dt * velocity).astype(np.float64)  # encode initial phase
+    return atom
 
 
 def default_atom_set() -> list[BehavioralAtom]:

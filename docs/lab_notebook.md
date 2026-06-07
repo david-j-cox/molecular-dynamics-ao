@@ -2487,3 +2487,30 @@ MD framing might be decorative. exp060 shows that claim is IMPRECISE and the ter
   this corrects/sharpens the exp048 concession -- the engine's atom is a damped integrator whose
   missing restoring force is supplied behaviorally (fatigue exp059 / coupling inhibition), not by a
   spring. Figure exp060_integrator_audit.png. (No new src code; uses existing integrator config.)
+
+---
+
+## 2026-06-07 -- Multi-dimensional / hierarchical atoms (exp061)
+
+Generalized the scalar BehavioralAtom to a multi-dimensional state with an optional internal coupling,
+backward-compatible (every existing atom stays dims=1, internal_coupling=None; reproduce exp001-030
+byte-identical; engine tests pass).
+
+- atoms.py: BehavioralAtom gains `internal_coupling` (a DxD matrix applied as -K@state each step in
+  integrate), a `dims` property, dimension-preserving reset, and `activation` reads the output (first)
+  state component. `_atom` gains n_dims/internal_coupling/state_init. New `oscillator_atom(period, dt,
+  amplitude, rel_phase)`: a 2-D two-muscle CPG (diagonal spring w^2 I, w=2pi/(period*dt); phase via
+  previous_state velocity).
+- KEY LINK to exp060: a scalar atom has no restoring force -> ramps; ADD an internal coupling (spring)
+  -> it oscillates. So multi-dim + coupling supplies the very restoring force exp060 found missing, and
+  buys TEMPORAL STRUCTURE (rhythm) a scalar atom cannot produce.
+- exp061 (3 panels): (A) scalar atom ramps to 10 under constant drive vs a 2-D oscillator atom that
+  CPGs at the set 40-step period (amp 1.0) -- rhythm; (B) the 2-D atom's two muscles run anti-phase
+  (corr -1.00) = a flexor/extensor gait within one atom; (C) HIERARCHY -- a slow scalar OPERANT atom
+  (go/no-go) gates the fast muscle CPG, so emitted behavior is rhythmic only on GO (amplitude 0.52 vs
+  0.13) = muscle->response->operant with built-in timescale separation (the structure exp059 needed).
+- 5 tests (test_atoms): scalar-uncoupled default set; scalar ramps; internal coupling oscillates &
+  bounded; muscles anti-phase; reset preserves dim. 147 pass; ruff clean. Figure exp061_multidim_atoms.png.
+- Not a full forces.py/organism.py refactor: the multi-dim capability lives in the atom primitive +
+  oscillator_atom and is exercised standalone; wiring multi-dim atoms through the full force/emission
+  pipeline (continuous motor output, CPG-driven locomotion in the gridworld) is the natural follow-on.
