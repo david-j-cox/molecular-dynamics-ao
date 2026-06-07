@@ -34,7 +34,8 @@ def _survive_next(energy_grid: np.ndarray, e_next: np.ndarray, value: np.ndarray
 
 def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
                 metabolism: float, cap: float = 1.0, n_egrid: int = 401,
-                predation_threshold: float | None = None, predation_prob: float = 0.0) -> dict:
+                predation_threshold: float | None = None, predation_prob: float = 0.0,
+                metabolism_night: float | None = None) -> dict:
     """Exact survival DP over one day/night cycle; derive the optimal risk policy.
 
     ``safe_outcomes`` / ``risky_outcomes`` are lists of ``(probability, intake)`` for the
@@ -43,7 +44,7 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
     survival value of each option ``q_safe``/``q_risky`` [day_steps, n_egrid], the optimal
     ``policy_risky`` (1 where the risky option strictly maximizes survival), the survival
     probability ``value`` = max of the two, and the emergent ``night_requirement`` =
-    ``night_steps * metabolism``.
+    ``night_steps * metabolism_night``.
 
     Optional PREDATION as a second death source above an upper reserve boundary (the starvation-
     predation trade-off; McNamara & Houston 1990): if ``predation_threshold`` is set, each DAY step
@@ -53,7 +54,17 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
     so the value function turns concave just below the upper boundary: the optimal policy becomes a
     twin-threshold rule, risk-prone below the night requirement and risk-averse as it approaches the
     predation boundary, targeting a reserve band between the two.
+
+    Optional DECOUPLED daytime vs overnight burn: ``metabolism`` is the per-step daytime cost (it
+    sets the reserve drift while foraging) and ``metabolism_night`` is the per-step overnight cost
+    (it sets the requirement ``R = night_steps * metabolism_night`` that must be banked by dusk).
+    Default ``None`` makes the night burn equal the day burn -- byte-identical to one-rate DP.
+    Separating them makes R (the boundary location, fixed by the overnight demand) structurally
+    independent of the daytime metabolism (which governs the reserve dynamics far from the boundary)
+    -- the two latent parameters parameter-recovery (exp055) must tell apart.
     """
+    m_day = metabolism
+    m_night = metabolism if metabolism_night is None else metabolism_night
     e = np.linspace(0.0, cap, n_egrid)
     value = (e > 0.0).astype(float)                 # end of cycle: survived iff alive
     # Per-step predation survival vs reserve: 1.0 below the boundary, 1 - predation_prob above it.
@@ -64,15 +75,15 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
 
     # Night, worked backward: forced drain, no choice, die if it takes you to <= 0.
     for _ in range(night_steps):
-        value = _survive_next(e, e - metabolism, value, cap)
+        value = _survive_next(e, e - m_night, value, cap)
 
     q_safe = np.zeros((day_steps, n_egrid))
     q_risky = np.zeros((day_steps, n_egrid))
     cont = np.zeros((day_steps, n_egrid))           # continuation value V_{t+1} per day-step
     for t in range(day_steps - 1, -1, -1):          # dusk -> dawn
         cont[t] = value                             # value currently holds V_{t+1}
-        qs = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in safe_outcomes)
-        qr = sum(p * _survive_next(e, e + d - metabolism, value, cap) for p, d in risky_outcomes)
+        qs = sum(p * _survive_next(e, e + d - m_day, value, cap) for p, d in safe_outcomes)
+        qr = sum(p * _survive_next(e, e + d - m_day, value, cap) for p, d in risky_outcomes)
         qs = pred_survive * qs                      # pay mass-dependent predation while foraging
         qr = pred_survive * qr
         q_safe[t] = qs
@@ -82,8 +93,9 @@ def survival_dp(safe_outcomes, risky_outcomes, day_steps: int, night_steps: int,
     policy_risky = (q_risky > q_safe + 1e-12).astype(float)
     return {"energy": e, "q_safe": q_safe, "q_risky": q_risky, "cont": cont,
             "policy_risky": policy_risky, "value": value,
-            "night_requirement": float(night_steps * metabolism),
-            "day_steps": day_steps, "night_steps": night_steps, "metabolism": metabolism}
+            "night_requirement": float(night_steps * m_night),
+            "day_steps": day_steps, "night_steps": night_steps, "metabolism": metabolism,
+            "metabolism_night": m_night}
 
 
 def risk_threshold(result: dict) -> np.ndarray:

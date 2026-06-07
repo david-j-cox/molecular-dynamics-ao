@@ -132,7 +132,7 @@ requirement is derived from the dynamics, and it is the right parametric axis.
 
 ## It evolves (`evolution.py`)
 
-The capstone removes the planner too. A population carries a **heritable** state-dependent
+The strictest test removes the planner too. A population carries a **heritable** state-dependent
 risk trait — a threshold linear in time of day, `theta(t) = a + b·(t/day)` — and gambles when
 its reserve is below `theta(t)`. Organisms forage through day/night cycles and die at E ≤ 0;
 the survivors reproduce with mutation (`survival.evolve_risk_policy`). Selection is the bare
@@ -346,6 +346,41 @@ contradictions — away from the deadline and the ruin edge, survival reduces to
 rate-maximizing MVT (the rich-patch regime, the mid-day leaving plateau). MVT is the not-desperate
 limit.
 
+## The devil is in the sequence: recovering the requirement (`recovery.py`, exp055/exp056)
+
+The arc above is normative — *what survival optimizes*. The empirical question is whether the
+requirement R is even *recoverable* from behavior. The field's own review (Houston & Rosenström 2024)
+says the evidence is mixed and that the diagnostic signal lives in the *sequence* of choices, not the
+aggregate preference — "the devil is in the sequence". We make that exact. A behaving population
+chooses risky with probability `σ(β·(q_risky − q_safe))` at its current (reserve, time); the latent
+parameters are the overnight requirement R (which fixes *where* the risk preference flips), the
+daytime metabolism `m_day` (the reserve drift far from the boundary), and the softmax temperature β
+(*how sharp* the flip is). Because the survival values depend only on (`m_day`, R) through the DP and
+β only on the choice rule, the trial-by-trial conditional-choice likelihood is exact and closed-form —
+no intractable likelihood, one ~0.3 ms DP solve per candidate.
+
+**R is identifiable from sequences, lost in aggregate** (`exp055`, `figures/exp055_identifiability.png`).
+The conditional choice curve `P(risky | reserve)` is a *bump*, not a sigmoid: indifferent (0.5) at
+ruin where both options mean death, risk-prone in the band below R, risk-averse approaching R, fading
+back to 0.5 deep-safe. Its downward crossing localizes R; its steepness localizes β. From the full
+**sequence** (every (reserve, choice) pair) R is recovered at r = 1.00 across a grid (profile-
+likelihood 95% interval narrower than the grid step). From the **aggregate** — the overall risky
+proportion plus the reserve-occupancy histogram, with the choice-to-reserve *pairing discarded* — R is
+*not* recovered (r = −0.27, a flat profile across 0.30–0.62): one scalar prediction fits along a whole
+(R, β) ridge. A Fisher-information map shows why the *pairing* matters: the information about R is
+concentrated at the requirement boundary, while the information about `m_day` is broader and sits at
+lower reserves — choices near R localize R, choices far from it localize metabolism.
+
+**But the sequence is not magic — identifiability comes from structure** (`exp056`,
+`figures/exp056_degeneracy.png`). On the *same* matched-mean choice and softmax rule, a generic
+delta-rule value-learner (learning rate α, temperature β) has no state-dependent structure, and its
+two parameters are degenerate: the likelihood is a long anticorrelated *valley* (ridge correlation
+−0.96), a faster learner with a flatter policy mimicking a slower one with a sharper policy — the
+well-known bandit α–β degeneracy. At a realistic session length (150 trials) α recovers only
+imprecisely (r = 0.81, within-truth CV ≈ 55%; the recovered (α, β) cloud is anticorrelated), where the
+planner's R was sharp. So "use the sequence" is not the lesson; the lesson is that the survival model's
+*state-dependent* structure is what makes R identifiable at all.
+
 ## Limitations
 
 - Model-free convergence is slow and the aggregate readout pools experience across the
@@ -368,3 +403,7 @@ limit.
 - Stephens, D. W., & Krebs, J. R. (1986). *Foraging Theory*. Princeton University Press.
 - Kacelnik, A., & Bateson, M. (1996). Risky theories -- the effects of variance on foraging
   decisions. *American Zoologist*, 36, 402–434.
+- Houston, A. I., & Rosenström, T. H. (2024). Optimal foraging and risk sensitivity: the devil is in
+  the sequence. *Biological Reviews*.
+- Wilson, R. C., & Collins, A. G. E. (2019). Ten simple rules for the computational modeling of
+  behavioral data. *eLife*, 8, e49547.

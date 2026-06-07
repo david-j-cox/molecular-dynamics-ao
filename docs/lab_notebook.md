@@ -2313,3 +2313,42 @@ standalone so reproduce stays 0-drift; 113 tests pass.
 - Manuscript (34pp): sec:moments gains a "fourth moment: temperance, derived" paragraph + fig:temperance;
   tab:moments kurtosis row updated; open-items (2)+(5) closed; abstract/conclusion updated to include
   kurtosis/temperance as derived (a sign, not a reversal).
+
+---
+
+## 2026-06-07 -- Roadmap 2.1: sequence identifiability of R (exp055) + RL degeneracy (exp056)
+
+The credibility item -- Houston & Rosenstrom 2024's own "the devil is in the sequence", made exact.
+New module `recovery.py`; survival_dp gains an optional `metabolism_night` (default None -> byte-
+identical) so the requirement R = night*m_night decouples from the daytime burn m_day.
+
+- THE MODEL. A behaving population chooses risky by `sigma(beta*(q_risky - q_safe))` at its current
+  (reserve, time); latent theta = (m_day, R, beta). q depends only on (m_day, R) via the DP (one
+  ~0.3 ms solve per candidate), beta only on the choice rule -> the conditional-choice likelihood is
+  exact and closed-form (no intractable DP-likelihood; Beaumont/ABC not needed). The conditional curve
+  P(risky | reserve) is a BUMP, not a sigmoid: ~0.5 at ruin (both options = death), risk-prone in the
+  band below R, risk-averse approaching R, fading to 0.5 deep-safe (the softmax_policy fade). Its
+  downward crossing/trough localizes R, its steepness localizes beta.
+- exp055 SEQUENCE vs AGGREGATE. Two readouts of the SAME population. SEQUENCE (keep every (reserve,
+  time, choice)) recovers R across a grid at r=1.00, rmse 0.001; m_day and beta also recovered (e.g.
+  0.040->0.040, 10->9.9). AGGREGATE (keep only the overall risky proportion + reserve-occupancy
+  histogram, drop the pairing) does NOT recover R (r=-0.27): one scalar prediction, so any (R, beta) on
+  its level set fits = a ridge. Profile likelihood of R: sequence 95% width < grid step (0.01); aggregate
+  flat across 0.30..0.62 (width 0.26). Fisher info by reserve: R-info concentrated at the boundary
+  (centroid ~0.38, near R=0.45), m_day-info broader/lower (~0.35) -- choices near R localize R, choices
+  far from it localize metabolism. Figure exp055_identifiability.png (4 panels: bump, recovery scatter,
+  profile, Fisher). Multi-start fits (8 starts) needed -- a beta->0 plateau (all choices 50/50) traps a
+  single far start, esp. at extreme R.
+- exp056 WHAT SEQUENCES CANNOT FIX. Identifiability is from the STATE-DEPENDENT STRUCTURE, not from
+  having sequences. Same matched-mean risk choice + same softmax, but a generic delta-rule value-learner
+  (alpha, beta) instead of the planner. The (alpha, beta) likelihood is a long anticorrelated VALLEY
+  (ridge corr -0.96), not a well: a faster learner with a flatter policy mimics a slower one with a
+  sharper policy (the bandit alpha-beta degeneracy; Comput. Brain Behav. 2022; Daw 2011). At a realistic
+  session length (n=150) recovery is imprecise/regressive (alpha r=0.81, within-truth CV ~55%; recovered
+  alpha,beta anticorrelated cloud, corr -0.74) vs the planner's R (r=1.00, sub-grid-step CI). beta capped
+  at 40 (it runs to infinity when a short sequence looks deterministic -- a real identifiability failure).
+  Figure exp056_degeneracy.png (valley, cloud, marginal).
+- TESTS/HYGIENE. tests/test_recovery.py (4: planner recovers R; sequence beats aggregate on R-profile
+  width; RL ridge anticorrelation; RL recovers with enough trials) + 2 survival_dp metabolism_night
+  tests; 118 pass; ruff clean. Not added to scripts/reproduce.py (that harness covers exp001-030 only;
+  exp031+ rely on tests + their own determinism). Pure numpy/scipy. Cite Wilson & Collins 2019.

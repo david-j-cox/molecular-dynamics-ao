@@ -323,6 +323,28 @@ def test_predation_off_is_byte_identical():
     assert np.array_equal(a["policy_risky"], b["policy_risky"])
 
 
+def test_metabolism_night_default_is_byte_identical():
+    """metabolism_night defaults to the daytime metabolism -- byte-identical to one-rate DP."""
+    from behavioral_md.survival import survival_dp
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    a = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=401)
+    b = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=401, metabolism_night=None)
+    c = survival_dp(safe, risky, 14, 16, 0.03, n_egrid=401, metabolism_night=0.03)
+    assert np.array_equal(a["q_risky"], b["q_risky"]) and np.array_equal(a["q_safe"], b["q_safe"])
+    assert np.array_equal(a["q_risky"], c["q_risky"])
+
+
+def test_metabolism_night_decouples_the_requirement():
+    """The requirement R = night * metabolism_night is set by the overnight burn alone, not the day
+    burn -- the structural decoupling sequence recovery (exp055) must tell apart."""
+    from behavioral_md.survival import survival_dp
+    safe, risky = [(1.0, 0.05)], [(0.5, 0.0), (0.5, 0.10)]
+    res = survival_dp(safe, risky, 14, 16, metabolism=0.05, n_egrid=401, metabolism_night=0.03)
+    assert np.isclose(res["night_requirement"], 16 * 0.03)
+    assert np.isclose(res["metabolism_night"], 0.03)
+    assert np.isclose(res["metabolism"], 0.05)
+
+
 def test_predation_makes_a_bounded_reserve_band():
     """A predation upper boundary turns the saturating survival value into a humped one: V stays
     high in the band between the night requirement and the boundary and falls above it (the

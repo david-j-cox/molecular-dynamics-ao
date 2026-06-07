@@ -98,7 +98,24 @@ figure exp054_temperance.png; manuscript sec:moments + fig:temperance. 0 reprodu
 
 ## TIER 2 -- credibility / empirical (the field's stated weak point)
 
-### 2.1 Sequence-based parameter recovery + identifiability of R
+### 2.1 Sequence-based parameter recovery + identifiability of R  -- DONE (2026-06-07)
+Built in `recovery.py` + exp055 (planner) + exp056 (RL degeneracy); survival_dp gains optional
+`metabolism_night` (default None -> byte-identical) so R = night*m_night decouples from the daytime
+burn. The behaving population chooses by `sigma(beta*(q_risky - q_safe))` at its current (reserve,
+time); the conditional-choice likelihood is exact and closed-form (no intractable DP-likelihood -- so
+Beaumont/ABC was not needed). RESULTS: (exp055) from the SEQUENCE of (reserve, choice) pairs R is
+recovered at r=1.00 (profile-likelihood 95% width < grid step); from the AGGREGATE risky proportion +
+occupancy it is NOT (r=-0.27, flat profile) -- a single scalar fits along a (R, beta) ridge. This is a
+mechanistic account of why the field's aggregate-preference evidence is mixed. Fisher info localizes
+R at the requirement boundary and m_day broader/lower (choices near R localize R, far from it localize
+metabolism). (exp056) identifiability is from the STATE-DEPENDENT STRUCTURE, not from having sequences:
+a generic delta-rule value-learner on the SAME choice has a degenerate anticorrelated (alpha, beta)
+valley (ridge corr -0.96; the bandit alpha-beta degeneracy), recovering imprecisely (alpha r=0.81, CV
+~55%) where the planner's R is sharp. 6 tests; 118 pass; ruff clean. Figures exp055_identifiability.png,
+exp056_degeneracy.png. Cites Houston & Rosenstrom 2024, Wilson & Collins 2019, the bandit-recovery
+degeneracy (Comput. Brain Behav. 2022).
+
+(original plan:)
 - **What:** Recover latent params (requirement R, metabolism, learning rate, softmax temperature)
   from trial-by-trial choice SEQUENCES; show R is identifiable from sequences but LOST in aggregate
   preference (explaining why the field's evidence is mixed). Profile-likelihood / Fisher-information
@@ -183,12 +200,12 @@ figure exp054_temperance.png; manuscript sec:moments + fig:temperance. 0 reprodu
 
 ---
 
-## CAPSTONE -- the mechanistic molecular-agent bridge (repo-unifying)
+## Molecular-agent bridge -- does the mechanism realize the optimum? (repo-unifying)
 
 - **What:** The parent project's thesis is behavioral MOLECULAR DYNAMICS -- distributed response
   "atoms", stimulus forces, Verlet integration, learning history (`atoms.py`, `forces.py`,
   `organism.py`, `chamber.py`). The entire risk arc has been pure survival DP, divorced from that
-  substrate. The capstone: give the atom-based organism an energy/hunger state that modulates its
+  substrate. This bridge: give the atom-based organism an energy/hunger state that modulates its
   forces, and test whether its EMERGENT choice between a safe and a risky option reproduces the
   energy-budget rule (risk-prone when hungry) and ideally the skew sensitivity -- WITHOUT imposing
   the survival utility. I.e. does the messy distributed mechanism IMPLEMENT the normative optimum?
@@ -212,7 +229,7 @@ figure exp054_temperance.png; manuscript sec:moments + fig:temperance. 0 reprodu
 
 ## Recommended sequence
 1.1 (headline, nearly free) -> 1.2 (must-do robustness) -> 2.1 (credibility foundation) -> 1.3
-(temperance) -> 3.1 (bet-hedging, cheap) -> capstone (molecular bridge) -> 2.2 (data, gated by
+(temperance) -> 3.1 (bet-hedging, cheap) -> molecular bridge -> 2.2 (data, gated by
 digitization) -> 3.2 / 3.3 / 3.4 (bigger builds) -> 2.3 (pre-reg).
 
 ## Caveats (verify before building / writing)
