@@ -2293,3 +2293,23 @@ standalone so reproduce stays 0-drift; 113 tests pass.
   seeds/CIs), the predation subsection + figure, corrected Charnov + quantified autodiff, the
   Kacelnik-Bateson amount-delay confound scope point, re-sorted the failures intro
   (constraints/surprises/corrections), and demoted the level-vi collapse to match its "open" status.
+
+---
+
+## 2026-06-06 -- Roadmap 1.3: temperance (kurtosis) derived (exp054)
+
+- survival.kurtosis_outcomes: >=5-point symmetric moment-matching generator (exact mean/variance,
+  zero skew, chosen kurtosis; r=(K-1)/(2 g^2 (g^2-1)), p=(1-2 r g^2)/2 on support mean+std[-g,-1,0,1,g],
+  g=3). The 3-point gamble of 1.1 was too non-local to isolate the 4th moment.
+- exp054 temperance: kurtosis preference (high-K minus low-K at matched mean/var/skew) measured off
+  the DP on the smooth interior (drop last 2 dusk step-function slices). RESULT: robustly NEGATIVE
+  (kurtosis aversion = temperance, V''''<0) on BOTH sides of R; below +15.7/-1.3/-1.6 above -3.1/+2.3/
+  -1.6 for variance/skew/kurtosis -> variance reverses, skew reverses, kurtosis is single-signed
+  aversion (NO reversal). Magnitude |pref| variance 10.8, skew 4.4, kurtosis 6.3 (x1e-3) -- kurtosis
+  is NOT negligible (the 1.1 3-point reading underplayed it). deep-safe control ~0. So we derive the
+  SIGN of temperance from survival (matches Eeckhoudt-Schlesinger axiom) and CORRECT the roadmap guess
+  of a kurtosis reversal: there is none. Pointed consequence: desperate below-R forager is
+  variance-SEEKING but kurtosis-AVERSE (wants spread, not fat tails). 2 tests; 112 pass; 0 drift.
+- Manuscript (34pp): sec:moments gains a "fourth moment: temperance, derived" paragraph + fig:temperance;
+  tab:moments kurtosis row updated; open-items (2)+(5) closed; abstract/conclusion updated to include
+  kurtosis/temperance as derived (a sign, not a reversal).

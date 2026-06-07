@@ -73,7 +73,18 @@ convex decay = escape-when-fat rather than the McNamara-Houston reserve target.)
 - **Novelty:** Medium (the trade-off is canonical); the skew x two-boundary interaction is novel and
   pre-empts the reviewer's reflex objection.
 
-### 1.3 Kurtosis / temperance as a derived fourth result
+### 1.3 Kurtosis / temperance as a derived fourth result  -- DONE (2026-06-06)
+Built in exp054 + survival.kurtosis_outcomes (a >=5-point symmetric moment-matching generator: exact
+mean/variance, zero skew, chosen kurtosis). RESULT: the survival objective is robustly TEMPERATE
+(kurtosis-averse, V''''<0) on BOTH sides of R, magnitude comparable to the skew effect, vanishing
+deep-safe (curvature control); measured on the smooth interior (dusk step-function slices excluded).
+So, unlike variance and skew, kurtosis preference does NOT reverse at R -- the moment ladder is two
+reversals (V'',V''') + one single-signed aversion (V''''). This DERIVES the sign of temperance from
+survival (matching the Eeckhoudt-Schlesinger axiom) and CORRECTS this item's conjecture of a reversal
+(there is none). Note: the desperate below-R forager is variance-SEEKING yet kurtosis-AVERSE. 2 tests;
+figure exp054_temperance.png; manuscript sec:moments + fig:temperance. 0 reproduce drift.
+
+(original plan:)
 - **What:** Match mean+variance+skew, vary only kurtosis (needs a >=5-point moment-matching gamble
   generator). Predict kurtosis-aversion (temperance) above R, kurtosis-seeking near/below R --
   deriving the SIGN of temperance and its reversal from a survival objective.

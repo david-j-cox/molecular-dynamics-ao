@@ -534,6 +534,28 @@ def skewed_outcomes(mean: float, std: float, skew: float, n_points: int = 121,
     return list(zip(w, mean + std * base, strict=True))
 
 
+def kurtosis_outcomes(mean: float, std: float, kurtosis: float, g: float = 3.0):
+    """A symmetric 5-point gamble with chosen mean, std, ZERO skew, and chosen kurtosis.
+
+    Support is ``mean + std*[-g, -1, 0, 1, g]`` with symmetric probabilities ``[r, p, p0, p, r]``;
+    symmetry forces skew = 0, and solving the variance and fourth-moment constraints gives
+    ``r = (kurtosis - 1) / (2 g^2 (g^2 - 1))`` and ``p = (1 - 2 r g^2)/2`` (kurtosis is scale-free).
+    This is the >=5-point moment-matching generator needed to vary ONLY the fourth
+    moment at fixed mean, variance, and skew, and so to derive the SIGN of the temperance (kurtosis)
+    preference cleanly, where the coarse symmetric three-point gamble cannot (its outliers are too
+    non-local). Valid for ``1 <= kurtosis <= 1 + 2 g^2 (g^2 - 1)`` (with ``g=3``, up to 145); raises
+    if the implied probabilities are negative. ``kurtosis = 3`` is mesokurtic (Gaussian), ``< 3``
+    platykurtic, ``> 3`` leptokurtic (fat-tailed)."""
+    r = (kurtosis - 1.0) / (2.0 * g ** 2 * (g ** 2 - 1.0))
+    p = (1.0 - 2.0 * r * g ** 2) / 2.0
+    p0 = 1.0 - 2.0 * p - 2.0 * r
+    if min(r, p, p0) < -1e-12:
+        raise ValueError(f"kurtosis {kurtosis} out of range for g={g}: r={r}, p={p}, p0={p0}")
+    pts = mean + std * np.array([-g, -1.0, 0.0, 1.0, g])
+    probs = np.array([r, p, p0, p, r])
+    return list(zip(probs, pts, strict=True))
+
+
 def outcome_moments(outcomes):
     """Mean, variance, and skewness of a discrete ``[(probability, value), ...]`` distribution."""
     p = np.array([pi for pi, _ in outcomes])

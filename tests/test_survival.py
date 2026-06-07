@@ -270,6 +270,49 @@ def test_moment_fields_reverse_across_the_requirement():
     assert s_bl < 0 < s_ab                                    # skew: neg-skew -> pos-skew
 
 
+def test_kurtosis_outcomes_match_target_moments():
+    """The 5-point generator hits the target mean, variance, and kurtosis with zero skew."""
+    from behavioral_md.survival import central_moments, kurtosis_outcomes
+    for K in (1.5, 3.0, 6.0):
+        m, mu2, mu3, mu4 = central_moments(kurtosis_outcomes(0.05, 0.03, K))
+        assert abs(m - 0.05) < 1e-9
+        assert abs(mu2 - 0.03 ** 2) < 1e-9
+        assert abs(mu3) < 1e-9                              # symmetric: zero skew
+        assert abs(mu4 / mu2 ** 2 - K) < 1e-6              # kurtosis on target
+
+
+def test_temperance_is_kurtosis_aversion_without_a_reversal():
+    """Derived sign of temperance: at fixed mean/variance/skew the survival objective is
+    kurtosis-AVERSE on both sides of R (V'''' < 0), unlike the variance and skew preferences which
+    reverse at R. Measured on the smooth interior (the near-dusk step-function slices excluded)."""
+    from behavioral_md.survival import kurtosis_outcomes, risk_threshold, survival_dp
+    s, day, night, metab, sd = 0.05, 14, 16, 0.03, 0.03
+    R = night * metab
+
+    def adv(out):
+        res = survival_dp([(1.0, s)], out, day, night, metab, n_egrid=1201)
+        return res["q_risky"] - res["q_safe"], res
+
+    kpref, res = adv(kurtosis_outcomes(s, sd, 7.0))
+    klo, _ = adv(kurtosis_outcomes(s, sd, 1.5))
+    kpref = kpref - klo
+    e, thr = res["energy"], risk_threshold(res)
+    below, above, deep = [], [], []
+    for t in range(day - 2):                               # drop dusk step-function slices
+        th = thr[t] if not np.isnan(thr[t]) else R
+        b = (e > 0.05) & (e < th - 0.02)
+        a = (e > th + 0.02) & (e < 0.85)
+        d = e > 0.9
+        if b.sum():
+            below.append(kpref[t, b].mean())
+        if a.sum():
+            above.append(kpref[t, a].mean())
+        if d.sum():
+            deep.append(kpref[t, d].mean())
+    assert np.nanmean(below) < 0 and np.nanmean(above) < 0   # averse on BOTH sides (no reversal)
+    assert abs(np.nanmean(deep)) < 2e-4                      # vanishes deep-safe (the control)
+
+
 def test_predation_off_is_byte_identical():
     """The predation arguments default to off and must not change the starvation-only DP."""
     from behavioral_md.survival import survival_dp
