@@ -7,9 +7,19 @@ engine (`organism.py`, `forces.py`) remains the canonical, readable reference;
 this module is validated to reproduce its force and integration numerically
 (`validate_against_numpy`).
 
-Scope so far: the deterministic dynamics -- the two-tier force decomposition
-(`compute_force`) and the damped Verlet update (`integrate`). Stochastic emission,
-learning, the cue-receptor field, and the environment are added in later phases.
+Scope: the FULL organism, not just the dynamics. The two-tier force decomposition
+(`compute_force`), the integrator (`integrate`: damped Verlet or the first-order leaky
+ablation), stochastic softmax emission (`emission_probs`/`sample_actions`), Rescorla-Wagner
+learning (`learn_step`) with the cue-receptor field (`learn_with_cue`), the gridworld coupling
+(`observe`/`env_step`), and the energy budget are all batched pure functions, assembled into a
+jitted one-life rollout (`make_simulate`) and a multi-life loop (`run_lives`). Each component is
+validated to reproduce the NumPy organism to floating-point precision (`validate_against_numpy`,
+`validate_learning`, `validate_emission`, `validate_env`), and the population runs ~85x faster
+(exp004). The NumPy engine (`organism.py`, `forces.py`) remains the canonical, readable reference.
+
+Not yet ported (NumPy-only, used in small-scale ablations): the effort->energy / load-bearing
+fatigue terms (exp059) and multi-dimensional / oscillator atoms (exp061; the spec assumes a scalar
+state per atom). The integrator choice (Verlet / leaky) IS supported.
 
 Static model structure (atom sensitivities, valences, directions, coupling) is
 packed once into a :class:`ModelSpec`; per-step state (activations, history,
@@ -155,7 +165,16 @@ def integrate(
     force: jnp.ndarray,
     config: SimulationConfig,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Damped Verlet step; returns (new_activation, new_previous), both clipped."""
+    """Integrator step; returns (new_activation, new_previous), both clipped.
+
+    Damped Verlet by default, or the first-order leaky accumulator when
+    ``config.integrator == 'leaky'`` (the exp048/exp060 ablation). ``config`` is static at trace
+    time, so the branch is resolved when the simulate function is built (no per-step Python branch).
+    """
+    if config.integrator == "leaky":
+        new = activation + config.dt * (force / spec.mass[None, :] - config.leak_coef * activation)
+        new = jnp.clip(new, config.activation_min, config.activation_max)
+        return new, activation
     velocity = (activation - previous) / config.dt
     net = force - config.damping_coef * velocity
     new = 2.0 * activation - previous + (net / spec.mass[None, :]) * config.dt**2

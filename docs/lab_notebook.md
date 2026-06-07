@@ -2514,3 +2514,27 @@ byte-identical; engine tests pass).
 - Not a full forces.py/organism.py refactor: the multi-dim capability lives in the atom primitive +
   oscillator_atom and is exercised standalone; wiring multi-dim atoms through the full force/emission
   pipeline (continuous motor output, CPG-driven locomotion in the gridworld) is the natural follow-on.
+
+---
+
+## 2026-06-07 -- JAX port: already complete; added leaky-integrator parity
+
+Investigating the "full JAX port" engine item, found the port was ALREADY COMPLETE and validated --
+the engine survey's "JAX covers only force+integration" read the stale module docstring, not the code.
+
+- STATE: jax_engine.py has the full organism as batched pure functions assembled into a jitted
+  one-life scan (make_simulate) + multi-life loop (run_lives): two-tier force (compute_force),
+  integrate, softmax emission (emission_probs/sample_actions), Rescorla-Wagner learning (learn_step)
+  + cue-receptor field (learn_with_cue), gridworld coupling (observe/env_step), energy budget. Four
+  validators reproduce the NumPy organism to fp precision: force 1.2e-7, learning 2.5e-8, emission
+  2.2e-8, env 6.0e-8. Exercised by exp004/005/006/044. Benchmark (exp004): ~85x faster than NumPy
+  (5.2M vs 62k agent-steps/s; 2000 organisms x 600 steps in 0.23s steady).
+- INCREMENT: added the first-order LEAKY integrator to jax_engine.integrate (was Verlet-only),
+  selectable via config.integrator (static at trace time, no per-step branch). Validated: JAX leaky
+  matches the NumPy leaky update exactly (0.0 diff); default Verlet unchanged (reproduce exp005/006/044
+  byte-identical). So the exp048/exp060 integrator ablation can now run at population scale. 1 test
+  (test_jax_engine, 5 total). Updated the stale docstring to describe the complete port.
+- REMAINING JAX GAPS (NumPy-only, small-scale ablation features, noted in the docstring): the
+  effort->energy / load-bearing fatigue terms (exp059) and multi-dimensional / oscillator atoms
+  (exp061; the ModelSpec assumes a scalar state per atom). Porting multi-dim atoms would be the larger
+  next step (the spec + force kernels are written for scalar activations). 148 tests; ruff clean.
