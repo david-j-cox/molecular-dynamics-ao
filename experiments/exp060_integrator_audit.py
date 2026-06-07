@@ -47,7 +47,7 @@ import pandas as pd  # noqa: E402
 from behavioral_md.atoms import verlet_update  # noqa: E402
 from behavioral_md.config import SimulationConfig  # noqa: E402
 from behavioral_md.environments.gridworld import BehavioralFieldEnv  # noqa: E402
-from behavioral_md.experiment_utils import weak_innate_atoms  # noqa: E402
+from behavioral_md.experiment_utils import synthetic_field_obs, weak_innate_atoms  # noqa: E402
 from behavioral_md.organism import Organism  # noqa: E402
 from behavioral_md.parallel import run_sweep  # noqa: E402
 from behavioral_md.simulation import run_episode  # noqa: E402
@@ -78,17 +78,6 @@ def step_response(integrator: str, c: float = 10.0, leak: float = 1.0, F0: float
 
 
 # --- C. organism-level persistence after stimulus removal --------------------------------------
-def _food_obs(on: bool) -> dict:
-    z = np.zeros(2)
-    o = {f"{s}_vector": z.copy() for s in ("food", "danger", "light", "cue")}
-    o.update({f"{s}_intensity": np.array([0.0]) for s in ("food", "danger", "light", "cue")})
-    o["food_intensity"] = np.array([1.0 if on else 0.0])
-    o["food_vector"] = np.array([1.0, 0.0])
-    o["food_contact"] = np.array([0.0])
-    o["cue_value"] = np.array([0.0])
-    o["context"] = np.array([0.0])
-    return o
-
 
 def persistence(integrator: str, c: float = 10.0, leak: float = 1.0, pulse: int = 25,
                 after: int = 20) -> float:
@@ -97,10 +86,10 @@ def persistence(integrator: str, c: float = 10.0, leak: float = 1.0, pulse: int 
     if integrator == "leaky":
         kw["leak_coef"] = leak
     org = Organism(SimulationConfig(**kw), rng=np.random.default_rng(0))
-    org.reset(_food_obs(True))
+    org.reset(synthetic_field_obs(food_contact=False, food_on=True))
     acts = []
     for t in range(pulse + after + 1):
-        org.step(_food_obs(t < pulse))
+        org.step(synthetic_field_obs(food_contact=False, food_on=t < pulse))
         acts.append(org.activation("approach_food"))
     off = acts[pulse - 1]
     return acts[pulse + after] / off if abs(off) > 1e-6 else 0.0

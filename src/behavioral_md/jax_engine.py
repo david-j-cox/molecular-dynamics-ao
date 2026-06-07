@@ -1,11 +1,8 @@
-"""JAX-vectorized engine (foundation): batched force + damped-Verlet step.
+"""JAX-vectorized engine: the full organism, batched.
 
 This is the fast twin of the object-oriented NumPy engine. The whole population is
 held as arrays ([n_organisms, n_atoms, ...]) and one timestep is a pure, batched,
-``jit``-able function -- no Python per-atom or per-organism loops. The NumPy
-engine (`organism.py`, `forces.py`) remains the canonical, readable reference;
-this module is validated to reproduce its force and integration numerically
-(`validate_against_numpy`).
+``jit``-able function -- no Python per-atom or per-organism loops.
 
 Scope: the FULL organism, not just the dynamics. The two-tier force decomposition
 (`compute_force`), the integrator (`integrate`: damped Verlet or the first-order leaky

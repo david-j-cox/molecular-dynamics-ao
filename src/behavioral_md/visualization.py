@@ -195,37 +195,6 @@ def plot_acquisition_latency(summaries: pd.DataFrame, path: str | Path) -> Path:
     return _save(fig, path)
 
 
-def plot_force_decomposition(
-    log: pd.DataFrame, episode: int, atom_name: str, path: str | Path
-) -> Path:
-    """Decompose one drive atom's force into its components over a single life.
-
-    Shows sensory / history / motivational / coupling and the net total, so the
-    learned (history) contribution is visible against the fixed innate (sensory)
-    one.
-    """
-    a = _episode_slice(log, episode)
-    a = a[a["atom_name"] == atom_name].sort_values("timestep")
-    t = a["timestep"]
-    comps = [
-        ("force_sensory", "Sensory (innate)"),
-        ("force_history", "History (learned)"),
-        ("force_motivational", "Motivational (energy)"),
-        ("force_coupling", "Coupling"),
-        ("atom_force", "Net"),
-    ]
-    fig, ax = plt.subplots(figsize=(8, 4))
-    for (col, label), (ls, marker) in zip(comps, _BW_CYCLE, strict=False):
-        if col in a:
-            ax.plot(t, a[col], color="black", ls=ls, lw=1.0, marker=marker, ms=3,
-                    markevery=max(1, len(a) // 18), label=label)
-    ax.axhline(0, color="0.6", lw=0.5)
-    ax.set_xlabel("Time (steps)")
-    ax.set_ylabel("Force")
-    _legend_outside(ax)
-    return _save(fig, path)
-
-
 _FORCE_COMPONENTS = [
     ("force_sensory", "Sensory (innate)"),
     ("force_history", "History (learned)"),

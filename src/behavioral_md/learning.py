@@ -19,10 +19,14 @@ different decremental-learning accounts can be swapped in. Implemented:
 ``LinearOperator``
     Strengthen-only ``dw = lr * mag * elig * intensity`` (the original literal
     rule); does not extinguish on its own.
+``DualExcitatoryInhibitory``
+    Separate excitatory (``w_plus``, preserved through extinction) and inhibitory
+    (``w_minus``, grows on omission, context-tagged) associations; the net weight
+    the force reads is ``w_plus - gate*w_minus``. Yields spontaneous recovery and
+    context-gated renewal (Konorski; Bouton). Selected via ``learning_model``.
 
-Planned (stubs, see ToDo): dual excitatory/inhibitory (spontaneous recovery,
-renewal), momentum-modulated decay (Nevin & Grace), Pearce-Hall associability,
-resurgence-as-choice (Shahan & Craig, 2017).
+(Momentum-modulated decay, Pearce-Hall associability, and resurgence-as-choice are
+modeled in the concurrent chamber, :mod:`behavioral_md.chamber`, not here.)
 
 ``credit_assignment`` (rw_independent | rw_competitive | source_only) controls
 how credit is shared across the present stimulus channels of a drive atom.

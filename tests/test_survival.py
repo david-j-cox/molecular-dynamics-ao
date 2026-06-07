@@ -459,7 +459,7 @@ def test_bethedge_matched_mean_geometric_below_arithmetic():
     kw = dict(n_days=24, rho=0.85, bad_scale=0.72, n_seasons=120, cohort=150, seed=5)
     safe_play = bethedge_fitness(safe, risky, 12, 4, 0.025, 0.0, **kw)
     gamble = bethedge_fitness(safe, risky, 12, 4, 0.025, 1.0, **kw)
-    assert gamble["arith"] <= safe_play["arith"] + 0.05 * safe_play["arith"]   # ~equal arithmetic
+    assert abs(gamble["arith"] - safe_play["arith"]) < 0.05 * safe_play["arith"]  # ~equal arith
     assert gamble["geom"] < safe_play["geom"]                  # gambling loses on geometric mean
 
 

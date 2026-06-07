@@ -33,22 +33,12 @@ import numpy as np  # noqa: E402
 
 from behavioral_md.atoms import default_atom_set, oscillator_atom  # noqa: E402
 from behavioral_md.config import SimulationConfig  # noqa: E402
+from behavioral_md.experiment_utils import synthetic_field_obs  # noqa: E402
 from behavioral_md.forces import default_coupling_matrix  # noqa: E402
 from behavioral_md.organism import Organism  # noqa: E402
 
 FIG = Path("outputs/figures")
 PERIOD = 30.0
-
-
-def _neutral_obs() -> dict:
-    z = np.zeros(2)
-    o = {f"{s}_vector": z.copy() for s in ("food", "danger", "light", "cue")}
-    o.update({f"{s}_intensity": np.array([0.0]) for s in ("food", "danger", "light", "cue")})
-    o["food_contact"] = np.array([0.0])
-    o["cue_value"] = np.array([0.0])
-    o["context"] = np.array([0.0])
-    return o
-
 
 def run(cpg_gain: float, steps: int = 150) -> dict:
     """Run an organism (no stimulus) with a CPG atom coupled to consume at the given gain."""
@@ -59,7 +49,7 @@ def run(cpg_gain: float, steps: int = 150) -> dict:
         coupling[idx["consume"], idx["rhythm"]] = cpg_gain        # CPG modulates consume
     org = Organism(SimulationConfig(seed=0, learning_rate=0.0), atoms=atoms,
                    coupling_matrix=coupling, rng=np.random.default_rng(0))
-    obs = _neutral_obs()
+    obs = synthetic_field_obs()
     org.reset(obs)
     cpg, consume = [], []
     for _ in range(steps):

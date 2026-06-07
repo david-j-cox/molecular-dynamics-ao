@@ -87,11 +87,16 @@ def test_jax_effort_and_fatigue_match_numpy():
     nf, _ = fc.compute(sensory, float(energy[0]))
     assert np.max(np.abs(jf[0] - nf)) < TOL                       # force includes -fatigue
 
-    # Fatigue update matches organism._update_fatigue; effort = summed positive action activation.
-    new_fat = cfg.fatigue_decay * fatigue + cfg.fatigue_gain * np.clip(act, 0.0, None)
-    ref_fat = np.array([[cfg.fatigue_decay * fatigue[0, i]
-                         + cfg.fatigue_gain * max(0.0, act[0, i]) for i in range(a)]])
-    assert np.max(np.abs(new_fat - ref_fat)) < TOL
+    # Fatigue update parity: the JAX closed form equals the real NumPy organism._update_fatigue.
+    from behavioral_md.organism import Organism
+    org = Organism(cfg)
+    for i, at in enumerate(org.atoms):
+        at.state = np.array([act[0, i]])
+        at.fatigue = float(fatigue[0, i])
+    org._update_fatigue()
+    np_fat = np.array([at.fatigue for at in org.atoms])
+    jax_fat = (cfg.fatigue_decay * fatigue + cfg.fatigue_gain * np.clip(act, 0.0, None))[0]
+    assert np.max(np.abs(np_fat - jax_fat)) < TOL
     idx = np.asarray(spec.action_atom_idx)
     jax_effort = float(np.clip(np.asarray(act)[:, idx], 0.0, None).sum())
     ref_effort = float(sum(max(0.0, act[0, k]) for k in idx))

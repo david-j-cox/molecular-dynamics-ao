@@ -40,6 +40,7 @@ from behavioral_md.atoms import verlet_update  # noqa: E402
 from behavioral_md.chamber import ChamberConfig, run_risk_choice  # noqa: E402
 from behavioral_md.config import SimulationConfig  # noqa: E402
 from behavioral_md.environments.gridworld import BehavioralFieldEnv  # noqa: E402
+from behavioral_md.experiment_utils import synthetic_field_obs  # noqa: E402
 from behavioral_md.organism import Organism  # noqa: E402
 
 FIG = Path("outputs/figures")
@@ -55,17 +56,6 @@ R = 12 * 0.025
 # ----------------------------------------------------------------------------------------------- #
 # PART A: the force <-> energy loop on the real Organism
 # ----------------------------------------------------------------------------------------------- #
-def _food_obs(on: bool) -> dict:
-    z = np.zeros(2)
-    o = {f"{s}_vector": z.copy() for s in ("food", "danger", "light", "cue")}
-    o.update({f"{s}_intensity": np.array([0.0]) for s in ("food", "danger", "light", "cue")})
-    o["food_intensity"] = np.array([1.0 if on else 0.0])
-    o["food_vector"] = np.array([1.0, 0.0])
-    o["food_contact"] = np.array([1.0 if on else 0.0])
-    o["cue_value"] = np.array([0.0])
-    o["context"] = np.array([0.0])
-    return o
-
 
 def effort_energy_trace(effort_cost: float, steps: int = 90, seed: int = 1) -> np.ndarray:
     """Energy over time for a foraging organism in the gridworld, with/without effort cost."""
@@ -92,10 +82,10 @@ def fatigue_bout(fatigue_gain: float, bout: int = 90, total: int = 150,
     cfg = SimulationConfig(seed=seed, fatigue_gain=fatigue_gain, fatigue_decay=0.98,
                            learning_rate=0.0)
     org = Organism(cfg, rng=np.random.default_rng(seed))
-    org.reset(_food_obs(True))
+    org.reset(synthetic_field_obs(food_on=True))
     acts = []
     for t in range(total):
-        org.step(_food_obs(t < bout))
+        org.step(synthetic_field_obs(food_on=t < bout))
         acts.append(org.activation("approach_food"))
     return np.array(acts)
 

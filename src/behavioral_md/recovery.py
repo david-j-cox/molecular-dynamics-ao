@@ -177,7 +177,7 @@ def aggregate_negloglik(m_day: float, R: float, beta: float, data: dict, occ, da
     res = solve(m_day, R, **soln)
     e = res["energy"]
     d = res["q_risky"] - res["q_safe"]
-    wsum = w.sum()
+    wsum = max(float(w.sum()), 1e-9)        # guard the divide below against empty occupancy
     p_mean = 0.0
     for t in range(day):
         if w[t].sum() == 0:

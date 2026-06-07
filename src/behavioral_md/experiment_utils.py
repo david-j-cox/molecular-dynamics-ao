@@ -16,10 +16,32 @@ from pathlib import Path
 
 import numpy as np
 
-from behavioral_md.atoms import default_atom_set
+from behavioral_md.atoms import STIMULI, default_atom_set
 
 LOG_DIR = Path("outputs/logs")
 FIG_DIR = Path("outputs/figures")
+
+
+def synthetic_field_obs(*, food_on: bool = False, food_contact: bool | None = None,
+                        food_vector=(1.0, 0.0)) -> dict:
+    """A minimal valid observation dict for driving an :class:`Organism` without an environment.
+
+    All four channels (food/danger/light/cue) are present with zero direction/intensity, except
+    food, whose intensity is 1.0 when ``food_on`` (pointing along ``food_vector``). ``food_contact``
+    (the sharp consummatory signal) defaults to ``food_on`` unless given explicitly. Mirrors the
+    fields the gridworld hands to ``Organism.step``; used by the engine experiments/tests that drive
+    an organism on a fixed synthetic field.
+    """
+    z = np.zeros(2)
+    obs = {f"{s}_vector": z.copy() for s in STIMULI}
+    obs.update({f"{s}_intensity": np.array([0.0]) for s in STIMULI})
+    obs["food_intensity"] = np.array([1.0 if food_on else 0.0])
+    obs["food_vector"] = np.asarray(food_vector, dtype=float)
+    contact = food_on if food_contact is None else food_contact
+    obs["food_contact"] = np.array([1.0 if contact else 0.0])
+    obs["cue_value"] = np.array([0.0])
+    obs["context"] = np.array([0.0])
+    return obs
 
 
 def compute_mean_ci(values, conf_z: float = 1.96) -> tuple[float, float]:

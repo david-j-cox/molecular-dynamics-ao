@@ -4,19 +4,8 @@ import numpy as np
 
 from behavioral_md.config import SimulationConfig
 from behavioral_md.environments.gridworld import BehavioralFieldEnv
+from behavioral_md.experiment_utils import synthetic_field_obs
 from behavioral_md.organism import Organism
-
-
-def _food_obs(on: bool) -> dict:
-    z = np.zeros(2)
-    o = {f"{s}_vector": z.copy() for s in ("food", "danger", "light", "cue")}
-    o.update({f"{s}_intensity": np.array([0.0]) for s in ("food", "danger", "light", "cue")})
-    o["food_intensity"] = np.array([1.0 if on else 0.0])
-    o["food_vector"] = np.array([1.0, 0.0])
-    o["food_contact"] = np.array([1.0 if on else 0.0])
-    o["cue_value"] = np.array([0.0])
-    o["context"] = np.array([0.0])
-    return o
 
 
 def _forage_energy(effort_cost=0.0, fatigue_energy_cost=0.0, fatigue_gain=0.0, steps=70, seed=1):
@@ -60,9 +49,9 @@ def test_fatigue_brakes_runaway_activation():
     def bout(gain):
         cfg = SimulationConfig(seed=0, fatigue_gain=gain, fatigue_decay=0.98, learning_rate=0.0)
         org = Organism(cfg, rng=np.random.default_rng(0))
-        org.reset(_food_obs(True))
+        org.reset(synthetic_field_obs(food_on=True))
         for _ in range(80):
-            org.step(_food_obs(True))
+            org.step(synthetic_field_obs(food_on=True))
         return org.activation("approach_food")
 
     assert bout(0.0) > bout(0.08) + 0.2                # fatigue meaningfully suppresses the ramp
@@ -73,7 +62,7 @@ def test_fatigue_energy_cost_adds_expenditure():
     effort/action cost, exposed via last_expenditure."""
     cfg = SimulationConfig(seed=0, fatigue_gain=0.1, fatigue_energy_cost=0.05, learning_rate=0.0)
     org = Organism(cfg, rng=np.random.default_rng(0))
-    obs = _food_obs(True)
+    obs = synthetic_field_obs(food_on=True)
     org.reset(obs)
     for _ in range(30):                                # build up some fatigue
         org.step(obs)

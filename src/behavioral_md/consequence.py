@@ -13,11 +13,10 @@ change in energy), the maximally objective view: there is no free-floating
 "reward", only energy gained and lost in the same units that govern survival.
 
 The reinforcement/punishment *asymmetry* (a punisher subtracts more than a
-reinforcer adds; punishment as competitive suppression; injury as a delayed
-healing cost plus repertoire impairment) lives in the OTHER models, which are
-stubbed here and to be filled in later. See the lab notebook for the literature
-(Rasmussen & Newland 2008; de Villiers; Deluty; Klapes & Riley 2018; Klapes &
-McDowell 2025).
+reinforcer adds) lives in the other models: :class:`Subtractive` (a tunable
+punishment weight) and :class:`ConcatenatedAsymmetric` (separate reinforcer/
+punisher sensitivities). See the lab notebook for the literature (Rasmussen &
+Newland 2008; de Villiers; Deluty).
 """
 
 from __future__ import annotations
@@ -128,15 +127,9 @@ class ConcatenatedAsymmetric(ConsequenceModel):
         return appetitive, aversive
 
 
-# --- Planned models (not yet implemented) -----------------------------------
-# CompetitiveSuppression (Deluty) and concatenated matching are CHOICE/ALLOCATION
-# accounts (about the relation BETWEEN responses), not event->energy maps, so they
-# live in the concurrent chamber (chamber.run_punishment_choice), not here. InjuryHealing
-# is a genuine ConsequenceModel (a delayed, embodied cost) left for a follow-up.
-
-
-class InjuryHealing(ConsequenceModel):
-    """Injury = delayed healing energy cost + temporary repertoire impairment. TODO."""
+# CompetitiveSuppression (Deluty) and concatenated matching are CHOICE/ALLOCATION accounts (about
+# the relation BETWEEN responses), not event->energy maps, so they live in the concurrent chamber
+# (chamber.run_punishment_choice), not here.
 
 
 def make_consequence_model(config) -> ConsequenceModel:
