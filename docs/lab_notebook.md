@@ -2457,3 +2457,33 @@ Shift from the risk arc back to the core atom/force engine. Closed the force<->e
 - exp059 4-panel figure (A1 effort-energy, A2 fatigue brake, C K-sweep climb, D P(risky|E) curves:
   K=1 under-builds, K=15 expresses the rule, +costly-effort, vs imposed). 4 tests (test_effort_energy);
   142 pass; ruff clean; reproduce byte-identical. Not in reproduce.py (exp031+ convention).
+
+---
+
+## 2026-06-07 -- Stress-test the MD thesis: is the 2nd-order term load-bearing? (exp060)
+
+Engine self-scrutiny following the exp048 ablation and the exp059 ramp finding. Reviewers/manuscript
+suggested the overdamped Verlet limit "is" a leaky competing accumulator (Usher-McClelland), so the
+MD framing might be decorative. exp060 shows that claim is IMPRECISE and the term is LOAD-BEARING.
+
+- THE DISTINCTION: damping != leak. The engine's atom has velocity damping (-c*v) but NO restoring/
+  spring term (k=0), so it is a damped INTEGRATOR, not a leaky accumulator. The overdamped limit of
+  m x'' + c x' + k x = F is the leaky accumulator only via the spring k; with k=0 the limit is a pure
+  integrator (ramps, persists). So the equivalence fails as implemented.
+- Step response (panel A): under a drive pulse the Verlet activation RAMPS and, once the drive ends,
+  HOLDS (persists; at low damping overshoots/carries momentum); the leaky integrator TRACKS the drive
+  and DECAYS to baseline.
+- Two load-bearing consequences leaky cannot reproduce:
+  - ACQUISITION CURVE (panel B): the ramp makes a naive organism slow (activation must build) -> high
+    naive latency falling with learning = the realistic acquisition curve (verlet ~141->60). Leaky
+    tracks the drive immediately -> fast from life 1 (~39->32, no naive-slow phase) at ANY softmax
+    temperature (tested temp 0.30/0.05/0.02: lowering it just makes leaky faster, never recovers the
+    curve). The integrator SHAPES the learning curve.
+  - PERSISTENCE (panel C): activation 20 steps after stimulus offset is ~1.00 (verlet c=10), 1.19
+    (verlet c=2, momentum) vs 0.11 (leaky) -- behavior outlasting its cue (perseveration), which the
+    leaky accumulator structurally cannot hold.
+- VERDICT: the 2nd-order/integrator term is load-bearing (shapes acquisition + gives persistence);
+  the "damped Verlet = leaky accumulator" claim conflates damping with leak. NOTE for the manuscript:
+  this corrects/sharpens the exp048 concession -- the engine's atom is a damped integrator whose
+  missing restoring force is supplied behaviorally (fatigue exp059 / coupling inhibition), not by a
+  spring. Figure exp060_integrator_audit.png. (No new src code; uses existing integrator config.)

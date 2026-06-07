@@ -330,6 +330,12 @@ non-reinforced cue drive overlapping receptors negative (inhibition).
   uses raw energy units (per-step energy amounts are too small to be useful RW
   targets). The reinforcement/punishment **asymmetry** is deferred to the
   pluggable `ConsequenceModel` variants (currently only `DeltaEnergy`).
+- **The second-order (Verlet) term is load-bearing**, not decorative. The atom is a *damped
+  integrator* (velocity friction, no restoring spring), distinct from a leaky accumulator: it ramps
+  under drive (shaping the acquisition curve) and *persists* after the drive ends (perseveration) —
+  neither of which a first-order leaky integrator reproduces at any temperature (`exp060`; the
+  "overdamped Verlet ≈ leaky accumulator" claim conflates damping with leak). The missing restoring
+  force is supplied behaviorally, by fatigue (`exp059`) or coupling inhibition.
 - **Reproducible**: all randomness is seeded via `SimulationConfig.seed`.
 - See `ToDO.txt` for what is not yet implemented (day/night, operant schedules,
   multiple food patches, the punishment-asymmetry models, tests).
