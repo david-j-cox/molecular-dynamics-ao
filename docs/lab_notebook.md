@@ -2583,3 +2583,50 @@ Brought the JAX engine to parity with the current NumPy organism's energy econom
   for a scalar [O, A] activation; generalizing to [O, A, D] (per-atom internal coupling, etc.) is a
   substantial refactor, and the multi-dim demos (exp061/062) are tiny standalone runs that do not need
   the 85x population-scale speed. Noted in the jax_engine docstring as the remaining gap.
+
+---
+
+## 2026-06-08 -- exp063: the energy-budget x skew design, run (roadmap 2.3, computational)
+
+Executed the discriminating design that exp058 only sketched (its panel D stopped at noise-free
+predicted probabilities). The question: could a real two-budget, skew-controlled study tell the
+survival account apart from curved-utility EU and prospect theory, and with how much data?
+
+- NEW fittable survival model in choice_models.py: `survival_choice_prob` (P(choose A over B) for a
+  survival-DP forager at a given reserve, with a free requirement R set through the overnight burn
+  m_night=R/night_steps, independent of the daytime metabolism) + `fit_survival` (MLE of (R, beta)
+  over reserve-tagged trials {A,B,reserve,k,n}; same {name,params,negloglik,aic,n_params} shape as
+  fit_model, so it slots into a cross-model comparison). This is the capability exp058 lacked --
+  survival was only an oracle generator there, never fit head-to-head. 3 tests; 150 pass; ruff clean.
+- One marginal-forager economy throughout (intake ~ metabolism, so the gamble is life-or-death and
+  the survival reversal is present: M=0.05, SD=0.03, day=14, night=16, m_day=0.03, R=0.48). Every
+  model scores the SAME gambles; the static utilities (EU/PT/MV) score intakes NORMALIZED to unit
+  mean -- the utility argument's scale is a free modelling convention and the only way curvature bites
+  at the marginal-forager scale. The survival model alone reads the reserve, so it alone can express
+  budget-dependence.
+- THE KEY FINDING (echoes exp055). Two parts that pull in opposite directions:
+  * DETECTING budget-dependence (rejecting the fixed-utility class) is EASY: no fixed-utility model
+    reads the reserve, so ANY two distinct budgets expose a dependence it cannot fit -- a sign
+    reversal is not even required. Panel D: P(survival selected by AIC, delta>4) rises 0.88->1.00 by
+    30 trials/cell on survival data, and stays 0.00 on EU and PT data at every sample size (clean
+    power vs specificity; the smaller param count of survival is NOT inflating selection).
+  * IDENTIFYING where the reversal sits (R) is HARD and is the exp055 ridge made into a design
+    requirement. Panel B (R recovery vs number of budget levels, n=120): sd 0.147 (1 budget), 0.119
+    (2), 0.080 (3), 0.006 (5-budget gradient), 0.002 (8). Two budgets is the (R,beta) ridge -- two
+    points barely constrain the conditional choice curve P(choice|reserve); a reserve GRADIENT (>=5)
+    traces the curve and pins R. Panel C (gradient): the 90% recovery interval for R narrows from
+    [0.469,0.844] at 15 trials/cell to [0.471,0.490] at 60 and [0.475,0.486] at 240 -- ~60 trials/cell
+    already gives +/-0.01.
+- This needed the right signal level. At a near-deterministic maximizer (beta=400) detection
+  saturates at 1.0 everywhere (no ramp) and R is pinned trivially; at a very noisy follower (beta=40)
+  R is unidentifiable even with the gradient (sd 0.2-0.37) and the curves go non-monotone. beta=200
+  (a noisy but informative gradient-follower) is where B/C/D are all clean -- documented in the script.
+- Figure exp063_two_budget_design.png (4 panels: A signature, B identifiability-vs-budgets, C
+  R-precision-vs-trials, D detection-vs-specificity). NOT added to scripts/reproduce.py: it is a
+  Monte-Carlo design analysis (~7 min, ~570 DP-based fits), out of scope for the smoke baseline; it is
+  covered by the 3 deterministic fit_survival/survival_choice_prob tests in test_choice_models.py.
+- DESIGN TAKEAWAY for the (no-longer-needed) pre-registration / any wet follow-up: two budgets suffice
+  to REFUTE fixed-utility, but to MEASURE R (and so to confirm the energy-budget reversal quantitatively)
+  use a reserve gradient of >=5 deprivation levels at ~60+ trials/cell. Completes exp058's 2.2
+  discrimination by construction; the empirical win over curved-utility EU still needs Caraco & Chasin
+  1984 (unavailable) or this design run on an animal.

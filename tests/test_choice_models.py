@@ -68,3 +68,34 @@ def test_fit_recovers_and_aic_counts_params():
     fit = cm.fit_model("eu", trials)
     assert set(fit["params"]) == {"a", "c", "beta"}
     assert np.isclose(fit["aic"], 2 * fit["n_params"] + 2 * fit["negloglik"])
+
+
+def test_survival_choice_prob_reverses_with_budget():
+    """The fittable survival model predicts opposite skew preferences at a low vs high reserve."""
+    A, B = skewed_outcomes(0.05, 0.03, 0.9), skewed_outcomes(0.05, 0.03, -0.9)
+    R = 0.48
+    p_low = cm.survival_choice_prob(A, B, 0.6 * R, R, beta=400.0, n_egrid=401)
+    p_high = cm.survival_choice_prob(A, B, 1.0 * R, R, beta=400.0, n_egrid=401)
+    assert p_low < 0.5 < p_high                         # -skew preferred when lean, +skew when safe
+
+
+def test_fit_survival_recovers_R_and_beats_fixed_utility():
+    """On survival-generated, reserve-tagged choice across TWO budgets, fit_survival recovers R and
+    wins on AIC over budget-invariant EU/PT (which cannot express the budget-dependent reversal)."""
+    rng = np.random.default_rng(0)
+    day, night, m_day = 14, 16, 0.03
+    R_true = 0.48
+    reserves = [0.6 * R_true, 1.05 * R_true]            # one budget below R, one above
+    trials = []
+    for s in (0.3, 0.6, 0.9):
+        A, B = skewed_outcomes(0.05, 0.03, s), skewed_outcomes(0.05, 0.03, -s)
+        for res in reserves:
+            p = cm.survival_choice_prob(A, B, res, R_true, beta=500.0, day_steps=day,
+                                        night_steps=night, m_day=m_day, n_egrid=401)
+            trials.append({"A": A, "B": B, "reserve": res, "n": 120,
+                           "k": int(rng.binomial(120, p))})
+    surv = cm.fit_survival(trials, n_egrid=401)
+    assert abs(surv["params"]["R"] - R_true) < 0.06     # requirement recovered
+    eu = cm.fit_model("eu", trials)
+    pt = cm.fit_model("pt", trials)
+    assert surv["aic"] < eu["aic"] and surv["aic"] < pt["aic"]

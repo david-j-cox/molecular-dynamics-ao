@@ -172,6 +172,85 @@ def compare_models(trials, names=("ev", "mv", "eu", "pt"), **kw) -> list[dict]:
     return fits
 
 
+def _gamble_key(g, nd: int = 6):
+    """A hashable, float-rounded key for a gamble (used to memoize DP solves within a fit)."""
+    return tuple((round(p, nd), round(x, nd)) for p, x in g)
+
+
+def survival_choice_prob(A, B, reserve: float, R: float, beta: float = 8.0, day_steps: int = 14,
+                         night_steps: int = 16, m_day: float = 0.03, n_egrid: int = 321) -> float:
+    """P(choose A over B) for a survival-DP forager at a given reserve, with requirement ``R``.
+
+    Unlike the static models, the survival forager's value depends on the energy budget: ``A`` is
+    scored as the 'safe' slot and ``B`` as the 'risky' slot, and the requirement ``R`` is set
+    through the overnight burn (``m_night = R / night_steps``) so it is independent of the daytime
+    metabolism ``m_day``. Choice is a logistic on the survival advantage ``q_A - q_B`` interpolated
+    at ``reserve`` (midday slice). Because the advantage changes sign across ``R``, this one model
+    predicts opposite skew preferences at a low vs high reserve -- the budget dependence the static
+    models structurally cannot express (they have no ``reserve`` input).
+    """
+    res = survival_dp(A, B, day_steps, night_steps, m_day, n_egrid=n_egrid,
+                      metabolism_night=R / night_steps)
+    e = res["energy"]
+    adv = res["q_safe"][day_steps // 2] - res["q_risky"][day_steps // 2]
+    a = float(np.interp(np.clip(reserve, e[0], e[-1]), e, adv))
+    return float(_sigmoid(beta * a))
+
+
+_SURV_BOUNDS = {"R": (0.05, 0.85), "beta": (1.0, 5000.0)}
+_SURV_INIT = {"R": 0.40, "beta": 200.0}
+
+
+def _survival_nll(x, trials, day_steps, night_steps, m_day, n_egrid) -> float:
+    """Negative log-likelihood of (R, beta) over reserve-tagged choice trials.
+
+    Solves the DP once per (R, gamble-pair) and reuses it across every trial/reserve sharing that
+    pair, so doubling the budgets does not double the DP cost.
+    """
+    R, beta = float(x[0]), float(x[1])
+    m_night = R / night_steps
+    t = day_steps // 2
+    cache: dict = {}
+    ll = 0.0
+    for tr in trials:
+        gk = (_gamble_key(tr["A"]), _gamble_key(tr["B"]))
+        if gk not in cache:
+            res = survival_dp(tr["A"], tr["B"], day_steps, night_steps, m_day, n_egrid=n_egrid,
+                              metabolism_night=m_night)
+            cache[gk] = (res["energy"], res["q_safe"][t] - res["q_risky"][t])
+        e, adv = cache[gk]
+        a = float(np.interp(np.clip(tr["reserve"], e[0], e[-1]), e, adv))
+        p = min(max(_sigmoid(beta * a), 1e-9), 1 - 1e-9)
+        ll += tr["k"] * np.log(p) + (tr["n"] - tr["k"]) * np.log(1 - p)
+    return -ll
+
+
+def fit_survival(trials, restarts: int = 3, seed: int = 0, day_steps: int = 14,
+                 night_steps: int = 16, m_day: float = 0.03, n_egrid: int = 321) -> dict:
+    """Maximum-likelihood fit of the survival-DP model to reserve-tagged choice trials.
+
+    ``trials`` is a list of ``{A, B, reserve, k, n}`` (``k`` of ``n`` choices were of ``A`` at the
+    energy ``reserve``). Free parameters are the requirement ``R`` and the choice temperature
+    ``beta``; the day/night structure and daytime metabolism are fixed by the design. Returns the
+    same ``{name, params, negloglik, aic, n_params}`` shape as :func:`fit_model` so it slots into a
+    cross-model comparison.
+    """
+    rng = np.random.default_rng(seed)
+    bounds = [_SURV_BOUNDS["R"], _SURV_BOUNDS["beta"]]
+    best = None
+    for r in range(restarts):
+        x0 = ([_SURV_INIT["R"], _SURV_INIT["beta"]] if r == 0
+              else [rng.uniform(*bounds[0]), rng.uniform(50.0, 1500.0)])
+        res = minimize(_survival_nll, x0,
+                       args=(trials, day_steps, night_steps, m_day, n_egrid),
+                       method="L-BFGS-B", bounds=bounds)
+        if best is None or res.fun < best.fun:
+            best = res
+    k = 2
+    return {"name": "survival", "params": {"R": float(best.x[0]), "beta": float(best.x[1])},
+            "negloglik": float(best.fun), "aic": float(2 * k + 2 * best.fun), "n_params": k}
+
+
 def crossval_loglik(name: str, trials, k_folds: int = 5, seed: int = 0, **kw) -> float:
     """Mean held-out per-trial log-likelihood under k-fold cross-validation (higher = better)."""
     rng = np.random.default_rng(seed)
