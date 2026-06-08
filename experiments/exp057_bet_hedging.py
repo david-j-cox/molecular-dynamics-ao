@@ -49,11 +49,25 @@ DAY, NIGHT, METAB, NDAYS = 12, 4, 0.025, 24
 THETAS = np.linspace(0.0, 1.0, 11)
 
 
-def geom_opt_theta(rho: float, bad: float, seed: int = 5) -> float:
-    """Geometric-mean-optimal constant threshold at (rho, bad_scale)."""
-    g = [bethedge_fitness(SAFE, RISKY, DAY, NIGHT, METAB, th, n_days=NDAYS, rho=rho,
-                          bad_scale=bad, seed=seed)["geom"] for th in THETAS]
-    return float(THETAS[int(np.argmax(g))])
+SEEDS = (5, 6, 7)   # seed-average so the phase diagram / flip is robust, not a single-seed argmax
+
+
+def avg_fitness(rho: float, bad: float) -> tuple[np.ndarray, np.ndarray]:
+    """Geometric and arithmetic fitness over THETAS at (rho, bad_scale), averaged across SEEDS."""
+    geom = np.zeros(THETAS.size)
+    arith = np.zeros(THETAS.size)
+    for sd in SEEDS:
+        fits = [bethedge_fitness(SAFE, RISKY, DAY, NIGHT, METAB, th, n_days=NDAYS, rho=rho,
+                                 bad_scale=bad, n_seasons=80, seed=sd) for th in THETAS]
+        geom += np.array([f["geom"] for f in fits])
+        arith += np.array([f["arith"] for f in fits])
+    return geom / len(SEEDS), arith / len(SEEDS)
+
+
+def geom_opt_theta(rho: float, bad: float) -> float:
+    """Geometric-mean-optimal constant threshold at (rho, bad_scale), seed-averaged."""
+    geom, _ = avg_fitness(rho, bad)
+    return float(THETAS[int(np.argmax(geom))])
 
 
 def main() -> None:
@@ -76,10 +90,9 @@ def main() -> None:
     rho_line = np.linspace(0.50, 0.96, 9)
     geom_line, arith_line, evolved_line = [], [], []
     for rho in rho_line:
-        gv = [bethedge_fitness(SAFE, RISKY, DAY, NIGHT, METAB, th, n_days=NDAYS, rho=rho,
-                               bad_scale=bad_mid, seed=5) for th in THETAS]
-        geom_line.append(THETAS[int(np.argmax([x["geom"] for x in gv]))])
-        arith_line.append(THETAS[int(np.argmax([x["arith"] for x in gv]))])
+        geom, arith = avg_fitness(rho, bad_mid)
+        geom_line.append(THETAS[int(np.argmax(geom))])
+        arith_line.append(THETAS[int(np.argmax(arith))])
         evolved_line.append(evolve_bethedge(SAFE, RISKY, DAY, NIGHT, METAB, n_days=NDAYS, rho=rho,
                                              bad_scale=bad_mid, n_generations=120, seed=0)
                             ["evolved_theta"])

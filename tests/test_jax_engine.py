@@ -101,3 +101,19 @@ def test_jax_effort_and_fatigue_match_numpy():
     jax_effort = float(np.clip(np.asarray(act)[:, idx], 0.0, None).sum())
     ref_effort = float(sum(max(0.0, act[0, k]) for k in idx))
     assert abs(jax_effort - ref_effort) < TOL
+
+
+def test_build_spec_rejects_unsupported_config():
+    """build_spec raises on config the JAX engine does not implement (rather than silently running
+    the default model in disguise); supported defaults build fine."""
+    import pytest as _pytest
+
+    from behavioral_md.config import SimulationConfig
+
+    jax_engine.build_spec(config=SimulationConfig())                      # defaults: OK
+    jax_engine.build_spec(config=SimulationConfig(integrator="leaky"))    # supported: OK
+    for bad in (dict(consequence_model="subtractive"), dict(learning_model="dual_exc_inhib"),
+                dict(credit_assignment="rw_competitive"), dict(emission="argmax"),
+                dict(day_night=True)):
+        with _pytest.raises(ValueError, match="jax_engine"):
+            jax_engine.build_spec(config=SimulationConfig(**bad))

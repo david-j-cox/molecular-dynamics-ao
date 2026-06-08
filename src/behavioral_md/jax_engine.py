@@ -61,8 +61,34 @@ class ModelSpec(NamedTuple):
     approach_food_idx: int        # atom index of approach_food (cue drive target)
 
 
+# Config the JAX engine reproduces; other values of these switches are NumPy-only and would be
+# silently ignored, so build_spec rejects them rather than running a different model in disguise.
+_SUPPORTED = {"consequence_model": "delta_energy", "credit_assignment": "rw_independent",
+              "learning_model": "rescorla_wagner", "emission": "softmax"}
+
+
+def _check_supported_config(config: SimulationConfig) -> None:
+    bad = [f"{k}={getattr(config, k)!r} (only {v!r})" for k, v in _SUPPORTED.items()
+           if getattr(config, k) != v]
+    if config.day_night:
+        bad.append("day_night=True (the JAX engine has no day/night light cycle)")
+    if bad:
+        raise ValueError(
+            "jax_engine reproduces only the default delta_energy / rw_independent / "
+            "rescorla_wagner / softmax / no-day_night organism; got unsupported: " + "; ".join(bad)
+            + ". Use the NumPy Organism for these, or extend jax_engine."
+        )
+
+
 def build_spec(atoms=None, config: SimulationConfig | None = None) -> ModelSpec:
-    """Pack a NumPy atom list (default: `default_atom_set`) into a :class:`ModelSpec`."""
+    """Pack a NumPy atom list (default: `default_atom_set`) into a :class:`ModelSpec`.
+
+    Raises ``ValueError`` if ``config`` selects a model variant the JAX engine does not implement
+    (a non-default consequence/credit/learning/emission rule, or day/night) -- those are NumPy-only,
+    and silently ignoring them would run a different model than requested.
+    """
+    if config is not None:
+        _check_supported_config(config)
     atoms = atoms if atoms is not None else default_atom_set()
     a = len(atoms)
     c = len(STIMULI)

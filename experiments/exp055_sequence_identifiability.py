@@ -114,13 +114,18 @@ def main() -> None:
     # --- B. recovery across a grid of true R (x2 beta), sequence vs aggregate -------------------
     R_truth = np.array([0.36, 0.42, 0.48, 0.54])
     betas = [8.0, 16.0]
+    seeds_b = (100, 200, 300)   # average each cell over seeds so the recovery is not single-seed
     rec = {"seq": {b: [] for b in betas}, "agg": {b: [] for b in betas}}
     for b in betas:
         for j, Rt in enumerate(R_truth):
-            d = rc.simulate_choice_sequences(TRUE["m_day"], float(Rt), b,
-                                             n_org=N_ORG, n_cycles=N_CYCLES, seed=100 + j)
-            rec["seq"][b].append(rc.fit_sequence(d)["R"])
-            rec["agg"][b].append(rc.fit_aggregate(d)["R"])
+            seq_r, agg_r = [], []
+            for s0 in seeds_b:
+                d = rc.simulate_choice_sequences(TRUE["m_day"], float(Rt), b,
+                                                 n_org=N_ORG, n_cycles=N_CYCLES, seed=s0 + j)
+                seq_r.append(rc.fit_sequence(d)["R"])
+                agg_r.append(rc.fit_aggregate(d)["R"])
+            rec["seq"][b].append(float(np.mean(seq_r)))
+            rec["agg"][b].append(float(np.mean(agg_r)))
     seq_all_t = np.concatenate([R_truth for _ in betas])
     seq_all_r = np.concatenate([rec["seq"][b] for b in betas])
     agg_all_r = np.concatenate([rec["agg"][b] for b in betas])
