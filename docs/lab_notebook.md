@@ -2647,15 +2647,18 @@ not extended.
   approach before it is unambiguously anticipatory). All of it lives in gridworld._build_observation
   + the food-intake gate; the organism's existing cue_field (drive on approach_food + eligibility-
   gated RW learn at food contact) does the rest. reproduce 37/37 byte-identical; +2 env tests.
-- RESULT (exp064, NumPy gridworld, 160 lives x 2 conditions, small arena, midday feeding window
-  phase [0.4,0.6]): PAIRED (window fixed at midday every life, so L predicts food) develops a
-  conditioned approach drive sharply time-locked to the feeding window, rising THROUGH the pre-window
-  (anticipation index pre-window-minus-off = +0.289) with learned weights peaking at the high-light
-  (midday) receptors (+0.886). The explicitly-UNPAIRED control (window re-randomized each day across
-  the full light range, so L predicts nothing) stays flat (anticipation -0.004, weights +0.495,
-  unstructured). So anticipation EMERGES from learning history over the sensed light cue, only when
-  the cue actually predicts food -- temporal stimulus control, derived, no hidden state. Figure
-  exp064_food_anticipation.png (A within-day profile, B emergence over lives, C learned weights vs L).
+- RESULT (exp064, NumPy gridworld, 16 INDEPENDENT agents x 2 conditions, 90 lives each, small arena,
+  midday feeding window phase [0.4,0.6]): PAIRED (window fixed at midday every life, so L predicts
+  food) develops a conditioned approach drive time-locked to the feeding window, rising THROUGH the
+  pre-window, with learned weights peaking at the high-light (midday) receptors. Across the fleet the
+  late anticipation index (pre-window-minus-off) = +0.212 +/- 0.069 (95% CI, n=16; EXCLUDES 0). The
+  explicitly-UNPAIRED control (window re-randomized each day across the full light range, so L
+  predicts nothing) = +0.058 +/- 0.172 (95% CI; INCLUDES 0 = no reliable anticipation), with flat,
+  unstructured weights. So anticipation EMERGES from learning history over the sensed light cue, and
+  the effect is robust across independent agents, only when the cue actually predicts food -- temporal
+  stimulus control, derived, no hidden state. Figure exp064_food_anticipation.png shows mean +/- 95%
+  CI bands over the 16 agents (A within-day profile, B emergence over lives, C learned weights vs L;
+  panel C, weights peaking at the feeding-time light only in paired, is the cleanest discriminator).
 - THREE DESIGN CORRECTIONS recorded (each a real finding, not just tuning): (1) the unpaired control
   must span the FULL light range -- an early control that drew feeding windows only from the bright
   half left "bright = food" intact and produced a spurious anticipation signal in the control; (2)

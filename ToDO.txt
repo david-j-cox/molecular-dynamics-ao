@@ -32,10 +32,11 @@ SINGLE-ORGANISM FINAL STATE -- DEFINITION OF DONE (TO SETTLE, NOT A STATUS CLAIM
 [x] LAST SINGLE-ORGANISM BUILD -- temporal stimulus control / food anticipation (exp064). DONE
     2026-06-08. New opt-in config (byte-identical off): `temporal_cue` feeds the sun L(t) as the
     learnable cue value; `food_phase_window` time-locks food so it APPEARS at a feeding time. The
-    EXISTING RW cue receptors do the rest (organism untouched). RESULT: paired (L predicts food)
-    develops a conditioned approach time-locked to the feeding window, rising through the pre-window
-    (anticipation index +0.289, weights peak at high light +0.886); the explicitly-unpaired control
-    (window randomized across the full light range) stays flat (-0.004). Anticipation EMERGES from
+    EXISTING RW cue receptors do the rest (organism untouched). RESULT (16 independent agents/cond):
+    paired (L predicts food) develops a conditioned approach time-locked to the feeding window, rising
+    through the pre-window; late anticipation index +0.212 +/- 0.069 (95% CI, EXCLUDES 0), weights
+    peak at high light. Explicitly-unpaired control (window randomized across the full light range)
+    +0.058 +/- 0.172 (INCLUDES 0 = no reliable anticipation), flat weights. Anticipation EMERGES from
     learning over the sensed light cue, no hidden drive, no imposed clock. Caveat: L(t) is symmetric
     about noon, so this conditions on light LEVEL; a directed circadian phase signal is a separate
     thread. reproduce 37/37 byte-identical, +2 env tests.
