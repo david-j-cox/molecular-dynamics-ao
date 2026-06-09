@@ -87,6 +87,9 @@ class BehavioralFieldEnv(gym.Env):
         # Scalar context signal (A/B environments). Surfaced in the observation and
         # used by the dual learning rule to make inhibition context-specific (renewal).
         self.context = context
+        # Time-locked food window (exp064); per-life overridable via reset options so a
+        # control condition can randomize it. None = food available at all phases.
+        self.food_phase_window = self.config.food_phase_window
 
         self.grid_size = self.config.grid_size
         self.sensor_range = self.config.sensor_range
@@ -150,6 +153,8 @@ class BehavioralFieldEnv(gym.Env):
             self.cue_value = float(options["cue_value"])
         if "context" in options:
             self.context = float(options["context"])
+        if "food_phase_window" in options:
+            self.food_phase_window = options["food_phase_window"]
 
         rng = self.np_random
         g = self.grid_size
@@ -204,7 +209,7 @@ class BehavioralFieldEnv(gym.Env):
         in_range = (self.food_present
                     and self._distance(self.position, self.food_pos) <= self.consume_radius)
         food_intake = 0.0
-        if in_range and self.food_reinforces:
+        if in_range and self.food_reinforces and self._food_phase_open():
             food_intake = min(cfg.food_intake_rate, self.food_biomass - cfg.food_min_biomass)
             food_intake = max(0.0, food_intake)
             self.food_biomass -= food_intake
@@ -285,6 +290,20 @@ class BehavioralFieldEnv(gym.Env):
         dist = self._distance(self.position, target)
         return float(np.exp(-dist / self.sensor_range))
 
+    def _day_phase(self) -> float:
+        """Phase of the day in [0, 1): 0 = midnight, 0.5 = noon."""
+        return (self.t % self.config.steps_per_day) / self.config.steps_per_day
+
+    def _food_phase_open(self) -> bool:
+        """Whether food reinforces at the current phase (time-locked food window, exp064).
+
+        ``None`` window = always open (byte-identical to the un-windowed world).
+        """
+        w = self.food_phase_window
+        if w is None:
+            return True
+        return w[0] <= self._day_phase() < w[1]
+
     def _light_factors(self) -> tuple[float, float, float]:
         """(ambient light L, danger-detectability factor, food visibility/growth factor).
 
@@ -309,9 +328,22 @@ class BehavioralFieldEnv(gym.Env):
         # When food is absent there is no food signal/contact at all (a food-free
         # interval), independent of the (renewable) biomass state.
         present = 1.0 if self.food_present else 0.0
+        # Time-locked food (exp064): outside the food window food is neither visible nor
+        # edible, so it APPEARS at a feeding time. Any approach before the window is then
+        # unambiguously anticipatory. 1.0 (no gating) when food_phase_window is None.
+        food_open = 1.0 if self._food_phase_open() else 0.0
         # Day/night perceptual gating: danger is harder to detect and food harder to see
         # at night (factors are 1.0 when day/night is off).
         light, danger_f, food_f = self._light_factors()
+        # Temporal stimulus control (exp064): the cue the organism conditions on IS the
+        # day phase, sensed as the ambient light L(t), present everywhere (intensity 1).
+        # Off => the usual spatial cue (value + distance falloff), byte-identical.
+        if self.config.temporal_cue:
+            cue_value = ambient_light(self.t, self.config.steps_per_day)
+            cue_intensity = 1.0
+        else:
+            cue_value = self.cue_value
+            cue_intensity = self._intensity(self.cue_pos)
         return {
             "position": self.position.astype(np.float32),
             "food_vector": self._unit_vector(self.food_pos),
@@ -319,7 +351,7 @@ class BehavioralFieldEnv(gym.Env):
             "light_vector": self._unit_vector(self.light_pos),
             "cue_vector": self._unit_vector(self.cue_pos),
             "food_intensity": np.array(
-                [self._intensity(self.food_pos) * biomass_frac * present * food_f],
+                [self._intensity(self.food_pos) * biomass_frac * present * food_f * food_open],
                 dtype=np.float32,
             ),
             "danger_intensity": np.array(
@@ -328,13 +360,14 @@ class BehavioralFieldEnv(gym.Env):
             "light_intensity": np.array(
                 [self._intensity(self.light_pos)], dtype=np.float32
             ),
-            "cue_intensity": np.array([self._intensity(self.cue_pos)], dtype=np.float32),
-            "cue_value": np.array([self.cue_value], dtype=np.float32),
+            "cue_intensity": np.array([cue_intensity], dtype=np.float32),
+            "cue_value": np.array([cue_value], dtype=np.float32),
             "context": np.array([self.context], dtype=np.float32),
             "ambient_light": np.array([light], dtype=np.float32),
             # Contact signal within consume_radius, scaled by remaining biomass.
             "food_contact": np.array(
-                [biomass_frac if (in_range and self.food_present) else 0.0], dtype=np.float32
+                [biomass_frac if (in_range and self.food_present and food_open) else 0.0],
+                dtype=np.float32,
             ),
             "last_consequence": np.array([self.last_consequence], dtype=np.float32),
         }

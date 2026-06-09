@@ -85,3 +85,46 @@ def test_day_night_grades_danger_detectability():
     # Detectability peaks at noon (L=1 -> raw) and is lowest at night (-> raw*floor).
     assert max(seen) > min(seen)
     assert max(seen) <= raw + 1e-6
+
+
+# --- temporal stimulus control: sun as a learnable cue + time-locked food (exp064) -------------
+
+def test_temporal_cue_feeds_ambient_light_as_cue():
+    """With temporal_cue on, the cue value the organism receives IS the sun L(t), at full presence;
+    off, it is the usual spatial cue (byte-identical), so behavior is unchanged by default."""
+    cfg = SimulationConfig(temporal_cue=True, steps_per_day=8)
+    env = BehavioralFieldEnv(cfg)
+    env.reset(seed=0, options={"layout": _LAY})
+    seen = []
+    for _ in range(8):
+        obs, *_ = env.step(0)
+        seen.append((float(obs["cue_value"][0]), float(obs["cue_intensity"][0])))
+    # cue_value tracks L(t) (peaks at noon), intensity is a constant 1.0 (ambient presence).
+    assert abs(seen[3][0] - ambient_light(4, 8)) < 1e-6 and abs(seen[3][0] - 1.0) < 1e-6
+    assert all(abs(it - 1.0) < 1e-9 for _v, it in seen)
+    # Off: cue value is the (static) spatial cue, not the light.
+    env_off = BehavioralFieldEnv(SimulationConfig(), cue_value=0.7)
+    obs_off, _ = env_off.reset(seed=0, options={"layout": _LAY})
+    assert abs(float(obs_off["cue_value"][0]) - 0.7) < 1e-6
+
+
+def test_food_phase_window_time_locks_food():
+    """A food_phase_window makes food appear (visible + edible) only within the phase window; with
+    no window food is available at every phase (byte-identical)."""
+    cfg = SimulationConfig(steps_per_day=8, food_phase_window=(0.4, 0.6))
+    env = BehavioralFieldEnv(cfg)
+    env.reset(seed=0, options={"layout": {"position": [4, 8], "food": [4, 8], "danger": [0, 0],
+                                          "light": [0, 0], "cue": [0, 0]}})
+    intakes = []
+    for _ in range(8):
+        obs, _r, _te, _tr, info = env.step(0)        # sit on the food cell
+        intakes.append(info["food_intake"])
+    # Food reinforces only while the pre-step phase i/8 is in [0.4, 0.6) -- i.e. at noon (i=4).
+    expected_open = [0.4 <= (i / 8) < 0.6 for i in range(8)]
+    assert any(intakes) and not all(i > 0 for i in intakes)
+    assert all((intake > 0) == op for intake, op in zip(intakes, expected_open, strict=True))
+    # No window => food available every step (the un-gated default).
+    env2 = BehavioralFieldEnv(SimulationConfig(steps_per_day=8))
+    env2.reset(seed=0, options={"layout": {"position": [4, 8], "food": [4, 8], "danger": [0, 0],
+                                           "light": [0, 0], "cue": [0, 0]}})
+    assert all(env2.step(0)[4]["food_intake"] > 0 for _ in range(8))

@@ -3,6 +3,62 @@ BEHAVIORAL MOLECULAR DYNAMICS ENGINE -- OUTSTANDING WORK
 Status legend:  [ ] todo   [~] partial/in-progress   [x] done
 Newest planning context: docs/lab_notebook.md (running record).
 
+SINGLE-ORGANISM FINAL STATE -- DEFINITION OF DONE (TO SETTLE, NOT A STATUS CLAIM)
+--------------------------------------------------------------------------------
+[ ] OPEN QUESTION: decide what "the single organism is done" MEANS before expanding to groups.
+    This is the rubric to settle, NOT a claim that we are there now. First draft of the candidate
+    dimensions (to refine / argue / cut):
+    - REPERTOIRE COVERAGE: the canonical individual-level phenomena reproduced from ONE unmodified
+      substrate (atoms / forces / Verlet / energy / learning), with no phenomenon-specific
+      machinery. Reproduced so far: acquisition, extinction, resurgence, generalization + peak
+      shift, discrimination, blocking / overshadowing, behavioral contrast (+ anticipatory),
+      matching / concurrent schedules, punishment asymmetry, risk sensitivity (energy-budget rule
+      DERIVED), bet-hedging, temperance, patch-leaving / MVT, behavioral momentum, CPG rhythm,
+      hierarchical muscle->response->operant, temporal stimulus control / anticipation (exp064).
+    - MECHANISTIC INTEGRITY: every phenomenon EMERGES, nothing imposed; each structural component
+      shown load-bearing (exp060 2nd-order term, exp048 integrator ablation). Residual: the
+      InjuryHealing stub in consequence.py.
+    - IDENTIFIABILITY: parameters recover from behavior; the model is falsifiable / inspectable
+      (exp055/056, recovery.py).
+    - CLOSURE: open single-organism tech debt closed; engine defaults fixed + documented; reproduce
+      baseline green; one figure/notebook mapping the whole repertoire to the shared substrate (the
+      "it is all one mechanism" artifact).
+    - HOMEOSTATIC AGENT: behavior organized around survival (energy in/out, hard death boundary),
+      not reward maximization.
+    STILL TO DECIDE: is coverage a FIXED checklist or open-ended; what test certifies "emerges,
+    not imposed"; whether a single recovery + repertoire-map artifact is the bar, or more; who/what
+    signs off. Settle this first, THEN assess current state against it.
+
+[x] LAST SINGLE-ORGANISM BUILD -- temporal stimulus control / food anticipation (exp064). DONE
+    2026-06-08. New opt-in config (byte-identical off): `temporal_cue` feeds the sun L(t) as the
+    learnable cue value; `food_phase_window` time-locks food so it APPEARS at a feeding time. The
+    EXISTING RW cue receptors do the rest (organism untouched). RESULT: paired (L predicts food)
+    develops a conditioned approach time-locked to the feeding window, rising through the pre-window
+    (anticipation index +0.289, weights peak at high light +0.886); the explicitly-unpaired control
+    (window randomized across the full light range) stays flat (-0.004). Anticipation EMERGES from
+    learning over the sensed light cue, no hidden drive, no imposed clock. Caveat: L(t) is symmetric
+    about noon, so this conditions on light LEVEL; a directed circadian phase signal is a separate
+    thread. reproduce 37/37 byte-identical, +2 env tests.
+
+TOWARD GROUPS / SOCIAL DYNAMICS (next phase, after the single-organism final state)
+----------------------------------------------------------------------------------
+The same first-principles substrate scales to N organisms sharing one environment; behavior of one
+organism becomes (stimulus / consequence) environment for another. Candidate threads, build order
+TBD, each to EMERGE from the existing atoms/forces/energy, not be imposed:
+[ ] N organisms in one arena: shared depleting resources -> competition; the ideal-free / matching
+    link as a group-level regularity (reuses the matching + multi-patch foraging machinery).
+[ ] Predator-prey: predation is already a death source in survival_dp; promote the predator to an
+    organism so prey and predator policies co-adapt (the evolve_* tier already selects policies).
+[ ] Social learning: one organism's emitted behavior as a discriminative stimulus / model for
+    another (observation, local enhancement) -- no new learning rule, a new source of stimuli.
+[ ] METACONTINGENCIES (Glenn): interlocking behavioral contingencies (IBCs) whose AGGREGATE PRODUCT
+    is selected; the unit of analysis is the IBC + its product, not the individual organism.
+[ ] MACROCONTINGENCIES: the cumulative effect of many individuals' (non-interlocking) operant
+    behavior plus its social/cultural consequence.
+[ ] Cultural-level selection as a THIRD selection tier alongside operant learning and the
+    evolutionary tier already present (evolve_risk_policy / evolve_bethedge) -- the through-line:
+    one selection-by-consequences logic at three timescales.
+
 DONE (for reference)
 --------------------
 [x] Phase 1  package scaffold, SimulationConfig, BehavioralFieldEnv (Gymnasium)

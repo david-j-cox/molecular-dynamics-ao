@@ -2630,3 +2630,43 @@ survival account apart from curved-utility EU and prospect theory, and with how 
   use a reserve gradient of >=5 deprivation levels at ~60+ trials/cell. Completes exp058's 2.2
   discrimination by construction; the empirical win over curved-utility EU still needs Caraco & Chasin
   1984 (unavailable) or this design run on an animal.
+
+---
+
+## 2026-06-08 -- exp064: temporal stimulus control, food anticipation from learning (not a clock)
+
+Closed the one open single-organism coverage item (ToDO.txt DEFINITION OF DONE): anticipation. Built
+NOT by adding an internal hunger drive or an imposed clock (both rejected in discussion as ungrounded
+latents), but by letting the organism learn that an OBSERVABLE cue it already senses -- the day/night
+sun L(t) -- predicts food, using the EXISTING Rescorla-Wagner cue receptors. The mechanism is reused,
+not extended.
+- WIRING (minimal, organism UNTOUCHED): two opt-in config flags, both byte-identical when off.
+  `temporal_cue` makes the gridworld feed the ambient light L(t) as the scalar cue value (at full
+  presence, intensity 1) instead of the spatial cue; `food_phase_window=(start,end)` makes food
+  visible AND edible only within a phase-of-day window, so food APPEARS at a feeding time (any
+  approach before it is unambiguously anticipatory). All of it lives in gridworld._build_observation
+  + the food-intake gate; the organism's existing cue_field (drive on approach_food + eligibility-
+  gated RW learn at food contact) does the rest. reproduce 37/37 byte-identical; +2 env tests.
+- RESULT (exp064, NumPy gridworld, 160 lives x 2 conditions, small arena, midday feeding window
+  phase [0.4,0.6]): PAIRED (window fixed at midday every life, so L predicts food) develops a
+  conditioned approach drive sharply time-locked to the feeding window, rising THROUGH the pre-window
+  (anticipation index pre-window-minus-off = +0.289) with learned weights peaking at the high-light
+  (midday) receptors (+0.886). The explicitly-UNPAIRED control (window re-randomized each day across
+  the full light range, so L predicts nothing) stays flat (anticipation -0.004, weights +0.495,
+  unstructured). So anticipation EMERGES from learning history over the sensed light cue, only when
+  the cue actually predicts food -- temporal stimulus control, derived, no hidden state. Figure
+  exp064_food_anticipation.png (A within-day profile, B emergence over lives, C learned weights vs L).
+- THREE DESIGN CORRECTIONS recorded (each a real finding, not just tuning): (1) the unpaired control
+  must span the FULL light range -- an early control that drew feeding windows only from the bright
+  half left "bright = food" intact and produced a spurious anticipation signal in the control; (2)
+  the readout must be drive-at-phase MINUS drive-at-an-off-time, because the cue weights carry a broad
+  positive offset that the raw pre-window level confounds; (3) broadening generalization to reach the
+  pre-window (cue_generalization_beta 6->3) DESTABILIZED the shared-error RW into the weight clip
+  (-5.0) at the demo learning rate -- kept the default beta=6 (the noon association still reaches the
+  immediate rising limb) and measured anticipation there. Demo amplifiers: cue_learning_rate 0.02->
+  0.01 and a benign energy economy so lives run full length; engine defaults untouched.
+- CAVEAT (recorded in the script): L(t) is symmetric about noon, so the organism conditions on light
+  LEVEL, not a directed clock; anticipation here is the rising-light limb driving approach before the
+  window. Distinguishing anticipation from post-window perseveration would need a monotonic phase
+  signal (an internal circadian oscillator) -- a separate thread; this demo deliberately uses only the
+  sensed light. With this, the single-organism repertoire coverage item for temporal control is met.

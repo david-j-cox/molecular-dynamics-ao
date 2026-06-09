@@ -329,6 +329,23 @@ class SimulationConfig(BaseModel):
         description="Night floor on food visibility AND regrowth (scale by floor+(1-floor)*L).",
     )
 
+    # --- Temporal stimulus control / food anticipation (exp064) ------------
+    # Opt-in: feed the day/night sun L(t) (the sensed ambient light) to the organism
+    # as the learnable scalar CUE value (with full presence, intensity = 1), so the
+    # existing Rescorla-Wagner cue receptors can associate time-of-day with food. With
+    # this off the cue is the usual spatial cue and behavior is byte-identical. Combine
+    # with food_phase_window to make food time-locked, giving the organism a feeding
+    # time to anticipate; anticipatory approach then EMERGES from learning history over
+    # the light cue (no internal clock, no hunger variable).
+    temporal_cue: bool = Field(
+        False, description="Feed ambient light L(t) as the learnable cue value (cue intensity=1)."
+    )
+    food_phase_window: tuple[float, float] | None = Field(
+        None,
+        description="Phase-of-day window [start,end) in [0,1) within which food reinforces; "
+        "None = food available at all times (byte-identical).",
+    )
+
     # --- Rendering ---------------------------------------------------------
     render_mode: Literal["human", "rgb_array", "none"] = Field(
         "none", description="Gymnasium render mode."
