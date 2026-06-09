@@ -3,31 +3,29 @@ BEHAVIORAL MOLECULAR DYNAMICS ENGINE -- OUTSTANDING WORK
 Status legend:  [ ] todo   [~] partial/in-progress   [x] done
 Newest planning context: docs/lab_notebook.md (running record).
 
-SINGLE-ORGANISM FINAL STATE -- DEFINITION OF DONE (TO SETTLE, NOT A STATUS CLAIM)
---------------------------------------------------------------------------------
-[ ] OPEN QUESTION: decide what "the single organism is done" MEANS before expanding to groups.
-    This is the rubric to settle, NOT a claim that we are there now. First draft of the candidate
-    dimensions (to refine / argue / cut):
-    - REPERTOIRE COVERAGE: the canonical individual-level phenomena reproduced from ONE unmodified
-      substrate (atoms / forces / Verlet / energy / learning), with no phenomenon-specific
-      machinery. Reproduced so far: acquisition, extinction, resurgence, generalization + peak
-      shift, discrimination, blocking / overshadowing, behavioral contrast (+ anticipatory),
-      matching / concurrent schedules, punishment asymmetry, risk sensitivity (energy-budget rule
-      DERIVED), bet-hedging, temperance, patch-leaving / MVT, behavioral momentum, CPG rhythm,
-      hierarchical muscle->response->operant, temporal stimulus control / anticipation (exp064).
-    - MECHANISTIC INTEGRITY: every phenomenon EMERGES, nothing imposed; each structural component
-      shown load-bearing (exp060 2nd-order term, exp048 integrator ablation). Residual: the
-      InjuryHealing stub in consequence.py.
-    - IDENTIFIABILITY: parameters recover from behavior; the model is falsifiable / inspectable
-      (exp055/056, recovery.py).
-    - CLOSURE: open single-organism tech debt closed; engine defaults fixed + documented; reproduce
-      baseline green; one figure/notebook mapping the whole repertoire to the shared substrate (the
-      "it is all one mechanism" artifact).
-    - HOMEOSTATIC AGENT: behavior organized around survival (energy in/out, hard death boundary),
-      not reward maximization.
-    STILL TO DECIDE: is coverage a FIXED checklist or open-ended; what test certifies "emerges,
-    not imposed"; whether a single recovery + repertoire-map artifact is the bar, or more; who/what
-    signs off. Settle this first, THEN assess current state against it.
+SINGLE-ORGANISM FINAL STATE -- DEFINITION OF DONE (SETTLED 2026-06-09)
+---------------------------------------------------------------------
+DONE = account for EVERY known behavioral process of operant and respondent conditioning, each
+demonstrated ON ITS OWN (fine-grained: escape vs signaled-avoidance vs Sidman as separate items),
+and -- the load-bearing bar -- each EMERGING from the one unmodified substrate (atoms / forces /
+Verlet / energy / RW credit-assignment). Hard-code a process-specific mechanism ONLY if forced, and
+flag every such case as a debt. Higher-order repertoires (stimulus equivalence, relational
+responding, verbal behavior) are OUT of scope for this milestone.
+[ ] FULL COVERAGE: the live tracker is docs/behavioral_process_coverage.md (process x status x
+    evidence x emergence). Current state: ~38 processes demonstrated, ~8 partial, ~30 gaps. Flip
+    [ ]->[x] as each is shown, preferring an EMERGENT demonstration.
+[ ] EMERGENCE AUDIT: several demonstrated rows lean on a process-specific term (renewal context,
+    contrast hunger/income terms, PREE Pearce-Hall, spontaneous-recovery decay, adjunctive CPG atom);
+    read each and decide -- legitimate substrate feature, or hard-coding to re-derive.
+[ ] CLOSURE: InjuryHealing stub in consequence.py; one figure/notebook mapping the whole repertoire
+    to the shared substrate (the "it is all one mechanism" artifact).
+BIGGEST GAP CLUSTERS (see the tracker): negative reinforcement quadrant (escape / avoidance /
+negative punishment); conditioned reinforcement + chaining + tokens; differential reinforcement
+(DRL/DRH/DRO/DRA); the Pavlovian return-of-fear family beyond ABA renewal (reinstatement, ABC/AAB,
+conditioned inhibition test, second-order, overexpectation, latent inhibition, sensory
+preconditioning, US devaluation); the Pavlovian-instrumental bridge (autoshaping, sign-tracking,
+PIT, two-process avoidance); misc operant (extinction burst, superstition, Premack, shaping a novel
+topography, self-control choice).
 
 [x] LAST SINGLE-ORGANISM BUILD -- temporal stimulus control / food anticipation (exp064). DONE
     2026-06-08. New opt-in config (byte-identical off): `temporal_cue` feeds the sun L(t) as the
